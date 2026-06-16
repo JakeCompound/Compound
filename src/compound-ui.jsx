@@ -345,6 +345,10 @@ function MultiChip({ active, onClick, children }) {
 // Numeric stepper — value left, − +  right; supports unit suffix
 function Stepper({ value, onChange, min = 0, max = 99, step = 1, unit, large = false }) {
   const fontSize = large ? 56 : 36;
+  // Round to the step's decimal precision so float math (0.1 + 0.1 + …) can't
+  // leak values like 89.19999999999999. decimals = 0 keeps integer steps integer.
+  const decimals = (String(step).split('.')[1] || '').length;
+  const round = (n) => +n.toFixed(decimals);
   return (
     <div
       style={{
@@ -385,8 +389,8 @@ function Stepper({ value, onChange, min = 0, max = 99, step = 1, unit, large = f
         )}
       </div>
       <div style={{ display: 'flex', gap: 8 }}>
-        <StepperBtn onClick={() => onChange(Math.max(min, value - step))} disabled={value <= min}>−</StepperBtn>
-        <StepperBtn onClick={() => onChange(Math.min(max, value + step))} disabled={value >= max}>+</StepperBtn>
+        <StepperBtn onClick={() => onChange(round(Math.max(min, value - step)))} disabled={value <= min}>−</StepperBtn>
+        <StepperBtn onClick={() => onChange(round(Math.min(max, value + step)))} disabled={value >= max}>+</StepperBtn>
       </div>
     </div>
   );

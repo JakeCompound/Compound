@@ -675,6 +675,9 @@ function ScreenGratitudeBuilder({ data, set, ctx, onNext, onBack }) {
       sub={null}
       footer={<FooterNav onBack={onBack} onNext={onNext} nextDisabled={!ready} nextLabel={nextLabel} />}
     >
+      <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      {/* Fixed pickers — stay put so adding items never shoves them down */}
+      <div style={{ flexShrink: 0 }}>
       {/* Progress strip */}
       <div style={{ marginBottom: 16 }}>
         <div
@@ -823,33 +826,6 @@ function ScreenGratitudeBuilder({ data, set, ctx, onNext, onBack }) {
         </button>
       </div>
 
-      {/* Selected items for this category */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {byCat(activeCat).map((g) => (
-          <div
-            key={g.id}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 10,
-              padding: '10px 12px',
-              background: C.surf1,
-              border: `1px solid ${C.line}`,
-              borderRadius: 10,
-            }}
-          >
-            <div style={{ width: 4, height: 16, background: C.accent, borderRadius: 2 }} />
-            <span style={{ flex: 1, fontFamily: 'Outfit, sans-serif', fontSize: 14, color: C.text }}>{g.text}</span>
-            <button
-              onClick={() => remove(g.id)}
-              style={{ background: 'transparent', border: 0, color: C.textLow, cursor: 'pointer', padding: 4 }}
-            >
-              <svg width="12" height="12" viewBox="0 0 12 12"><path d="M2 2 L10 10 M10 2 L2 10" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
-            </button>
-          </div>
-        ))}
-      </div>
-
       {/* Suggestions — stay visible; tap to add as many as apply. Used ones drop off. */}
       {(() => {
         const usedTexts = new Set(byCat(activeCat).map((g) => g.text.toLowerCase()));
@@ -889,6 +865,36 @@ function ScreenGratitudeBuilder({ data, set, ctx, onNext, onBack }) {
           </div>
         );
       })()}
+      </div>
+
+      {/* Chosen items — the only scrolling region; capped so the pickers above stay fixed */}
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', marginTop: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {byCat(activeCat).map((g) => (
+          <div
+            key={g.id}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              padding: '10px 12px',
+              background: C.surf1,
+              border: `1px solid ${C.line}`,
+              borderRadius: 10,
+              flexShrink: 0,
+            }}
+          >
+            <div style={{ width: 4, height: 16, background: C.accent, borderRadius: 2 }} />
+            <span style={{ flex: 1, fontFamily: 'Outfit, sans-serif', fontSize: 14, color: C.text }}>{g.text}</span>
+            <button
+              onClick={() => remove(g.id)}
+              style={{ background: 'transparent', border: 0, color: C.textLow, cursor: 'pointer', padding: 4 }}
+            >
+              <svg width="12" height="12" viewBox="0 0 12 12"><path d="M2 2 L10 10 M10 2 L2 10" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
+            </button>
+          </div>
+        ))}
+      </div>
+      </div>
     </FormShell>
   );
 }

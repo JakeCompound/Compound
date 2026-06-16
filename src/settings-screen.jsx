@@ -229,7 +229,7 @@ function SettingsRow({ icon, label, hint, onClick, badge, value }) {
           )}
         </div>
         {hint && (
-          <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9.5, color: C.textLow, letterSpacing: 1, marginTop: 2 }}>
+          <div style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12, color: C.textMid, lineHeight: 1.4, marginTop: 3 }}>
             {hint}
           </div>
         )}

@@ -77,7 +77,7 @@ function WorkoutHome({ onNav, hasInProgress, user = {} }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <SecondaryCard
             label="WEEKLY PLAN"
-            sub="3-day split · suggested for this week"
+            sub={`${target}-day split · suggested for this week`}
             icon={<IconCal />}
             onClick={() => onNav('plan')}
           />

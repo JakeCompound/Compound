@@ -309,6 +309,13 @@ const DEMO_HEATMAP = {
 // Weekly plan suggestion (matches user's training days)
 function makeWeeklyPlan(trainingDays) {
   const splits = {
+    1: [
+      { day: 'WED', label: 'Full Body', focus: 'Full-body compounds', est: 60 },
+    ],
+    2: [
+      { day: 'MON', label: 'Upper', focus: 'Chest · Back · Shoulders · Arms', est: 55 },
+      { day: 'THU', label: 'Lower', focus: 'Quads · Hams · Glutes · Core', est: 55 },
+    ],
     3: [
       { day: 'MON', label: 'Push', focus: 'Chest · Shoulders · Triceps', est: 45 },
       { day: 'WED', label: 'Pull', focus: 'Back · Biceps', est: 45 },
@@ -326,6 +333,23 @@ function makeWeeklyPlan(trainingDays) {
       { day: 'WED', label: 'Legs',  focus: 'Quad focus', est: 50 },
       { day: 'FRI', label: 'Shldr', focus: 'Shoulders · Arms', est: 40 },
       { day: 'SAT', label: 'Legs',  focus: 'Hinge · Core', est: 50 },
+    ],
+    6: [
+      { day: 'MON', label: 'Push', focus: 'Chest · Shoulders · Triceps', est: 45 },
+      { day: 'TUE', label: 'Pull', focus: 'Back · Biceps', est: 45 },
+      { day: 'WED', label: 'Legs', focus: 'Quads · Hams · Glutes', est: 50 },
+      { day: 'THU', label: 'Push', focus: 'Shoulders · Chest · Triceps', est: 45 },
+      { day: 'FRI', label: 'Pull', focus: 'Back · Rear delts · Biceps', est: 45 },
+      { day: 'SAT', label: 'Legs', focus: 'Hinge · Quads · Core', est: 50 },
+    ],
+    7: [
+      { day: 'MON', label: 'Push', focus: 'Chest · Shoulders · Triceps', est: 45 },
+      { day: 'TUE', label: 'Pull', focus: 'Back · Biceps', est: 45 },
+      { day: 'WED', label: 'Legs', focus: 'Quads · Hams · Glutes', est: 50 },
+      { day: 'THU', label: 'Push', focus: 'Shoulders · Chest · Triceps', est: 45 },
+      { day: 'FRI', label: 'Pull', focus: 'Back · Rear delts · Biceps', est: 45 },
+      { day: 'SAT', label: 'Legs', focus: 'Hinge · Quads · Core', est: 50 },
+      { day: 'SUN', label: 'Mobility', focus: 'Core · Conditioning · Mobility', est: 30 },
     ],
   };
   const days = splits[trainingDays] || splits[3];

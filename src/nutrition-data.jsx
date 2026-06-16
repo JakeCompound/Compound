@@ -1,16 +1,23 @@
 // nutrition-data.jsx — Targets calculator (rippedbody replica), stores, day totals.
 
-// ── rippedbody-style calorie + macro calculator ───────────────────────────
+// ── Calorie + macro calculator ─────────────────────────────────────────────
 // BMR: Mifflin-St Jeor (no BF) or Katch-McArdle (BF known).
-// Activity ×BMR → TDEE. Cut = deficit from weekly %; Bulk = monthly % surplus +50%.
+// TDEE is built additively from real inputs — a moderate maintenance base + step
+// NEAT + training burn — replacing the old ×activity-multiplier model, which
+// over-estimated. Cut = deficit from weekly %; Gain = monthly % surplus +50%.
 // Protein: USER OVERRIDE — 0.6 g/lb bodyweight (editable). Fat from preference; carbs fill.
-const ACTIVITY = {
-  sedentary:   { mult: 1.25, label: 'Sedentary', sub: '<5k steps/day' },
-  mostly:      { mult: 1.45, label: 'Mostly sedentary + lifting', sub: '<5k steps + strength' },
-  light:       { mult: 1.65, label: 'Lightly active + lifting', sub: '5–10k steps + strength' },
-  active:      { mult: 1.85, label: 'Active + lifting', sub: '10–15k steps + strength' },
-  veryactive:  { mult: 2.05, label: 'Highly active + lifting', sub: '15k+ steps + strength' },
-};
+//
+// MODERATE dials — deliberately mid-range (between a lean estimate and the old
+// generous ×1.65). The plateau loop does the real calibrating, so the start just
+// needs to be sane and sustainable. Kept as named constants to tune after real use.
+const MAINTENANCE_MULT = 1.30;     // RMR + TEF + daily living, ×BMR
+const STEPS_KCAL_FACTOR = 0.00045; // NEAT per step, bodyweight-scaled
+const LIFTING_MET = 6;             // METs for resistance training
+
+// Defaults for the activity inputs (a typical day, not a goal).
+const DEFAULT_STEPS = 7000;
+const DEFAULT_SESSIONS = 3;
+const DEFAULT_MINUTES = 45;
 
 const GOALS = {
   cut:     { label: 'Cut', sub: 'Lose fat, slow & steady' },
@@ -50,8 +57,15 @@ function calcTargets(input) {
   if (input.inDeficit) bmr *= 0.95;
   if (input.weightReduced) bmr *= 0.97;
 
-  const mult = (ACTIVITY[input.activity] || ACTIVITY.light).mult;
-  const tdee = bmr * mult;
+  // Additive TDEE: moderate maintenance base + step-driven NEAT + training burn.
+  const steps = input.steps ?? DEFAULT_STEPS;
+  const sessions = input.sessions ?? DEFAULT_SESSIONS;
+  const minutes = input.minutes ?? DEFAULT_MINUTES;
+  const maintenanceBase = bmr * MAINTENANCE_MULT;
+  const stepsKcal = steps * wKg * STEPS_KCAL_FACTOR;
+  // 3.5 ml O₂/kg/min baseline; /200 → kcal/min; /7 spreads the week's training over the week.
+  const trainingKcalPerDay = (sessions * minutes * (LIFTING_MET * 3.5 * wKg / 200)) / 7;
+  const tdee = maintenanceBase + stepsKcal + trainingKcalPerDay;
 
   let calories = tdee;
   if (input.goal === 'cut') {
@@ -79,7 +93,7 @@ function calcTargets(input) {
   return {
     bmr: Math.round(bmr), tdee: Math.round(tdee), calories,
     protein, fat, carbs,
-    proteinPerLb, activity: input.activity, goal: input.goal, rate: input.rate,
+    proteinPerLb, steps, sessions, minutes, goal: input.goal, rate: input.rate,
   };
 }
 
@@ -161,11 +175,11 @@ function setNipsToday(n, date) {
 }
 
 Object.assign(window, {
-  ACTIVITY, GOALS, CUT_RATES, GAIN_RATES, calcTargets,
+  GOALS, CUT_RATES, GAIN_RATES, calcTargets,
   loadTargets, saveTargets, loadFood, saveFood, foodForDay, addFood, updateFood, removeFood,
   dayTotals, openMealQuestions, todayKey: todayKey,
   loadNipsToday, setNipsToday,
   loadAlcoholKcal, setAlcoholKcal, addAlcoholKcal,
 });
 
-export { ACTIVITY, ALC_KCAL_KEY, CUT_RATES, FOOD_KEY, GAIN_RATES, GOALS, KCAL_PER_LB, LB_PER_KG, NIPS_KEY, TARGETS_KEY, addAlcoholKcal, addFood, calcTargets, dayTotals, foodForDay, loadAlcoholKcal, loadFood, loadNipsToday, loadTargets, openMealQuestions, removeFood, saveFood, saveTargets, setAlcoholKcal, setNipsToday, todayKey, updateFood };
+export { ALC_KCAL_KEY, CUT_RATES, DEFAULT_MINUTES, DEFAULT_SESSIONS, DEFAULT_STEPS, FOOD_KEY, GAIN_RATES, GOALS, KCAL_PER_LB, LB_PER_KG, LIFTING_MET, MAINTENANCE_MULT, NIPS_KEY, STEPS_KCAL_FACTOR, TARGETS_KEY, addAlcoholKcal, addFood, calcTargets, dayTotals, foodForDay, loadAlcoholKcal, loadFood, loadNipsToday, loadTargets, openMealQuestions, removeFood, saveFood, saveTargets, setAlcoholKcal, setNipsToday, todayKey, updateFood };

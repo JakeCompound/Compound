@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>COMPOUND — Tier B: The Real App</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@300;400;500;600&display=swap" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  :root {
+    --bg: #070709; --bg2: #0d0d11; --ink: #F2F1EC;
+    --amber: #F2A30F; --dim: rgba(242,241,236,.52); --faint: rgba(242,241,236,.30);
+    --line: rgba(242,241,236,.10); --green: #5AC57E; --red: #E5564B;
+  }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); font-family: 'Outfit', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  body { background: radial-gradient(120% 70% at 50% -10%, rgba(242,163,15,.10), transparent 60%), var(--bg); min-height: 100vh; }
+  .wrap { max-width: 820px; margin: 0 auto; padding: 56px 28px 100px; }
+
+  .eyebrow { font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 3px; color: var(--amber); text-transform: uppercase; margin: 0 0 14px; }
+  h1 { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: clamp(40px, 9vw, 72px); line-height: .92; text-transform: uppercase; margin: 0 0 12px; }
+  h1 .b { color: var(--amber); }
+  .lede { font-size: 17px; line-height: 1.55; color: var(--dim); max-width: 60ch; margin: 0 0 8px; }
+  .lede strong { color: var(--ink); font-weight: 600; }
+  .rule { height: 1px; background: var(--line); border: 0; margin: 44px 0; }
+
+  h2.sec { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 14px; letter-spacing: 3px; text-transform: uppercase; color: var(--faint); margin: 0 0 22px; }
+
+  .stack { display: grid; gap: 14px; }
+  .row { display: grid; grid-template-columns: 150px 1fr; gap: 22px; align-items: start; background: linear-gradient(180deg, var(--bg2), #08080b); border: 1px solid var(--line); border-radius: 16px; padding: 20px 22px; }
+  .row .k { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 21px; letter-spacing: .4px; text-transform: uppercase; }
+  .row .k .tool { display: block; font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 1px; color: var(--amber); margin-top: 4px; text-transform: none; }
+  .row .v { font-size: 15.5px; line-height: 1.6; color: var(--dim); }
+  .row .v strong { color: var(--ink); font-weight: 600; }
+  .free { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--bg); background: var(--green); border-radius: 5px; padding: 3px 7px; font-weight: 700; }
+  .paid { background: var(--amber); }
+
+  .phase { display: grid; grid-template-columns: 48px 1fr; gap: 18px; margin: 0 0 26px; align-items: start; }
+  .pn { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 17px; color: var(--amber); border: 1px solid rgba(242,163,15,.35); border-radius: 10px; width: 40px; height: 40px; display: grid; place-items: center; }
+  .phase h3 { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 23px; letter-spacing: .4px; text-transform: uppercase; margin: 6px 0 8px; }
+  .phase p { font-size: 15.5px; line-height: 1.6; color: var(--dim); margin: 0; }
+  .phase p strong { color: var(--ink); font-weight: 600; }
+  .who { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; margin-top: 7px; display: inline-block; }
+  .who.me { color: var(--green); }
+  .who.you { color: var(--amber); }
+
+  .card { background: linear-gradient(180deg, var(--bg2), #08080b); border: 1px solid var(--line); border-radius: 18px; padding: 26px; }
+  .card.amber { border-color: rgba(242,163,15,.28); background: linear-gradient(180deg, rgba(242,163,15,.06), #08080b); }
+  .card h2 { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 22px; letter-spacing: .5px; text-transform: uppercase; margin: 0 0 14px; }
+  ul.clean { list-style: none; margin: 0; padding: 0; }
+  ul.clean li { font-size: 15.5px; line-height: 1.55; color: var(--dim); padding: 0 0 11px 22px; position: relative; }
+  ul.clean li::before { content: ""; position: absolute; left: 2px; top: 8px; width: 6px; height: 6px; border-radius: 50%; background: var(--amber); }
+  ul.clean li strong { color: var(--ink); font-weight: 600; }
+  .foot { font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 1.5px; color: var(--faint); text-transform: uppercase; text-align: center; margin-top: 56px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="eyebrow">Tier B · The Real App</p>
+  <h1>From prototype<br/>to <span class="b">a real app.</span></h1>
+  <p class="lede">The plan to turn COMPOUND into a true installed app with <strong>cloud backup, sync across devices, working AI, and real notifications</strong> — built on free tiers, owned by you, version-controlled in GitHub.</p>
+
+  <hr class="rule" />
+
+  <h2 class="sec">The Stack — my recommendation</h2>
+  <div class="stack">
+    <div class="row">
+      <div class="k">Code Home<span class="tool">GitHub</span></div>
+      <div class="v">Your repo — the single source of truth. Every change is tracked, and Claude Code works directly against it. <span class="free">Free</span></div>
+    </div>
+    <div class="row">
+      <div class="k">Backend<span class="tool">Supabase</span></div>
+      <div class="v"><strong>Your data vault.</strong> A real cloud database (Postgres) + accounts + live sync. Replaces localStorage so your history is safe and follows you to any device. <span class="free">Free tier</span></div>
+    </div>
+    <div class="row">
+      <div class="k">Hosting<span class="tool">Vercel</span></div>
+      <div class="v">Serves the app + auto-deploys every time you push to GitHub. Also runs a tiny secure function that talks to the AI (so your key is never exposed). <span class="free">Free tier</span></div>
+    </div>
+    <div class="row">
+      <div class="k">The AI<span class="tool">Anthropic API</span></div>
+      <div class="v"><strong>Revives every AI feature</strong> — food-photo estimates, Quick-Log, Ask chat, workout generation, insights. Pay-as-you-go, typically a few cents a day for one person. <span class="free paid">~Cents/day</span></div>
+    </div>
+  </div>
+
+  <hr class="rule" />
+
+  <h2 class="sec">The Build — four phases</h2>
+
+  <div class="phase">
+    <div class="pn">1</div>
+    <div>
+      <h3>Get it into GitHub</h3>
+      <p>Push the whole working app to your repo and convert it from "rebuilds-on-every-load" into a fast, pre-built app that loads instantly on your phone.</p>
+      <span class="who me">› I do this</span>
+    </div>
+  </div>
+  <div class="phase">
+    <div class="pn">2</div>
+    <div>
+      <h3>Swap localStorage → cloud</h3>
+      <p>I refactor the data layer so everything you log writes to <strong>Supabase</strong> instead of just the phone. Add a simple sign-in so your data is yours and syncs everywhere. <strong>Nothing about how the app feels changes</strong> — same screens, durable data underneath.</p>
+      <span class="who me">› I architect &amp; wire the code</span> &nbsp; <span class="who you">› You create the free Supabase project</span>
+    </div>
+  </div>
+  <div class="phase">
+    <div class="pn">3</div>
+    <div>
+      <h3>Revive the AI — securely</h3>
+      <p>Point the app's AI calls at a small server function holding your Anthropic key (never shipped to the phone). Every smart feature comes back to life.</p>
+      <span class="who me">› I build the proxy + wiring</span> &nbsp; <span class="who you">› You add one API key</span>
+    </div>
+  </div>
+  <div class="phase">
+    <div class="pn">4</div>
+    <div>
+      <h3>Deploy + real notifications</h3>
+      <p>Connect the repo to <strong>Vercel</strong> — it auto-publishes. Install the PWA on your S24, then layer in real push reminders (weigh-in, check-in, workout days).</p>
+      <span class="who me">› I prep config + runbook</span> &nbsp; <span class="who you">› You click deploy (with Claude Code)</span>
+    </div>
+  </div>
+
+  <hr class="rule" />
+
+  <div class="card amber">
+    <h2>The honest division of labour</h2>
+    <ul class="clean">
+      <li><strong>I do:</strong> all the code — repo prep, the cloud data layer, sign-in, the secure AI proxy, notifications, deploy config, and a step-by-step runbook Claude Code follows.</li>
+      <li><strong>You do (with Claude Code):</strong> create the free Supabase + Vercel accounts, paste in one Anthropic API key, and run the deploy. Maybe 30–45 minutes of guided clicking, no coding knowledge needed.</li>
+      <li><strong>Cost:</strong> $0 to host and store. The only spend is AI usage — pennies a day for one person, and you set a hard cap.</li>
+    </ul>
+  </div>
+
+  <p class="foot">COMPOUND · Consistency over perfection</p>
+</div>
+</body>
+</html>

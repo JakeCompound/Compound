@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+  <title>COMPOUND</title>
+
+  <!-- PWA / Add to Home Screen -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="COMPOUND" />
+  <meta name="theme-color" content="#070709" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@300;400;500;600&display=swap" />
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: #050507; color: #F2F1EC; font-family: 'Outfit', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+    #root { min-height: 100vh; }
+
+    /* hide scrollbar on inner content while keeping scroll */
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.08); border-radius: 2px; }
+
+    /* avoid blue tap highlight on Android */
+    button { -webkit-tap-highlight-color: transparent; }
+
+    /* number input cleanup */
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type="number"] { -moz-appearance: textfield; }
+
+    /* show side meta only on wider viewports */
+    @media (min-width: 980px) {
+      .side-meta { display: block !important; }
+    }
+
+    /* placeholder color */
+    input::placeholder { color: rgba(242,241,236,.28); }
+  </style>
+</head>
+<body>
+  <template id="__bundler_thumbnail">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+      <rect width="100" height="100" fill="#070709"/>
+      <circle cx="50" cy="42" r="22" fill="none" stroke="#F2A30F" stroke-width="3" stroke-dasharray="104 35" stroke-linecap="round" transform="rotate(120 50 42)"/>
+      <text x="50" y="48" font-family="monospace" font-size="16" font-weight="700" fill="#F2F1EC" text-anchor="middle">87</text>
+      <text x="50" y="82" font-family="monospace" font-size="7" letter-spacing="2" fill="#F2A30F" text-anchor="middle">COMPOUND</text>
+    </svg>
+  </template>
+  <div id="root"></div>
+
+  <script src="app-icon.js"></script>
+  <script>
+    // Set up Add-to-Home-Screen icon + manifest at runtime (self-contained)
+    (function () {
+      try {
+        if (window.COMPOUND_ICON_180) {
+          var apple = document.createElement('link');
+          apple.rel = 'apple-touch-icon';
+          apple.href = window.COMPOUND_ICON_180;
+          document.head.appendChild(apple);
+          var fav = document.createElement('link');
+          fav.rel = 'icon';
+          fav.href = window.COMPOUND_ICON_180;
+          document.head.appendChild(fav);
+        }
+        var manifest = {
+          name: 'COMPOUND',
+          short_name: 'COMPOUND',
+          description: 'Consistency over perfection. Life tracking & training.',
+          display: 'standalone',
+          orientation: 'portrait',
+          background_color: '#070709',
+          theme_color: '#070709',
+          start_url: '.',
+          icons: [
+            { src: window.COMPOUND_ICON_512, sizes: '512x512', type: 'image/png', purpose: 'any' },
+            { src: window.COMPOUND_ICON_512, sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+            { src: window.COMPOUND_ICON_180, sizes: '180x180', type: 'image/png' }
+          ]
+        };
+        var blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+        var link = document.createElement('link');
+        link.rel = 'manifest';
+        link.href = URL.createObjectURL(blob);
+        document.head.appendChild(link);
+      } catch (e) {}
+    })();
+  </script>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+  <script type="text/babel" src="tweaks-panel.jsx"></script>
+  <script type="text/babel" src="mobile-shell.jsx"></script>
+  <script type="text/babel" src="samsung-frame.jsx"></script>
+  <script type="text/babel" src="compound-ui.jsx"></script>
+  <script type="text/babel" src="onboarding-screens.jsx"></script>
+  <script type="text/babel" src="home-data.jsx"></script>
+  <script type="text/babel" src="live-state.jsx"></script>
+  <script type="text/babel" src="home-components.jsx"></script>
+  <script type="text/babel" src="three-rings.jsx"></script>
+  <script type="text/babel" src="todo-list.jsx"></script>
+  <script type="text/babel" src="home-screen.jsx"></script>
+  <script type="text/babel" src="checkin-modal.jsx"></script>
+  <script type="text/babel" src="workout-data.jsx"></script>
+  <script type="text/babel" src="workout-history.jsx"></script>
+  <script type="text/babel" src="workout-screens.jsx"></script>
+  <script type="text/babel" src="workout-session.jsx"></script>
+  <script type="text/babel" src="workout-dashboard.jsx"></script>
+  <script type="text/babel" src="workout-enhancements.jsx"></script>
+  <script type="text/babel" src="nutrition-data.jsx"></script>
+  <script type="text/babel" src="macro-calc-screen.jsx"></script>
+  <script type="text/babel" src="add-button.jsx"></script>
+  <script type="text/babel" src="nutrition-screen.jsx"></script>
+  <script type="text/babel" src="nutrition-tab.jsx"></script>
+  <script type="text/babel" src="reports-data.jsx"></script>
+  <script type="text/babel" src="reports-screen.jsx"></script>
+  <script type="text/babel" src="badges.jsx"></script>
+  <script type="text/babel" src="settings-screen.jsx"></script>
+  <script type="text/babel" src="home-extras.jsx"></script>
+  <script type="text/babel" src="quick-log.jsx"></script>
+  <script type="text/babel" src="body-progress.jsx"></script>
+  <script type="text/babel" src="app.jsx"></script>
+</body>
+</html>

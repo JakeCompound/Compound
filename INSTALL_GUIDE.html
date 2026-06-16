@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>COMPOUND — Get It On Your Phone</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@300;400;500;600&display=swap" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  :root {
+    --bg: #070709;
+    --bg2: #0d0d11;
+    --ink: #F2F1EC;
+    --amber: #F2A30F;
+    --dim: rgba(242,241,236,.52);
+    --faint: rgba(242,241,236,.30);
+    --line: rgba(242,241,236,.10);
+    --green: #5AC57E;
+  }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); font-family: 'Outfit', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  body { background:
+    radial-gradient(120% 80% at 50% -10%, rgba(242,163,15,.10), transparent 60%),
+    var(--bg);
+    min-height: 100vh; }
+  .wrap { max-width: 780px; margin: 0 auto; padding: 56px 28px 96px; }
+
+  .eyebrow { font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 3px; color: var(--amber); text-transform: uppercase; margin: 0 0 14px; }
+  h1 { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: clamp(40px, 9vw, 72px); line-height: .92; letter-spacing: .5px; text-transform: uppercase; margin: 0 0 8px; }
+  h1 .b { color: var(--amber); }
+  .lede { font-size: 17px; line-height: 1.55; color: var(--dim); max-width: 56ch; margin: 0 0 8px; }
+  .lede strong { color: var(--ink); font-weight: 600; }
+
+  .rule { height: 1px; background: var(--line); border: 0; margin: 40px 0; }
+
+  .step { display: grid; grid-template-columns: 56px 1fr; gap: 20px; margin: 0 0 30px; align-items: start; }
+  .num { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 20px; color: var(--bg); background: var(--amber); width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; }
+  .step h3 { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 26px; letter-spacing: .4px; text-transform: uppercase; margin: 6px 0 8px; }
+  .step p { font-size: 16px; line-height: 1.6; color: var(--dim); margin: 0 0 8px; }
+  .step p strong { color: var(--ink); font-weight: 600; }
+
+  .path { font-family: 'JetBrains Mono', monospace; font-size: 13.5px; color: var(--amber); background: rgba(242,163,15,.08); border: 1px solid rgba(242,163,15,.22); border-radius: 8px; padding: 8px 12px; display: inline-block; margin: 4px 0; line-height: 1.5; }
+  .path .sep { color: var(--faint); margin: 0 7px; }
+
+  .card { background: linear-gradient(180deg, var(--bg2), #08080b); border: 1px solid var(--line); border-radius: 18px; padding: 26px 26px; margin: 0 0 14px; }
+  .card.amber { border-color: rgba(242,163,15,.28); background: linear-gradient(180deg, rgba(242,163,15,.06), #08080b); }
+  .card h2 { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 22px; letter-spacing: .5px; text-transform: uppercase; margin: 0 0 12px; }
+  .card p { font-size: 15.5px; line-height: 1.6; color: var(--dim); margin: 0 0 10px; }
+  .card p:last-child { margin-bottom: 0; }
+  .card strong { color: var(--ink); font-weight: 600; }
+
+  .tag { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--bg); background: var(--green); border-radius: 5px; padding: 3px 8px; font-weight: 700; vertical-align: middle; }
+  .tag.warn { background: var(--amber); }
+
+  ul.clean { list-style: none; margin: 0; padding: 0; }
+  ul.clean li { font-size: 15.5px; line-height: 1.55; color: var(--dim); padding: 0 0 9px 22px; position: relative; }
+  ul.clean li::before { content: ""; position: absolute; left: 2px; top: 9px; width: 6px; height: 6px; border-radius: 50%; background: var(--amber); }
+  ul.clean li strong { color: var(--ink); font-weight: 600; }
+
+  .foot { font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 1.5px; color: var(--faint); text-transform: uppercase; text-align: center; margin-top: 56px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="eyebrow">Install Guide · Samsung Galaxy S24 Ultra</p>
+  <h1>Get COMPOUND<br/><span class="b">on your phone.</span></h1>
+  <p class="lede">A 10-minute, no-coding path to a real installable app on your home screen. <strong>Free, permanent, and yours.</strong> Do it once — then start the daily loop.</p>
+
+  <hr class="rule" />
+
+  <div class="step">
+    <div class="num">1</div>
+    <div>
+      <h3>Get the file</h3>
+      <p>Download <strong>COMPOUND.html</strong> (the download card is in our chat). It's a single self-contained file — the whole app in one. Save it somewhere you can find it, like your computer's Desktop or Downloads.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="num">2</div>
+    <div>
+      <h3>Host it free on Netlify Drop</h3>
+      <p>On a computer, go to <strong>app.netlify.com/drop</strong>. <strong>Drag the COMPOUND.html file onto the page.</strong> No account needed to start. In a few seconds it gives you a permanent web address (URL) like <span class="path">silver-otter-1234.netlify.app/COMPOUND.html</span></p>
+      <p>Copy that URL. (Tip: make a free Netlify account so the link stays live forever and you can drag-drop updated versions later.)</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="num">3</div>
+    <div>
+      <h3>Open it on your S24 Ultra</h3>
+      <p>Send yourself the URL however you like (text it to yourself, email, etc.). Open it in <strong>Chrome</strong> on your phone. The app loads full-screen.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="num">4</div>
+    <div>
+      <h3>Install to your home screen</h3>
+      <p>In Chrome, tap the <strong>⋮ menu</strong> (top-right) →</p>
+      <p><span class="path">⋮ Menu <span class="sep">›</span> Add to Home screen <span class="sep">›</span> Install</span></p>
+      <p>Chrome will offer <strong>"Install app"</strong> — choose that (not just "shortcut"). COMPOUND lands in your <strong>app drawer</strong> with its own icon and opens like a native app, no browser bar. <span class="tag">Done</span></p>
+    </div>
+  </div>
+
+  <hr class="rule" />
+
+  <div class="card amber">
+    <h2>Two honest heads-ups</h2>
+    <p><span class="tag warn">AI off for now</span> &nbsp;Food-photo calorie estimates, Quick-Log, "Ask COMPOUND" chat, AI workout generation and AI insights need a real AI service wired in — they'll be quiet on your phone until we build that. <strong>Everything else works:</strong> rings, to-do loop, check-ins, manual workouts &amp; logging, nutrition tracking, reports, badges.</p>
+    <p><span class="tag">Good news</span> &nbsp;Your S24 Ultra is the best-case device. Once <strong>installed</strong> (step 4), Android keeps your data safe — it won't get wiped like iPhones do after a week unused. It also works offline after the first load.</p>
+  </div>
+
+  <div class="card">
+    <h2>What "your data lives here" means</h2>
+    <ul class="clean">
+      <li>Everything you log is stored <strong>on this one phone</strong>. No cloud, no sync to other devices (yet).</li>
+      <li><strong>Don't "clear browsing data" for the installed app</strong> — that would erase your history. Normal use is totally safe.</li>
+      <li>When we build the real backend, your daily logging carries forward — nothing you do now is wasted.</li>
+    </ul>
+  </div>
+
+  <p class="foot">COMPOUND · Consistency over perfection</p>
+</div>
+</body>
+</html>

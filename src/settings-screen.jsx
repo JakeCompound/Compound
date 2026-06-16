@@ -247,50 +247,99 @@ function SettingsRow({ icon, label, hint, onClick, badge, value }) {
 }
 
 // ── Sub-pages ───────────────────────────────────────────────────────────
+// Sub-pages are read-only by default; tapping EDIT reveals the inputs, Done
+// (the same button) returns to read-only. Values still persist via set(...).
+function EditToggle({ editing, onToggle }) {
+  return (
+    <button
+      onClick={onToggle}
+      style={{ background: 'transparent', border: 0, color: C.accent, cursor: 'pointer',
+        fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 2, padding: 4 }}
+    >
+      {editing ? 'DONE' : 'EDIT'}
+    </button>
+  );
+}
+
+function ReadField({ label, value }) {
+  return (
+    <div>
+      <FieldLabel>{label}</FieldLabel>
+      <div style={{ fontFamily: 'Outfit, sans-serif', fontSize: 17, fontWeight: 500, color: C.text, marginTop: 6 }}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
 function SettingsProfileEdit({ user, set, onBack }) {
+  const [editing, setEditing] = React.useState(false);
+  const age = window.computeAge ? window.computeAge(user.dob) : null;
   return (
     <div style={{ height: '100%', background: C.bg, display: 'flex', flexDirection: 'column' }}>
-      <SettingsHeader title="PROFILE" onBack={onBack} />
+      <SettingsHeader title="PROFILE" onBack={onBack} right={<EditToggle editing={editing} onToggle={() => setEditing((e) => !e)} />} />
       <div style={{ flex: 1, overflowY: 'auto', padding: '14px 22px 32px' }}>
-        <FieldLabel>Name</FieldLabel>
-        <TextInput value={user.name} onChange={(v) => set({ name: v })} placeholder="Your name" />
-        <div style={{ marginTop: 24 }}>
-          <FieldLabel>Date of birth</FieldLabel>
-          <div style={{ marginTop: 12 }}>
-            <DateWheel value={user.dob || '1992-04-15'} onChange={(v) => set({ dob: v })} />
+        {editing ? (
+          <>
+            <FieldLabel>Name</FieldLabel>
+            <TextInput value={user.name} onChange={(v) => set({ name: v })} placeholder="Your name" />
+            <div style={{ marginTop: 24 }}>
+              <FieldLabel>Date of birth</FieldLabel>
+              <div style={{ marginTop: 12 }}>
+                <DateWheel value={user.dob || '1992-04-15'} onChange={(v) => set({ dob: v })} />
+              </div>
+            </div>
+          </>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+            <ReadField label="Name" value={user.name || '—'} />
+            <ReadField label="Date of birth" value={user.dob ? `${user.dob}${age ? ` · ${age} yrs` : ''}` : '—'} />
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
 }
 
 function SettingsGoals({ user, set, onBack }) {
+  const [editing, setEditing] = React.useState(false);
   return (
     <div style={{ height: '100%', background: C.bg, display: 'flex', flexDirection: 'column' }}>
-      <SettingsHeader title="GOALS" onBack={onBack} />
+      <SettingsHeader title="GOALS" onBack={onBack} right={<EditToggle editing={editing} onToggle={() => setEditing((e) => !e)} />} />
       <div style={{ flex: 1, overflowY: 'auto', padding: '14px 22px 32px' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-          <div>
-            <FieldLabel>Current weight</FieldLabel>
-            <Stepper value={user.weight} onChange={(v) => set({ weight: v })} min={30} max={250} step={0.5} unit="kg" />
-          </div>
-          <div>
-            <FieldLabel>Goal weight</FieldLabel>
-            <Stepper value={user.weightGoal} onChange={(v) => set({ weightGoal: v })} min={30} max={250} step={0.5} unit="kg" />
-          </div>
-          <div>
-            <FieldLabel>Training days / week</FieldLabel>
-            <Stepper value={user.trainingDays} onChange={(v) => set({ trainingDays: v })} min={1} max={7} unit="days" />
-          </div>
-          <div>
-            <FieldLabel>Step goal</FieldLabel>
-            <Stepper value={user.stepGoal} onChange={(v) => set({ stepGoal: v })} min={1000} max={30000} step={500} unit="steps" />
-          </div>
-          <div>
-            <FieldLabel>Sleep goal</FieldLabel>
-            <Stepper value={user.sleepGoal} onChange={(v) => set({ sleepGoal: v })} min={4} max={12} step={0.5} unit="hours" />
-          </div>
+          {editing ? (
+            <>
+              <div>
+                <FieldLabel>Current weight</FieldLabel>
+                <Stepper value={user.weight} onChange={(v) => set({ weight: v })} min={30} max={250} step={0.5} unit="kg" />
+              </div>
+              <div>
+                <FieldLabel>Goal weight</FieldLabel>
+                <Stepper value={user.weightGoal} onChange={(v) => set({ weightGoal: v })} min={30} max={250} step={0.5} unit="kg" />
+              </div>
+              <div>
+                <FieldLabel>Training days / week</FieldLabel>
+                <Stepper value={user.trainingDays} onChange={(v) => set({ trainingDays: v })} min={1} max={7} unit="days" />
+              </div>
+              <div>
+                <FieldLabel>Step goal</FieldLabel>
+                <Stepper value={user.stepGoal} onChange={(v) => set({ stepGoal: v })} min={1000} max={30000} step={500} unit="steps" />
+              </div>
+              <div>
+                <FieldLabel>Sleep goal</FieldLabel>
+                <Stepper value={user.sleepGoal} onChange={(v) => set({ sleepGoal: v })} min={4} max={12} step={0.5} unit="hours" />
+              </div>
+            </>
+          ) : (
+            <>
+              <ReadField label="Current weight" value={`${user.weight} kg`} />
+              <ReadField label="Goal weight" value={`${user.weightGoal} kg`} />
+              <ReadField label="Training days / week" value={`${user.trainingDays || 3} days`} />
+              <ReadField label="Step goal" value={`${user.stepGoal} steps`} />
+              <ReadField label="Sleep goal" value={`${user.sleepGoal} hours`} />
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -298,37 +347,52 @@ function SettingsGoals({ user, set, onBack }) {
 }
 
 function SettingsReminders({ user, set, onBack }) {
+  const [editing, setEditing] = React.useState(false);
   return (
     <div style={{ height: '100%', background: C.bg, display: 'flex', flexDirection: 'column' }}>
-      <SettingsHeader title="REMINDERS" onBack={onBack} />
+      <SettingsHeader title="REMINDERS" onBack={onBack} right={<EditToggle editing={editing} onToggle={() => setEditing((e) => !e)} />} />
       <div style={{ flex: 1, overflowY: 'auto', padding: '14px 22px 32px' }}>
-        <FieldLabel>Nightly check-in</FieldLabel>
-        <div style={{ marginTop: 12 }}>
-          <TimeWheel value={user.checkInTime} onChange={(v) => set({ checkInTime: v })} />
-        </div>
-        <div style={{ marginTop: 24 }}>
-          <FieldLabel>Friday weigh-in window</FieldLabel>
-          <div style={{ marginTop: 12 }}>
-            <TimeWheel value={user.weighInTime} onChange={(v) => set({ weighInTime: v })} hourMin={5} hourMax={7} />
+        {editing ? (
+          <>
+            <FieldLabel>Nightly check-in</FieldLabel>
+            <div style={{ marginTop: 12 }}>
+              <TimeWheel value={user.checkInTime} onChange={(v) => set({ checkInTime: v })} />
+            </div>
+            <div style={{ marginTop: 24 }}>
+              <FieldLabel>Friday weigh-in window</FieldLabel>
+              <div style={{ marginTop: 12 }}>
+                <TimeWheel value={user.weighInTime} onChange={(v) => set({ weighInTime: v })} hourMin={5} hourMax={7} />
+              </div>
+            </div>
+          </>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+            <ReadField label="Nightly check-in" value={user.checkInTime || '—'} />
+            <ReadField label="Friday weigh-in window" value={user.weighInTime || '—'} />
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
 }
 
 function SettingsEquipment({ user, set, onBack }) {
+  const [editing, setEditing] = React.useState(false);
   return (
     <div style={{ height: '100%', background: C.bg, display: 'flex', flexDirection: 'column' }}>
-      <SettingsHeader title="EQUIPMENT" onBack={onBack} />
+      <SettingsHeader title="EQUIPMENT" onBack={onBack} right={<EditToggle editing={editing} onToggle={() => setEditing((e) => !e)} />} />
       <div style={{ flex: 1, overflowY: 'auto', padding: '14px 22px 32px' }}>
         <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 13.5, color: C.textMid, margin: '0 0 18px', lineHeight: 1.5 }}>
           Where you train determines what exercises the AI programs.
         </p>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <SelectCard active={user.equipment === 'home'} onClick={() => set({ equipment: 'home' })} title="AT HOME" subtitle="Bodyweight only" meta="BW" />
-          <SelectCard active={user.equipment === 'gym'} onClick={() => set({ equipment: 'gym' })} title="GYM / GARAGE" subtitle="Reeplex PRO90 + dumbbells ≤ 35kg" meta="FULL" />
-        </div>
+        {editing ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <SelectCard active={user.equipment === 'home'} onClick={() => set({ equipment: 'home' })} title="AT HOME" subtitle="Bodyweight only" meta="BW" />
+            <SelectCard active={user.equipment === 'gym'} onClick={() => set({ equipment: 'gym' })} title="GYM / GARAGE" subtitle="Reeplex PRO90 + dumbbells ≤ 35kg" meta="FULL" />
+          </div>
+        ) : (
+          <ReadField label="Training location" value={user.equipment === 'home' ? 'At home · bodyweight only' : 'Gym / garage · Reeplex PRO90 + dumbbells ≤ 35kg'} />
+        )}
       </div>
     </div>
   );
@@ -558,18 +622,25 @@ function IconStar() {
 
 function SettingsNipLimit({ onBack }) {
   const [v, setV] = React.useState(() => { try { return parseInt(localStorage.getItem('compound:nipLimit'), 10) || 55; } catch (e) { return 55; } });
+  const [editing, setEditing] = React.useState(false);
   const save = (n) => { setV(n); try { localStorage.setItem('compound:nipLimit', String(n)); } catch (e) {} };
   return (
     <div style={{ height: '100%', background: C.bg, display: 'flex', flexDirection: 'column' }}>
-      <SettingsHeader title="WEEKLY NIP LIMIT" onBack={onBack} />
+      <SettingsHeader title="WEEKLY NIP LIMIT" onBack={onBack} right={<EditToggle editing={editing} onToggle={() => setEditing((e) => !e)} />} />
       <div style={{ flex: 1, overflowY: 'auto', padding: '14px 22px 32px' }}>
         <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 13.5, color: C.textMid, margin: '0 0 18px', lineHeight: 1.5 }}>
           The cap the Weekly Nips ring tracks against. Set it here only — taper 5–10 at a time, no hero cuts. The ring goes red once you pass it.
         </p>
-        <FieldLabel>Nips per week</FieldLabel>
-        <div style={{ marginTop: 12 }}>
-          <Stepper value={v} onChange={save} min={0} max={150} step={1} unit="nips / week" large />
-        </div>
+        {editing ? (
+          <>
+            <FieldLabel>Nips per week</FieldLabel>
+            <div style={{ marginTop: 12 }}>
+              <Stepper value={v} onChange={save} min={0} max={150} step={1} unit="nips / week" large />
+            </div>
+          </>
+        ) : (
+          <ReadField label="Nips per week" value={`${v} nips / week`} />
+        )}
       </div>
     </div>
   );

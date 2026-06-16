@@ -23,6 +23,8 @@ pnpm-debug.log*
 
 # Claude Code local settings
 .claude/settings.local.json
+# Local launch config (contains machine-specific absolute paths)
+.claude/launch.json
 
 # Editor / OS
 .vscode/*

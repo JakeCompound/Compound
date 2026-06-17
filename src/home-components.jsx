@@ -1,5 +1,6 @@
 import React from 'react';
 import { C } from './compound-ui.jsx';
+import { isFirstWeekPostJoin } from './mid-week-join.js';
 
 // home-components.jsx — Visual building blocks for the Home tab
 // Life Score arc, radar chart, streak cards, week strip, etc.
@@ -422,7 +423,8 @@ function CheckinCard({ time, done, onOpen }) {
 // ── Workout-remaining urgency banner ──────────────────────────────────────
 function WorkoutBanner({ done, target, daysLeft }) {
   const remaining = Math.max(0, target - done);
-  const urgent = remaining > 0 && remaining >= daysLeft;
+  // Hold back the "tight margin" pressure during the mid-week-join grace period.
+  const urgent = !isFirstWeekPostJoin() && remaining > 0 && remaining >= daysLeft;
   const complete = remaining === 0;
 
   return (

@@ -5,6 +5,7 @@ import { computeLifeScore, getTodayCopy } from './home-data.jsx';
 import { BirthdayCard, ComebackCard, WeighInModal } from './home-extras.jsx';
 import { ThreeRings } from './three-rings.jsx';
 import { TodayTodos } from './todo-list.jsx';
+import { isFirstWeekPostJoin } from './mid-week-join.js';
 
 // home-screen.jsx — The Home tab — assembles all the components
 
@@ -93,6 +94,9 @@ function HomeScreen({ user, set, state, onOpenCheckin, onGoTo, onOpenSettings, o
         </button>
       </div>
 
+      {/* Mid-week join: gentle welcome during the partial first week */}
+      {isFirstWeekPostJoin() && <WelcomeBanner />}
+
       {/* Birthday takeover (above everything) */}
       {demoFlags?.birthday && (
         <div style={{ marginTop: 14 }}>
@@ -163,6 +167,43 @@ function HomeScreen({ user, set, state, onOpenCheckin, onGoTo, onOpenSettings, o
           onClose={() => setWeighOpen(false)}
         />
       )}
+    </div>
+  );
+}
+
+// Shown only during the partial week a user joins in. Sets expectations gently:
+// no pressure to "catch up", full weekly tracking begins Sunday. Dismissible.
+function WelcomeBanner() {
+  const [hidden, setHidden] = React.useState(() => {
+    try { return localStorage.getItem('compound:welcomeDismissed') === '1'; } catch (e) { return false; }
+  });
+  if (hidden) return null;
+  const dismiss = () => { try { localStorage.setItem('compound:welcomeDismissed', '1'); } catch (e) {} setHidden(true); };
+  return (
+    <div
+      style={{
+        marginTop: 14, padding: '14px 16px', borderRadius: 14,
+        background: C.accentSoft, border: `1px solid ${C.accentDim}`,
+        display: 'flex', alignItems: 'flex-start', gap: 12,
+      }}
+    >
+      <span style={{ fontSize: 20, lineHeight: 1 }}>👋</span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, letterSpacing: 1.6, color: C.accent, marginBottom: 3 }}>WELCOME TO COMPOUND</div>
+        <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 17, letterSpacing: 0.4, color: C.text, textTransform: 'uppercase', lineHeight: 1.1 }}>
+          You're in — ease into it
+        </div>
+        <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: C.textMid, lineHeight: 1.45, margin: '4px 0 0' }}>
+          You joined mid-week, so there's nothing to catch up on. Log what you can, build the habit — <span style={{ color: C.accent }}>full weekly tracking kicks in Sunday.</span>
+        </p>
+      </div>
+      <button
+        onClick={dismiss}
+        aria-label="Dismiss"
+        style={{ background: 'transparent', border: 0, color: C.textLow, cursor: 'pointer', flexShrink: 0, padding: 2, lineHeight: 1 }}
+      >
+        <svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 3 L11 11 M11 3 L3 11" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
+      </button>
     </div>
   );
 }

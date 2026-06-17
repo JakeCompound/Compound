@@ -12,6 +12,7 @@ import { NutritionTab } from './nutrition-tab.jsx';
 import { ExitedScreen, SaveExitModal, Screen1RM, ScreenAge, ScreenCheckInTime, ScreenComplete, ScreenEquipment, ScreenFitnessLevel, ScreenGratitudeBuilder, ScreenGratitudeIntro, ScreenName, ScreenStepsSleep, ScreenTrackFood, ScreenTrainingDays, ScreenWeighInTime, ScreenWeight, ScreenWelcome } from './onboarding-screens.jsx';
 import { ReportsScreen } from './reports-screen.jsx';
 import { SettingsScreen } from './settings-screen.jsx';
+import { markJoined } from './mid-week-join.js';
 import { TweakButton, TweakColor, TweakRadio, TweakSection, TweakSelect, TweakToggle, TweaksPanel, useTweaks } from './tweaks-panel.jsx';
 import { PastWorkouts, WeeklyPlan, WorkoutDashboard } from './workout-dashboard.jsx';
 import { SavedWorkoutsScreen } from './workout-enhancements.jsx';
@@ -242,6 +243,7 @@ function App() {
 
   // ── Finish onboarding handler ────────────────────────────────────────────
   const finishOnboarding = () => {
+    markJoined(); // record join date (once) for the mid-week-join grace period
     setView('app');
     setTab('home');
   };

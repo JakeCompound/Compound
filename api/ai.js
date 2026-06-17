@@ -8,10 +8,11 @@
 import Anthropic from '@anthropic-ai/sdk';
 
 // Public values (the anon/publishable key is meant for the browser and already
-// ships in the client bundle) — hardcoded as a fallback so JWT verification
-// never depends on a specific Vercel env-var name reaching the function runtime.
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || 'https://jzlimmbllpbbovyvssfp.supabase.co';
-const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || 'sb_publishable_TJ3WQjGO5pAvz37WjnzRXA_gktZf6LE';
+// ships in the client bundle). Hardcoded on purpose: the Vercel env var copy of
+// the anon key contains a stray non-ASCII character (an em-dash) that makes it
+// invalid as an HTTP header value, so we use the known-good literal here instead.
+const SUPABASE_URL = 'https://jzlimmbllpbbovyvssfp.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_TJ3WQjGO5pAvz37WjnzRXA_gktZf6LE';
 // Sonnet 4.6: vision-capable, good cost/quality (matches the RUNBOOK's Sonnet
 // choice). Override with ANTHROPIC_MODEL if needed.
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
@@ -37,7 +38,7 @@ export default async function handler(req, res) {
     });
     if (!u.ok) return res.status(401).json({ error: 'Invalid session' });
   } catch (e) {
-    return res.status(401).json({ error: 'Auth check failed', detail: String(e && e.message || e), name: String(e && e.name) });
+    return res.status(401).json({ error: 'Auth check failed' });
   }
 
   // 2) Validate the content payload (text + base64 image blocks).

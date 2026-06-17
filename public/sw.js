@@ -8,6 +8,11 @@
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
 
+// No-op fetch handler. We don't cache anything yet, but its mere presence is
+// what makes Chrome offer "Install app" for the PWA. Letting it fall through
+// means the network handles every request normally.
+self.addEventListener('fetch', () => {});
+
 // A push arrived. Payload is JSON: { title, body, tag, url }.
 self.addEventListener('push', (event) => {
   let data = {};

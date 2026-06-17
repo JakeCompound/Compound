@@ -2,6 +2,7 @@ import React from 'react';
 import { C, DateWheel, FieldLabel, SelectCard, Stepper, TextInput, TimeWheel, computeAge } from './compound-ui.jsx';
 import { ScreenGratitudeBuilder } from './onboarding-screens.jsx';
 import { supabase, supabaseConfigured } from './supabase.js';
+import { pushSupported, notifPermission, isSubscribed, subscribePush, unsubscribePush } from './push.js';
 
 // settings-screen.jsx — Full settings, accessible via Home cog
 // Profile, goals, reminders, equipment, gratitude management, account, danger zone.
@@ -497,6 +498,91 @@ function SettingsGratitude({ user, set, onBack }) {
   );
 }
 
+// Master switch: turn Web Push on/off for THIS device. The per-type toggles
+// below it only matter once this is on.
+function PushDeviceCard() {
+  const [state, setState] = React.useState('loading'); // loading|unsupported|denied|off|on
+  const [busy, setBusy] = React.useState(false);
+  const [err, setErr] = React.useState('');
+
+  const refresh = React.useCallback(async () => {
+    if (!pushSupported) return setState('unsupported');
+    const perm = notifPermission();
+    if (perm === 'denied') return setState('denied');
+    const sub = await isSubscribed();
+    setState(sub && perm === 'granted' ? 'on' : 'off');
+  }, []);
+  React.useEffect(() => { refresh(); }, [refresh]);
+
+  const enable = async () => {
+    setBusy(true); setErr('');
+    try {
+      const r = await subscribePush();
+      if (!r.ok) {
+        if (r.reason === 'denied') setErr('Notifications are blocked. Allow them for COMPOUND in your phone settings, then try again.');
+        else if (r.reason === 'unsupported') setErr('This browser can’t send push. Install COMPOUND to your home screen first.');
+        else setErr('Couldn’t turn it on just now — try again.');
+      }
+    } catch (e) { setErr('Couldn’t turn it on just now — try again.'); }
+    setBusy(false); refresh();
+  };
+  const disable = async () => { setBusy(true); setErr(''); try { await unsubscribePush(); } catch (e) {} setBusy(false); refresh(); };
+
+  const on = state === 'on';
+  const wrap = {
+    padding: '14px 16px', borderRadius: 14,
+    background: on ? C.accentSoft : C.surf1,
+    border: `1px solid ${on ? C.accentDim : C.line}`,
+    display: 'flex', flexDirection: 'column', gap: 10,
+  };
+  const titleRow = { display: 'flex', alignItems: 'center', gap: 10 };
+  const title = { fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 17, letterSpacing: 0.4, color: C.text, textTransform: 'uppercase' };
+  const sub = { fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: C.textMid, lineHeight: 1.45 };
+  const pill = (txt, color, bg) => (
+    <span style={{ marginLeft: 'auto', fontFamily: 'JetBrains Mono, monospace', fontSize: 9, letterSpacing: 1, color, background: bg, border: `1px solid ${color}`, borderRadius: 20, padding: '3px 9px' }}>{txt}</span>
+  );
+  const btn = (label, onClick, primary) => (
+    <button onClick={onClick} disabled={busy}
+      style={{
+        alignSelf: 'flex-start', cursor: busy ? 'default' : 'pointer',
+        fontFamily: 'JetBrains Mono, monospace', fontSize: 11, letterSpacing: 1, textTransform: 'uppercase',
+        padding: '9px 16px', borderRadius: 10,
+        background: primary ? C.accent : 'transparent',
+        color: primary ? '#0A0A0C' : C.textMid,
+        border: primary ? 0 : `1px solid ${C.line}`,
+        opacity: busy ? 0.6 : 1,
+      }}>{busy ? '…' : label}</button>
+  );
+
+  return (
+    <div style={wrap}>
+      <div style={titleRow}>
+        <div style={title}>Push on this device</div>
+        {state === 'on' && pill('ON', C.accent, C.accentSoft)}
+        {state === 'denied' && pill('BLOCKED', '#E0653E', 'rgba(224,101,62,.12)')}
+        {state === 'unsupported' && pill('INSTALL FIRST', C.textLow, C.surf2)}
+      </div>
+
+      {state === 'loading' && <div style={sub}>Checking…</div>}
+      {state === 'off' && (<>
+        <div style={sub}>Get reminders even when COMPOUND is closed. Turning this on will ask your phone for permission once.</div>
+        {btn('Enable notifications', enable, true)}
+      </>)}
+      {state === 'on' && (<>
+        <div style={sub}>This device will receive your reminders. Choose which ones below.</div>
+        {btn('Turn off on this device', disable, false)}
+      </>)}
+      {state === 'denied' && (
+        <div style={sub}>Notifications are blocked for COMPOUND. Open your phone’s app/site settings, allow notifications, then come back and tap Enable.</div>
+      )}
+      {state === 'unsupported' && (
+        <div style={sub}>Add COMPOUND to your home screen (install it) — push notifications work once it’s installed.</div>
+      )}
+      {err && <div style={{ ...sub, color: '#E0653E' }}>{err}</div>}
+    </div>
+  );
+}
+
 function SettingsNotifications({ onBack }) {
   const [prefs, setPrefs] = React.useState(() => {
     try { return JSON.parse(localStorage.getItem('compound:notifs') || '{}'); } catch { return {}; }
@@ -526,6 +612,10 @@ function SettingsNotifications({ onBack }) {
         <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 13.5, color: C.textMid, margin: '0 0 18px', lineHeight: 1.5 }}>
           We send the minimum. Each one earns its place.
         </p>
+        <PushDeviceCard />
+        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9.5, color: C.textLow, letterSpacing: 1, margin: '20px 2px 8px' }}>
+          WHAT GETS THROUGH
+        </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {Object.entries(defs).map(([k, d]) => (
             <NotifRow key={k} label={d.label} hint={d.hint} on={isOn(k)} onChange={(v) => set(k, v)} />

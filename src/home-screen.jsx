@@ -8,7 +8,7 @@ import { TodayTodos } from './todo-list.jsx';
 
 // home-screen.jsx — The Home tab — assembles all the components
 
-function HomeScreen({ user, state, onOpenCheckin, onGoTo, onOpenSettings, onChanged, onRecalc, demoFlags, setDemoFlag }) {
+function HomeScreen({ user, set, state, onOpenCheckin, onGoTo, onOpenSettings, onChanged, onRecalc, demoFlags, setDemoFlag }) {
   const lifeScore = computeLifeScore(state.metrics);
   const today = getTodayCopy(state.dayOfWeek);
 
@@ -100,28 +100,12 @@ function HomeScreen({ user, state, onOpenCheckin, onGoTo, onOpenSettings, onChan
         </div>
       )}
 
-      {/* Plateau nudge — weight flat while training steady → smart recalc */}
+      {/* Plateau nudge — recomp-aware: a flat scale is cross-checked against
+          strength + waist before ever suggesting a cut. */}
       {user.dietTracking && (() => {
         const p = window.detectPlateau ? window.detectPlateau() : null;
         if (!p) return null;
-        return (
-          <div style={{ marginTop: 14, padding: '14px 16px', background: C.surf1, border: `1px solid ${C.accentDim}`, borderRadius: 14, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-            <span style={{ fontSize: 20 }}>📊</span>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: C.accent, letterSpacing: 1.6, marginBottom: 3 }}>PLATEAU SPOTTED</div>
-              <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 16, letterSpacing: 0.5, color: C.text, textTransform: 'uppercase', lineHeight: 1.1 }}>
-                Weight's held for {p.weeks} weeks
-              </div>
-              <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: C.textMid, lineHeight: 1.45, margin: '4px 0 10px' }}>
-                Training's been consistent — your numbers may need a nudge. Recalculate takes 5 seconds.
-              </p>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={() => onRecalc && onRecalc()} style={{ background: C.accent, border: 0, color: '#0A0A0C', padding: '8px 14px', borderRadius: 8, fontFamily: 'JetBrains Mono, monospace', fontSize: 10, fontWeight: 600, letterSpacing: 1.2, cursor: 'pointer' }}>RECALCULATE</button>
-                <button onClick={() => { window.dismissPlateau && window.dismissPlateau(); onChanged && onChanged(); }} style={{ background: 'transparent', border: `1px solid ${C.line}`, color: C.textMid, padding: '8px 12px', borderRadius: 8, fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 1.2, cursor: 'pointer' }}>DISMISS</button>
-              </div>
-            </div>
-          </div>
-        );
+        return <PlateauCard p={p} user={user} set={set} onGoTo={onGoTo} onChanged={onChanged} />;
       })()}
 
       {/* Three north-star rings hero */}
@@ -290,6 +274,75 @@ function PlaceholderTab({ title, sub, accent = '#F2A30F' }) {
   );
 }
 
-Object.assign(window, { HomeScreen, PlaceholderTab, QuickLink, WeekLegend });
+// ── Plateau nudge ───────────────────────────────────────────────────────
+const PLAT_BTN_PRIMARY = { background: C.accent, border: 0, color: '#0A0A0C', padding: '8px 14px', borderRadius: 8, fontFamily: 'JetBrains Mono, monospace', fontSize: 10, fontWeight: 600, letterSpacing: 1.2, cursor: 'pointer' };
+const PLAT_BTN_SECONDARY = { background: C.surf2, border: `1px solid ${C.accentDim}`, color: C.accent, padding: '8px 14px', borderRadius: 8, fontFamily: 'JetBrains Mono, monospace', fontSize: 10, fontWeight: 600, letterSpacing: 1.2, cursor: 'pointer' };
+const PLAT_BTN_GHOST = { background: 'transparent', border: `1px solid ${C.line}`, color: C.textMid, padding: '8px 12px', borderRadius: 8, fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 1.2, cursor: 'pointer' };
 
-export { HomeScreen, PlaceholderTab, QuickLink, WeekLegend };
+function PlateauCard({ p, user, set, onGoTo, onChanged }) {
+  const wrap = (children, accent) => (
+    <div style={{ marginTop: 14, padding: '14px 16px', background: C.surf1, border: `1px solid ${accent || C.line}`, borderRadius: 14, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+      {children}
+    </div>
+  );
+  const done = () => { window.dismissPlateau && window.dismissPlateau(); onChanged && onChanged(); };
+  const trim = () => { window.applyPlateauTrim && window.applyPlateauTrim(); onChanged && onChanged(); };
+  const addSteps = () => { if (set) set({ stepGoal: (user.stepGoal || 7000) + 1500 }); window.dismissPlateau && window.dismissPlateau(); onChanged && onChanged(); };
+
+  // Recomposition — flat scale but progressing. Don't cut; encourage.
+  if (p.kind === 'recomp') {
+    const reason = p.liftsUp && p.waistDown ? 'your lifts are up and your waist is down'
+      : p.liftsUp ? 'your lifts are climbing'
+      : 'your waist is coming down';
+    return wrap(
+      <>
+        <span style={{ fontSize: 20 }}>💪</span>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: C.success, letterSpacing: 1.6, marginBottom: 3 }}>RECOMPOSITION</div>
+          <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 16, letterSpacing: 0.5, color: C.text, textTransform: 'uppercase', lineHeight: 1.1 }}>
+            Trading fat for muscle
+          </div>
+          <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: C.textMid, lineHeight: 1.45, margin: '4px 0 10px' }}>
+            Scale's flat {p.weeks} weeks, but {reason} — that's recomposition, not a stall. Don't cut. Hold the course.
+          </p>
+          <button onClick={done} style={PLAT_BTN_GHOST}>GOT IT</button>
+        </div>
+      </>,
+      C.success + '55',
+    );
+  }
+
+  // True stall — strength flat/declining and waist flat. Offer the smaller lever.
+  return wrap(
+    <>
+      <span style={{ fontSize: 20 }}>📊</span>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: C.accent, letterSpacing: 1.6, marginBottom: 3 }}>TRUE STALL</div>
+        <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 16, letterSpacing: 0.5, color: C.text, textTransform: 'uppercase', lineHeight: 1.1 }}>
+          Held {p.weeks} weeks — lifts &amp; waist flat too
+        </div>
+        <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: C.textMid, lineHeight: 1.45, margin: '4px 0 10px' }}>
+          A real stall. Pick the smaller lever — eat a touch less, or move a touch more. Your call, and only one nudge every few weeks.
+        </p>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button onClick={trim} style={PLAT_BTN_PRIMARY}>TRIM ~120 KCAL/DAY</button>
+          <button onClick={addSteps} style={PLAT_BTN_SECONDARY}>+1,500 STEPS/DAY</button>
+          <button onClick={done} style={PLAT_BTN_GHOST}>DISMISS</button>
+        </div>
+        {!p.waistKnown && (
+          <>
+            <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 11.5, color: C.textLow, lineHeight: 1.4, margin: '10px 0 6px' }}>
+              No waist data yet — logging it lets us tell true fat loss from a stall next time.
+            </p>
+            <button onClick={() => onGoTo && onGoTo('reports')} style={{ ...PLAT_BTN_GHOST, borderColor: C.accentDim, color: C.accent }}>LOG A WAIST MEASUREMENT</button>
+          </>
+        )}
+      </div>
+    </>,
+    C.accentDim,
+  );
+}
+
+Object.assign(window, { HomeScreen, PlaceholderTab, QuickLink, WeekLegend, PlateauCard });
+
+export { HomeScreen, PlaceholderTab, PlateauCard, QuickLink, WeekLegend };

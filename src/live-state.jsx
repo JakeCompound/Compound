@@ -248,7 +248,9 @@ function computeWeeklyNips(history) {
     .reduce((sum, h) => sum + (h.answers.nips || 0), 0);
 }
 
-// Plateau detector: weight flat >~28 days while training consistent + sleep/steps steady.
+// Plateau detector — multi-signal. A flat scale alone isn't enough: it can mean
+// a true stall OR body recomposition (losing fat while gaining muscle at once).
+// We only ever suggest cutting when strength AND waist agree it's a real stall.
 function detectPlateau() {
   try {
     const weighins = JSON.parse(localStorage.getItem('compound:weighins') || '[]')
@@ -272,18 +274,86 @@ function detectPlateau() {
     const twoWk = new Date(lastDate.getTime() - 14 * 86400000);
     const recentW = workouts.filter((w) => new Date(w.date + 'T12:00:00') >= twoWk);
     if (recentW.length < 3) return null;
-    // Don't re-nudge within 21 days of last dismissal
+    // Don't re-nudge within 21 days of last dismissal/adjustment (paced)
     const dismissed = Number(localStorage.getItem('compound:plateauDismissed') || 0);
     if (Date.now() - dismissed < 21 * 86400000) return null;
-    return { change: +change.toFixed(1), weeks: Math.round(span / 7), current: last.value };
+
+    // Cross-check the flat scale against strength + waist before deciding.
+    const winStart = cutoff.getTime();
+    const lastMs = lastDate.getTime();
+    const liftsUp = strengthTrendUp(workouts, winStart, lastMs);
+    const measurements = (window.loadMeasurements ? window.loadMeasurements() : []);
+    const waist = waistTrend(measurements, winStart, lastMs);
+    const recomp = liftsUp || waist.down;
+
+    return {
+      change: +change.toFixed(1), weeks: Math.round(span / 7), current: last.value,
+      kind: recomp ? 'recomp' : 'stall',
+      liftsUp, waistDown: waist.down, waistKnown: waist.known, waistDelta: waist.delta,
+    };
   } catch (e) { return null; }
 }
+
+// Strength trending up = muscle being gained. Signal: a PR in the last 21 days,
+// or best e1RM on common lifts rising from the window's first half to its second.
+function strengthTrendUp(workouts, sinceMs, lastMs) {
+  try {
+    const w = workouts
+      .filter((x) => { const t = new Date(x.date + 'T12:00:00').getTime(); return t >= sinceMs && t <= lastMs; })
+      .slice().sort((a, b) => (a.date < b.date ? -1 : 1));
+    if (w.length < 2) return false;
+    const prCut = lastMs - 21 * 86400000;
+    if (w.some((x) => (x.prs || []).length > 0 && new Date(x.date + 'T12:00:00').getTime() >= prCut)) return true;
+    const half = Math.floor(w.length / 2);
+    const agg = (arr) => {
+      const b = {};
+      arr.forEach((e) => { const s = window.sessionBest1RM ? window.sessionBest1RM(e) : {}; Object.keys(s).forEach((k) => { b[k] = Math.max(b[k] || 0, s[k]); }); });
+      return b;
+    };
+    const be = agg(w.slice(0, half)), bl = agg(w.slice(half));
+    const keys = Object.keys(bl).filter((k) => be[k]);
+    if (keys.length) {
+      const se = keys.reduce((s, k) => s + be[k], 0), sl = keys.reduce((s, k) => s + bl[k], 0);
+      if (sl > se * 1.01) return true; // >1% rise on lifts trained in both halves
+    }
+    return false;
+  } catch (e) { return false; }
+}
+
+// Waist trend over the plateau window. down = a meaningful drop (≥0.3cm) = fat loss.
+function waistTrend(measurements, sinceMs, lastMs) {
+  const pick = (list) => list.filter((m) => m && m.values && typeof m.values.waist === 'number').slice().sort((a, b) => (a.date < b.date ? -1 : 1));
+  const inWin = pick(measurements).filter((m) => { const t = new Date((m.date || '') + 'T12:00:00').getTime(); return t >= sinceMs && t <= lastMs; });
+  const series = inWin.length >= 2 ? inWin : pick(measurements);
+  if (series.length < 2) return { known: false, down: false, delta: 0 };
+  const delta = +(series[series.length - 1].values.waist - series[0].values.waist).toFixed(1);
+  return { known: true, down: delta <= -0.3, delta };
+}
+
 function dismissPlateau() { try { localStorage.setItem('compound:plateauDismissed', String(Date.now())); } catch (e) {} }
+
+// True-stall adjustment: a gentle −120 kcal/day trim with a hard floor (never
+// below ~BMR×1.1), carbs refilled, and the 21-day pacing guard set. User-confirmed
+// from the Home nudge. Returns the new targets (or null if none set yet).
+function applyPlateauTrim() {
+  try {
+    const t = window.loadTargets ? window.loadTargets() : null;
+    if (!t) { dismissPlateau(); return null; }
+    const floor = Math.max(1600, Math.round((t.bmr || 1500) * 1.1));
+    const calories = Math.max(floor, (t.calories || 0) - 120);
+    let carbs = Math.round((calories - (t.protein || 0) * 4 - (t.fat || 0) * 9) / 4);
+    if (carbs < 0) carbs = 0;
+    const next = { ...t, calories, carbs, setAt: Date.now() };
+    if (window.saveTargets) window.saveTargets(next);
+    dismissPlateau();
+    return next;
+  } catch (e) { return null; }
+}
 
 Object.assign(window, {
   loadCheckins, saveCheckins, recordCheckin, deriveMetricsFromCheckin,
   deriveLiveState, computeStreaks, buildWeek, isoDate, computeWeeklyNips,
-  detectPlateau, dismissPlateau,
+  detectPlateau, dismissPlateau, applyPlateauTrim,
 });
 
-export { CHECKINS_KEY, ZERO_METRICS, buildLiveInsight, buildWeek, computeStreaks, computeWeeklyNips, deriveLiveState, deriveMetricsFromCheckin, detectPlateau, dismissPlateau, isoDate, loadCheckins, nextMilestone, recordCheckin, saveCheckins };
+export { CHECKINS_KEY, ZERO_METRICS, applyPlateauTrim, buildLiveInsight, buildWeek, computeStreaks, computeWeeklyNips, deriveLiveState, deriveMetricsFromCheckin, detectPlateau, dismissPlateau, isoDate, loadCheckins, nextMilestone, recordCheckin, saveCheckins, strengthTrendUp, waistTrend };

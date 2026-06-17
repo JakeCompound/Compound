@@ -280,6 +280,7 @@ function PhotoSlot({ slot }) {
 
 Object.assign(window, {
   BodyMeasurementsCard, ProgressPhotosCard, BODY_METRICS,
+  loadMeasurements, saveMeasurements, deriveMetric,
 });
 
 export { BODY_METRICS, BodyMeasurementsCard, LogMeasurementsModal, MEASUREMENTS_KEY, MeasurementMini, MiniSpark, PhotoSlot, ProgressPhotosCard, deriveMetric, loadMeasurements, saveMeasurements };

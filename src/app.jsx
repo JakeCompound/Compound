@@ -292,6 +292,7 @@ function App() {
       return (
         <HomeScreen
           user={data}
+          set={set}
           state={stateForHome}
           onOpenCheckin={openCheckin}
           onGoTo={(t) => setTab(t)}

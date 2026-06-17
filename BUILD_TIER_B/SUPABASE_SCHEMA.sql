@@ -163,9 +163,9 @@ end $$;
 -- Auto-create a profile row the moment a user signs up.
 -- ============================================================================
 create or replace function handle_new_user()
-returns trigger language plpgsql security definer as $$
+returns trigger language plpgsql security definer set search_path = public as $$
 begin
-  insert into profiles (id) values (new.id) on conflict do nothing;
+  insert into public.profiles (id) values (new.id) on conflict do nothing;
   return new;
 end $$;
 

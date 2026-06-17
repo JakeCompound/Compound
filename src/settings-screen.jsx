@@ -378,7 +378,7 @@ function SettingsReminders({ user, set, onBack }) {
             <div style={{ marginTop: 24 }}>
               <FieldLabel>Friday weigh-in window</FieldLabel>
               <div style={{ marginTop: 12 }}>
-                <TimeWheel value={user.weighInTime} onChange={(v) => set({ weighInTime: v })} hourMin={5} hourMax={7} />
+                <TimeWheel value={user.weighInTime} onChange={(v) => set({ weighInTime: v })} hourMin={3} hourMax={8} />
               </div>
             </div>
           </>

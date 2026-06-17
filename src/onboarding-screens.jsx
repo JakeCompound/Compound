@@ -604,9 +604,9 @@ function ScreenWeighInTime({ data, set, ctx, onNext, onBack }) {
       sub="Every Friday morning. Post bathroom, pre water, pre breakfast. One number."
       footer={<FooterNav onBack={onBack} onNext={onNext} />}
     >
-      <FieldLabel>Weigh-in window (5:00 – 7:00 AM)</FieldLabel>
+      <FieldLabel>Weigh-in window (3:00 – 8:00 AM)</FieldLabel>
       <div style={{ marginTop: 12 }}>
-        <TimeWheel value={data.weighInTime} onChange={(v) => set({ weighInTime: v })} hourMin={5} hourMax={7} />
+        <TimeWheel value={data.weighInTime} onChange={(v) => set({ weighInTime: v })} hourMin={3} hourMax={8} />
       </div>
       <BellHint text="“Friday weigh-in — hop on the scales before breakfast. Post bathroom, pre water.”" />
     </FormShell>

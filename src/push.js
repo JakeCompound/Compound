@@ -27,8 +27,13 @@ function urlBase64ToUint8Array(base64String) {
 let swReg = null;
 export async function registerSW() {
   if (!pushSupported) return null;
-  if (swReg) return swReg;
-  try { swReg = await navigator.serviceWorker.register('/sw.js'); } catch (e) { console.warn('[push] SW register failed', e); }
+  if (swReg) { try { await swReg.update(); } catch (e) {} return swReg; }
+  try {
+    // updateViaCache:'none' → the browser never serves sw.js from HTTP cache,
+    // so a new version is always picked up. update() forces an immediate check.
+    swReg = await navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' });
+    try { await swReg.update(); } catch (e) {}
+  } catch (e) { console.warn('[push] SW register failed', e); }
   return swReg;
 }
 

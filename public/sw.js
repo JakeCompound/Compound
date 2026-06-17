@@ -1,4 +1,4 @@
-// sw.js — COMPOUND service worker.
+// sw.js — COMPOUND service worker.  (v3 — ring badge)
 //
 // Its job for Phase 6 is Web Push: receive a pushed message from the server and
 // show a notification, even when the app (or the whole browser) is closed. It is

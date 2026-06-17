@@ -5,6 +5,24 @@ import { ScreenGratitudeBuilder } from './onboarding-screens.jsx';
 // settings-screen.jsx — Full settings, accessible via Home cog
 // Profile, goals, reminders, equipment, gratitude management, account, danger zone.
 
+// Weekday picker model + small formatters for the Workout schedule.
+const WS_DAYS = [
+  { i: 0, l: 'SUN' }, { i: 1, l: 'MON' }, { i: 2, l: 'TUE' }, { i: 3, l: 'WED' },
+  { i: 4, l: 'THU' }, { i: 5, l: 'FRI' }, { i: 6, l: 'SAT' },
+];
+function fmtTime12(hhmm) {
+  if (!hhmm) return '—';
+  const [h, m] = hhmm.split(':').map(Number);
+  const ap = h >= 12 ? 'pm' : 'am';
+  const h12 = ((h + 11) % 12) + 1;
+  return `${h12}:${String(m || 0).padStart(2, '0')}${ap}`;
+}
+function fmtWorkoutSchedule(user) {
+  const days = Array.isArray(user.workoutDays) ? user.workoutDays.slice().sort((a, b) => a - b) : [];
+  if (!days.length) return 'No days set';
+  return `${days.map((i) => WS_DAYS[i].l[0] + WS_DAYS[i].l.slice(1).toLowerCase()).join(' · ')} · ${fmtTime12(user.workoutTime)}`;
+}
+
 function SettingsScreen({ user, set, onClose, onReset, onRecalc }) {
   const [section, setSection] = React.useState(null); // null = main, else section id
 
@@ -19,6 +37,9 @@ function SettingsScreen({ user, set, onClose, onReset, onRecalc }) {
   }
   if (section === 'equipment') {
     return <SettingsEquipment user={user} set={set} onBack={() => setSection(null)} />;
+  }
+  if (section === 'workoutschedule') {
+    return <SettingsWorkoutSchedule user={user} set={set} onBack={() => setSection(null)} />;
   }
   if (section === 'gratitude') {
     return <SettingsGratitude user={user} set={set} onBack={() => setSection(null)} />;
@@ -80,6 +101,7 @@ function SettingsScreen({ user, set, onClose, onReset, onRecalc }) {
           <SettingsRow icon={<IconUser />} label="Profile" hint="Name, date of birth" onClick={() => setSection('profile')} />
           <SettingsRow icon={<IconTarget />} label="Goals" hint={`${user.weight}kg → ${user.weightGoal}kg · ${user.stepGoal} steps · ${user.sleepGoal}h`} onClick={() => setSection('goals')} />
           <SettingsRow icon={<IconBolt />} label="Equipment" hint={user.equipment === 'home' ? 'Home (bodyweight)' : 'Gym / garage'} onClick={() => setSection('equipment')} />
+          <SettingsRow icon={<IconStar />} label="Workout schedule" hint={fmtWorkoutSchedule(user)} onClick={() => setSection('workoutschedule')} />
         </SettingsGroup>
 
         <SettingsGroup label="HABITS">
@@ -319,10 +341,6 @@ function SettingsGoals({ user, set, onBack }) {
                 <Stepper value={user.weightGoal} onChange={(v) => set({ weightGoal: v })} min={30} max={250} step={0.5} unit="kg" />
               </div>
               <div>
-                <FieldLabel>Training days / week</FieldLabel>
-                <Stepper value={user.trainingDays} onChange={(v) => set({ trainingDays: v })} min={1} max={7} unit="days" />
-              </div>
-              <div>
                 <FieldLabel>Step goal</FieldLabel>
                 <Stepper value={user.stepGoal} onChange={(v) => set({ stepGoal: v })} min={1000} max={30000} step={500} unit="steps" />
               </div>
@@ -335,7 +353,6 @@ function SettingsGoals({ user, set, onBack }) {
             <>
               <ReadField label="Current weight" value={`${user.weight} kg`} />
               <ReadField label="Goal weight" value={`${user.weightGoal} kg`} />
-              <ReadField label="Training days / week" value={`${user.trainingDays || 3} days`} />
               <ReadField label="Step goal" value={`${user.stepGoal} steps`} />
               <ReadField label="Sleep goal" value={`${user.sleepGoal} hours`} />
             </>
@@ -398,6 +415,59 @@ function SettingsEquipment({ user, set, onBack }) {
   );
 }
 
+function SettingsWorkoutSchedule({ user, set, onBack }) {
+  const [editing, setEditing] = React.useState(false);
+  const selected = Array.isArray(user.workoutDays) ? user.workoutDays : [];
+  const toggle = (i) => {
+    const next = (selected.includes(i) ? selected.filter((d) => d !== i) : [...selected, i]).sort((a, b) => a - b);
+    set({ workoutDays: next, trainingDays: next.length });
+  };
+  return (
+    <div style={{ height: '100%', background: C.bg, display: 'flex', flexDirection: 'column' }}>
+      <SettingsHeader title="WORKOUT SCHEDULE" onBack={onBack} right={<EditToggle editing={editing} onToggle={() => setEditing((e) => !e)} />} />
+      <div style={{ flex: 1, overflowY: 'auto', padding: '14px 22px 32px' }}>
+        {editing ? (
+          <>
+            <FieldLabel>Workout days</FieldLabel>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 5, marginTop: 12 }}>
+              {WS_DAYS.map((d) => {
+                const active = selected.includes(d.i);
+                return (
+                  <button
+                    key={d.i}
+                    onClick={() => toggle(d.i)}
+                    style={{ aspectRatio: '1 / 1.4', background: active ? C.accent : C.surf1, color: active ? '#0A0A0C' : C.text, border: active ? `1px solid ${C.accent}` : `1px solid ${C.line}`, borderRadius: 10, fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 12, letterSpacing: 0.3, cursor: 'pointer' }}
+                  >
+                    {d.l}
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: selected.length ? C.accent : C.textLow, letterSpacing: 1.4, marginTop: 10 }}>
+              {selected.length} {selected.length === 1 ? 'DAY' : 'DAYS'} / WEEK
+            </div>
+            <div style={{ marginTop: 24 }}>
+              <FieldLabel>Workout time</FieldLabel>
+              <div style={{ marginTop: 12 }}>
+                <TimeWheel value={user.workoutTime || '17:00'} onChange={(v) => set({ workoutTime: v })} />
+              </div>
+              <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12, color: C.textMid, marginTop: 10, lineHeight: 1.5 }}>
+                A gentle reminder fires 30 minutes before, on each day you've picked.
+              </p>
+            </div>
+          </>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+            <ReadField label="Workout days" value={selected.length ? selected.slice().sort((a, b) => a - b).map((i) => WS_DAYS[i].l).join(' · ') : 'None set'} />
+            <ReadField label="Per week" value={`${selected.length} ${selected.length === 1 ? 'day' : 'days'}`} />
+            <ReadField label="Workout time" value={fmtTime12(user.workoutTime)} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function SettingsGratitude({ user, set, onBack }) {
   return (
     <div style={{ height: '100%', background: C.bg, display: 'flex', flexDirection: 'column' }}>
@@ -422,8 +492,9 @@ function SettingsNotifications({ onBack }) {
   const defs = {
     nightly:    { label: 'Nightly check-in',       hint: 'Your set time, every night' },
     weighin:    { label: 'Friday weigh-in',        hint: 'Friday morning, your set window' },
-    urgency:    { label: 'Workout urgency',        hint: "When days left = workouts left" },
-    sunday:     { label: 'Sunday warning',         hint: "If you're short on workouts" },
+    workout:    { label: 'Workout reminder',       hint: '30 min before your set workout time' },
+    missed:     { label: 'Missed workout',         hint: 'Nudge to move it to another day' },
+    urgency:    { label: 'Workout urgency',        hint: 'Midday nudge when 2 days & 2 workouts remain' },
     streaks:    { label: 'Streak milestones',      hint: 'Every interval reached' },
     pbs:        { label: 'Personal records',       hint: 'When you hit an estimated PR' },
     comeback:   { label: 'Comeback nudge',         hint: 'After 3+ missed days' },

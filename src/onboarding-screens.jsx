@@ -377,45 +377,67 @@ function DeltaCard({ from, to }) {
   );
 }
 
-// ── 05 TRAINING DAYS ───────────────────────────────────────────────────────
+// ── 05 WORKOUT DAYS + TIME ─────────────────────────────────────────────────
+// Pick the specific weekdays you train and a time. The number of days IS the
+// weekly target (days drive the count). A gentle reminder fires 30 min before.
+const WEEKDAYS = [
+  { i: 0, l: 'SUN' }, { i: 1, l: 'MON' }, { i: 2, l: 'TUE' }, { i: 3, l: 'WED' },
+  { i: 4, l: 'THU' }, { i: 5, l: 'FRI' }, { i: 6, l: 'SAT' },
+];
 function ScreenTrainingDays({ data, set, ctx, onNext, onBack }) {
+  const selected = Array.isArray(data.workoutDays) ? data.workoutDays : [1, 3, 5];
+  const toggle = (i) => {
+    const next = (selected.includes(i) ? selected.filter((d) => d !== i) : [...selected, i]).sort((a, b) => a - b);
+    set({ workoutDays: next, trainingDays: next.length });
+  };
   return (
     <FormShell
       {...ctx}
-      title="HOW MANY DAYS"
-      accentLine="DO YOU LIFT?"
-      sub="The honest answer, not the aspirational one. We'll hold you to it."
-      footer={<FooterNav onBack={onBack} onNext={onNext} />}
+      title="WHICH DAYS DO"
+      accentLine="YOU TRAIN?"
+      sub="Pick the days you'll train, and a time. A gentle reminder lands 30 minutes before."
+      footer={<FooterNav onBack={onBack} onNext={onNext} nextDisabled={selected.length === 0} />}
     >
-      <FieldLabel>Training days per week</FieldLabel>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6, marginTop: 14 }}>
-        {[1, 2, 3, 4, 5, 6, 7].map((n) => {
-          const active = data.trainingDays === n;
+      <FieldLabel>Workout days</FieldLabel>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 5, marginTop: 12 }}>
+        {WEEKDAYS.map((d) => {
+          const active = selected.includes(d.i);
           return (
             <button
-              key={n}
-              onClick={() => { set({ trainingDays: n }); setTimeout(onNext, 240); }}
+              key={d.i}
+              onClick={() => toggle(d.i)}
               style={{
-                aspectRatio: '1 / 1.2',
+                aspectRatio: '1 / 1.4',
                 background: active ? C.accent : C.surf1,
                 color: active ? '#0A0A0C' : C.text,
                 border: active ? `1px solid ${C.accent}` : `1px solid ${C.line}`,
                 borderRadius: 10,
-                fontFamily: 'JetBrains Mono, monospace',
-                fontSize: 20,
-                fontWeight: 600,
+                fontFamily: 'Barlow Condensed, sans-serif',
+                fontWeight: 700,
+                fontSize: 12,
+                letterSpacing: 0.3,
                 cursor: 'pointer',
                 transition: 'all .12s',
               }}
             >
-              {n}
+              {d.l}
             </button>
           );
         })}
       </div>
-      <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 13, color: C.textMid, marginTop: 18, lineHeight: 1.5 }}>
-        We'll nudge you when you're running out of days to hit your weekly target.
-      </p>
+      <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: selected.length ? C.accent : C.textLow, letterSpacing: 1.4, marginTop: 10 }}>
+        {selected.length} {selected.length === 1 ? 'DAY' : 'DAYS'} / WEEK
+      </div>
+
+      <div style={{ marginTop: 22 }}>
+        <FieldLabel>Workout time</FieldLabel>
+        <div style={{ marginTop: 12 }}>
+          <TimeWheel value={data.workoutTime || '17:00'} onChange={(v) => set({ workoutTime: v })} />
+        </div>
+        <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: C.textMid, marginTop: 12, lineHeight: 1.5 }}>
+          We'll remind you 30 minutes before, and nudge you midday if the week's running short on days.
+        </p>
+      </div>
     </FormShell>
   );
 }

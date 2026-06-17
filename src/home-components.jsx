@@ -279,7 +279,8 @@ function LifeBalanceRadar({ values, size = 240 }) {
 
 // ── This-week strip ──────────────────────────────────────────────────────
 function WeekStrip({ days }) {
-  const labels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+  // Week runs Sun → Sat; prefer the label baked into each day by buildWeek.
+  const labels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
   return (
     <div style={{ display: 'flex', gap: 6 }}>
       {days.map((d, i) => {

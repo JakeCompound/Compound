@@ -135,11 +135,13 @@ function HomeScreen({ user, set, state, onOpenCheckin, onGoTo, onOpenSettings, o
           >
             <TodayTodos
               user={user}
+              set={set}
               state={state}
               onOpenCheckin={onOpenCheckin}
               onWeighIn={() => setWeighOpen(true)}
               onGoWorkout={() => onGoTo && onGoTo('workout')}
               onGoNutrition={() => onGoTo && onGoTo('nutrition')}
+              onChanged={onChanged}
               weighDoneToday={weighDoneToday}
             />
           </div>
@@ -148,7 +150,7 @@ function HomeScreen({ user, set, state, onOpenCheckin, onGoTo, onOpenSettings, o
 
       {/* This week strip */}
       <div style={{ marginTop: 22 }}>
-        <SectionLabel meta="MON – SUN">THIS WEEK</SectionLabel>
+        <SectionLabel meta="SUN – SAT">THIS WEEK</SectionLabel>
         <WeekStrip days={state.weekDays} />
         <WeekLegend />
       </div>

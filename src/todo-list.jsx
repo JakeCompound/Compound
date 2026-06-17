@@ -40,30 +40,45 @@ function scheduledWorkoutDays(user) {
 }
 
 const WORKOUT_WEEK_KEY = 'compound:workoutWeek';
-function mondayKey() {
+// Start (Sunday) of the current week — the week runs Sun → Sat.
+function weekStartKey() {
   const today = new Date(); today.setHours(12, 0, 0, 0);
-  const dow = (today.getDay() + 6) % 7;
-  const mon = new Date(today.getTime() - dow * 86400000);
-  return window.isoDate ? window.isoDate(mon) : mon.toISOString().slice(0, 10);
+  const dow = today.getDay(); // 0 = Sunday
+  const sun = new Date(today.getTime() - dow * 86400000);
+  return window.isoDate ? window.isoDate(sun) : sun.toISOString().slice(0, 10);
 }
 function loadWeekOverride() {
   try {
     const all = JSON.parse(localStorage.getItem(WORKOUT_WEEK_KEY) || '{}');
-    return all[mondayKey()] || null;
+    return all[weekStartKey()] || null;
   } catch (e) { return null; }
 }
 function saveWeekOverride(days) {
   try {
     const all = JSON.parse(localStorage.getItem(WORKOUT_WEEK_KEY) || '{}');
-    all[mondayKey()] = days;
+    all[weekStartKey()] = days;
     localStorage.setItem(WORKOUT_WEEK_KEY, JSON.stringify(all));
   } catch (e) {}
 }
-// position within Mon→Sun week (0=Mon … 6=Sun)
-const weekPos = (dow) => (dow + 6) % 7;
+// position within the Sun→Sat week (0=Sun … 6=Sat)
+const weekPos = (dow) => dow;
 const DAY_LABELS = { 0: 'SUN', 1: 'MON', 2: 'TUE', 3: 'WED', 4: 'THU', 5: 'FRI', 6: 'SAT' };
 
-function TodayTodos({ user, state, onOpenCheckin, onWeighIn, onGoWorkout, onGoNutrition, weighDoneToday }) {
+// Postpone log — per week: how many times a workout has been pushed, with reasons.
+// After >4 in a week we offer to swap the troublesome day permanently.
+const POSTPONE_KEY = 'compound:workoutPostpones'; // { [weekStart]: [{ from, to, reason, ts }] }
+const POSTPONE_SWAP_THRESHOLD = 4;
+function loadPostpones() { try { return JSON.parse(localStorage.getItem(POSTPONE_KEY) || '{}'); } catch (e) { return {}; } }
+function weekPostpones() { return loadPostpones()[weekStartKey()] || []; }
+function addPostpone(entry) {
+  const all = loadPostpones();
+  const k = weekStartKey();
+  all[k] = [...(all[k] || []), entry];
+  try { localStorage.setItem(POSTPONE_KEY, JSON.stringify(all)); } catch (e) {}
+  return all[k];
+}
+
+function TodayTodos({ user, set, state, onOpenCheckin, onWeighIn, onGoWorkout, onGoNutrition, onChanged, weighDoneToday }) {
   const [now, setNow] = React.useState(Date.now());
   React.useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
@@ -96,6 +111,28 @@ function TodayTodos({ user, state, onOpenCheckin, onWeighIn, onGoWorkout, onGoNu
   const addExtra = () => { applyOverride([...effectiveDays, todayDow]); setAddSheet(false); onGoWorkout && onGoWorkout(); };
   const swapFrom = (fromDow) => { applyOverride([...effectiveDays.filter((d) => d !== fromDow), todayDow]); setAddSheet(false); onGoWorkout && onGoWorkout(); };
 
+  // Postpone today's workout → a free future day this week (not already a workout day).
+  const [postponeOpen, setPostponeOpen] = React.useState(false);
+  const [swapOffer, setSwapOffer] = React.useState(null); // { to } once postponed >4× this week
+  const postponeTargets = [0, 1, 2, 3, 4, 5, 6]
+    .filter((d) => weekPos(d) > weekPos(todayDow) && !effectiveDays.includes(d));
+  const doPostpone = (toDay, reason) => {
+    applyOverride([...effectiveDays.filter((d) => d !== todayDow), toDay].sort((a, b) => weekPos(a) - weekPos(b)));
+    addPostpone({ from: todayDow, to: toDay, reason, ts: Date.now() });
+    setPostponeOpen(false);
+    if (weekPostpones().length > POSTPONE_SWAP_THRESHOLD) setSwapOffer({ to: toDay });
+    onChanged && onChanged();
+  };
+  const acceptSwapDefault = () => {
+    if (set && swapOffer) {
+      const base = (Array.isArray(user.workoutDays) ? user.workoutDays : baseDays).filter((d) => d !== todayDow);
+      const next = [...base, swapOffer.to].sort((a, b) => weekPos(a) - weekPos(b));
+      set({ workoutDays: next, trainingDays: next.length });
+    }
+    setSwapOffer(null);
+    onChanged && onChanged();
+  };
+
   const todos = [
     {
       id: 'weighin',
@@ -120,6 +157,8 @@ function TodayTodos({ user, state, onOpenCheckin, onWeighIn, onGoWorkout, onGoNu
       time: user.workoutTime || '17:00',
       done: !!workoutDoneToday,
       onDo: onGoWorkout,
+      canPostpone: true,
+      onPostpone: () => setPostponeOpen(true),
       glyph: (
         <svg width="20" height="20" viewBox="0 0 22 22" fill="none">
           <rect x="1" y="8" width="2" height="6" rx="1" fill="currentColor" />
@@ -216,6 +255,24 @@ function TodayTodos({ user, state, onOpenCheckin, onWeighIn, onGoWorkout, onGoNu
           onSwap={swapFrom}
           onExtra={addExtra}
           onClose={() => setAddSheet(false)}
+        />
+      )}
+
+      {postponeOpen && (
+        <PostponeSheet
+          targets={postponeTargets}
+          fromDow={todayDow}
+          onConfirm={doPostpone}
+          onClose={() => setPostponeOpen(false)}
+        />
+      )}
+
+      {swapOffer && (
+        <SwapDefaultSheet
+          toDow={swapOffer.to}
+          fromDow={todayDow}
+          onAccept={acceptSwapDefault}
+          onDecline={() => setSwapOffer(null)}
         />
       )}
     </div>
@@ -321,8 +378,26 @@ function TodoRow({ todo, now, dateKey }) {
         </div>
       </button>
 
-      {/* Missed → ask for a reason */}
-      {missed && !todo.done && (
+      {/* Workout: explicit Complete + Postpone (Postpone also handles a missed session) */}
+      {todo.canPostpone && !todo.done && (
+        <div style={{ display: 'flex', gap: 8, padding: '0 14px 14px' }}>
+          <button
+            onClick={todo.onDo}
+            style={{ flex: 1, padding: '10px 0', background: C.accent, border: 0, borderRadius: 10, color: '#0A0A0C', fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 14, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer' }}
+          >
+            Complete
+          </button>
+          <button
+            onClick={todo.onPostpone}
+            style={{ flex: 1, padding: '10px 0', background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 10, color: C.textMid, fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 14, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer' }}
+          >
+            {missed ? 'Move it' : 'Postpone'}
+          </button>
+        </div>
+      )}
+
+      {/* Missed → ask for a reason (non-workout; the workout captures its reason on Postpone) */}
+      {missed && !todo.done && !todo.canPostpone && (
         <div style={{ padding: '0 14px 14px', borderTop: `1px solid rgba(229,86,75,.18)` }}>
           {reason ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingTop: 12 }}>
@@ -432,6 +507,74 @@ function AddWorkoutSheet({ futureDays, onSwap, onExtra, onClose }) {
   );
 }
 
+// Postpone the day's workout to a free future day this week — reason required.
+function PostponeSheet({ targets, fromDow, onConfirm, onClose }) {
+  const [day, setDay] = React.useState(null);
+  const [reason, setReason] = React.useState(null);
+  const canConfirm = day != null && !!reason;
+  return (
+    <div onClick={onClose} style={{ position: 'absolute', inset: 0, zIndex: 220, background: 'rgba(0,0,0,.72)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'flex-end' }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', background: C.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: '20px 22px 24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 3, borderRadius: 2, background: 'rgba(255,255,255,.18)' }} /></div>
+        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.accent, letterSpacing: 2.4, marginBottom: 8 }}>POSTPONE {DAY_LABELS[fromDow]}'S WORKOUT</div>
+        <h3 style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 26, lineHeight: 1, letterSpacing: 0.5, color: C.text, margin: '0 0 10px', textTransform: 'uppercase' }}>
+          MOVE IT TO<br /><span style={{ color: C.accent }}>ANOTHER DAY</span>
+        </h3>
+        {targets.length === 0 ? (
+          <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 13, color: C.textMid, lineHeight: 1.5, margin: '4px 0 4px' }}>
+            No free days left this week. Complete it late, or add an extra day from the Workout tab.
+          </p>
+        ) : (
+          <>
+            <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 13, color: C.textMid, lineHeight: 1.5, margin: '0 0 14px' }}>
+              Pick a day later this week, and tell us what got in the way — naming it is the win.
+            </p>
+            <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, letterSpacing: 1.6, color: C.textLow, marginBottom: 8 }}>MOVE TO</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+              {targets.map((d) => (
+                <button key={d} onClick={() => setDay(d)} style={{ padding: '10px 16px', borderRadius: 10, background: day === d ? C.accentDim : C.surf1, border: day === d ? `1px solid ${C.accent}` : `1px solid ${C.line}`, color: day === d ? C.accent : C.text, fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 15, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer' }}>{DAY_LABELS[d]}</button>
+              ))}
+            </div>
+            <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, letterSpacing: 1.6, color: C.textLow, marginBottom: 8 }}>WHY TODAY DIDN'T WORK</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 18 }}>
+              {MISS_REASONS.map((r) => (
+                <button key={r} onClick={() => setReason(r)} style={{ padding: '7px 12px', borderRadius: 999, background: reason === r ? C.accentDim : C.surf1, border: reason === r ? `1px solid ${C.accent}` : `1px solid ${C.line}`, color: reason === r ? C.accent : C.text, fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 600, fontSize: 13, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer' }}>{r}</button>
+              ))}
+            </div>
+            <button onClick={() => canConfirm && onConfirm(day, reason)} disabled={!canConfirm} style={{ width: '100%', height: 50, background: canConfirm ? C.accent : C.surf2, border: 0, borderRadius: 12, color: canConfirm ? '#0A0A0C' : C.textLow, fontFamily: 'Barlow Condensed, sans-serif', fontSize: 15, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', cursor: canConfirm ? 'pointer' : 'default' }}>
+              {day != null ? `Move to ${DAY_LABELS[day]}` : 'Pick a day'}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// After >4 postpones in a week, offer to make the new day the default.
+function SwapDefaultSheet({ toDow, fromDow, onAccept, onDecline }) {
+  return (
+    <div onClick={onDecline} style={{ position: 'absolute', inset: 0, zIndex: 221, background: 'rgba(0,0,0,.72)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'flex-end' }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', background: C.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: '20px 22px 24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 3, borderRadius: 2, background: 'rgba(255,255,255,.18)' }} /></div>
+        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.accent, letterSpacing: 2.4, marginBottom: 8 }}>THIS KEEPS MOVING</div>
+        <h3 style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 26, lineHeight: 1, letterSpacing: 0.5, color: C.text, margin: '0 0 10px', textTransform: 'uppercase' }}>
+          MAKE {DAY_LABELS[toDow]} YOUR<br /><span style={{ color: C.accent }}>REGULAR DAY?</span>
+        </h3>
+        <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 13, color: C.textMid, lineHeight: 1.5, margin: '0 0 16px' }}>
+          You've moved {DAY_LABELS[fromDow]}'s session a few times. Want to make {DAY_LABELS[toDow]} your usual workout day instead — so it sticks?
+        </p>
+        <button onClick={onAccept} style={{ width: '100%', height: 50, background: C.accent, border: 0, borderRadius: 12, color: '#0A0A0C', fontFamily: 'Barlow Condensed, sans-serif', fontSize: 15, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', cursor: 'pointer' }}>
+          Yes — make {DAY_LABELS[toDow]} my day
+        </button>
+        <button onClick={onDecline} style={{ width: '100%', height: 46, marginTop: 8, background: 'transparent', border: `1px solid ${C.line}`, borderRadius: 12, color: C.textMid, fontFamily: 'Barlow Condensed, sans-serif', fontSize: 14, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', cursor: 'pointer' }}>
+          No, just this week
+        </button>
+      </div>
+    </div>
+  );
+}
+
 Object.assign(window, { TodayTodos });
 
-export { AddWorkoutSheet, DAY_LABELS, MISS_GRACE_MS, MISS_REASONS, TODO_STATE_KEY, TodayTodos, TodoRow, WORKOUT_WEEK_KEY, dueToday, getTodoReason, loadTodoState, loadWeekOverride, mondayKey, saveTodoReason, saveWeekOverride, scheduledWorkoutDays, weekPos };
+export { AddWorkoutSheet, DAY_LABELS, MISS_GRACE_MS, MISS_REASONS, TODO_STATE_KEY, TodayTodos, TodoRow, WORKOUT_WEEK_KEY, dueToday, getTodoReason, loadTodoState, loadWeekOverride, saveTodoReason, saveWeekOverride, scheduledWorkoutDays, weekPos, weekStartKey };

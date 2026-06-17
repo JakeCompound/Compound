@@ -180,9 +180,9 @@ function relativeDay(dateStr) {
 
 function sessionsThisWeek(history) {
   const today = new Date(); today.setHours(12, 0, 0, 0);
-  const dow = (today.getDay() + 6) % 7;
-  const monday = new Date(today.getTime() - dow * 86400000);
-  return history.filter((e) => new Date(e.date + 'T12:00:00') >= monday).length;
+  const dow = today.getDay(); // 0 = Sunday — week runs Sun → Sat
+  const weekStart = new Date(today.getTime() - dow * 86400000);
+  return history.filter((e) => new Date(e.date + 'T12:00:00') >= weekStart).length;
 }
 
 Object.assign(window, {

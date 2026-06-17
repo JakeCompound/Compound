@@ -102,12 +102,12 @@ function buildWeek(history) {
   const today = new Date();
   today.setHours(12, 0, 0, 0);
   const todayKey = isoDate(today);
-  // Monday of this week
-  const dow = (today.getDay() + 6) % 7; // 0 = Monday
-  const monday = new Date(today.getTime() - dow * 86400000);
-  const labels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+  // Sunday of this week (week runs Sun → Sat)
+  const dow = today.getDay(); // 0 = Sunday … 6 = Saturday
+  const sunday = new Date(today.getTime() - dow * 86400000);
+  const labels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
   return labels.map((lab, i) => {
-    const d = new Date(monday.getTime() + i * 86400000);
+    const d = new Date(sunday.getTime() + i * 86400000);
     const key = isoDate(d);
     const e = byDate[key];
     const isToday = key === todayKey;

@@ -101,6 +101,8 @@ function App() {
       weight: 82.5,
       weightGoal: 78,
       trainingDays: 3,
+      workoutDays: [1, 3, 5],
+      workoutTime: '17:00',
       stepGoal: 10000,
       sleepGoal: 7.5,
       equipment: null,

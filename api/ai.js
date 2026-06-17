@@ -37,7 +37,7 @@ export default async function handler(req, res) {
     });
     if (!u.ok) return res.status(401).json({ error: 'Invalid session' });
   } catch (e) {
-    return res.status(401).json({ error: 'Auth check failed' });
+    return res.status(401).json({ error: 'Auth check failed', detail: String(e && e.message || e), name: String(e && e.name) });
   }
 
   // 2) Validate the content payload (text + base64 image blocks).

@@ -9,6 +9,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import './ai.js'; // defines window.claude.complete (AI proxy client)
+import './push.js'; // registers the service worker for Web Push
 
 import './tweaks-panel.jsx';
 import './mobile-shell.jsx';

@@ -36,7 +36,7 @@ function CheckinModal({ open, onClose, onComplete, gratitudeLibrary = [], user =
     afd: null,
     nips: 0,
     calmRating: 0,
-    gratitudeAcked: [false, false, false],
+    gratitudeAcked: [false, false, false, false, false, false],
     gratitudeNew: '',
     partnerTime: null,
     partnerNote: '',
@@ -46,24 +46,57 @@ function CheckinModal({ open, onClose, onComplete, gratitudeLibrary = [], user =
     workoutDays: Array.isArray(user.workoutDays) ? user.workoutDays : null,
   });
 
-  // Gratitude shuffle — 3 random items, computed once when modal opens
+  // Gratitude shuffle — 6 random items, computed once when modal opens.
   const [gratShuffle, setGratShuffle] = React.useState([]);
+  // Texts shown so far this session — Refresh works through the whole library
+  // before repeating any (pinned/ticked items don't count against it).
+  const gratSeenRef = React.useRef(new Set());
   React.useEffect(() => {
     if (open) {
       setStep(0);
       const pool = gratitudeLibrary.length > 0 ? gratitudeLibrary : DEFAULT_GRATITUDE;
-      const shuf = [...pool].sort(() => Math.random() - 0.5).slice(0, 3);
+      const shuf = [...pool].sort(() => Math.random() - 0.5).slice(0, 6);
       setGratShuffle(shuf);
-      // Editing an existing check-in → prefill with what was logged today.
+      gratSeenRef.current = new Set(shuf.map((g) => g.text));
+      // Editing an existing check-in → prefill with what was logged today
+      // (pre-tick all so the min-2 gate is already satisfied).
       if (initialAnswers) {
-        setAnswers((a) => ({ ...a, ...initialAnswers, gratitudeAcked: [true, true, true], gratitudeNew: initialAnswers.gratitudeNew || '' }));
+        setAnswers((a) => ({ ...a, ...initialAnswers, gratitudeAcked: shuf.map(() => true), gratitudeNew: initialAnswers.gratitudeNew || '' }));
       } else {
         // Fresh open: prefill nips from today's live tally (logged via + Add).
         var liveNips = window.loadNipsToday ? window.loadNipsToday() : 0;
-        setAnswers((a) => ({ ...a, gratitudeAcked: [false, false, false], gratitudeNew: '', nips: liveNips, afd: liveNips > 0 ? false : a.afd }));
+        setAnswers((a) => ({ ...a, gratitudeAcked: shuf.map(() => false), gratitudeNew: '', nips: liveNips, afd: liveNips > 0 ? false : a.afd }));
       }
     }
   }, [open]);
+
+  // Re-roll the un-ticked slots, pulling items the user hasn't seen yet this
+  // session, so Refresh works through the whole library before repeating any.
+  // Ticked items stay pinned. When the library is exhausted, a fresh cycle
+  // starts (seen forgets everything except the pinned items). A library too
+  // small to fill the slots falls back to reshuffling the current un-ticked.
+  const refreshGratitude = () => {
+    const pool = gratitudeLibrary.length > 0 ? gratitudeLibrary : DEFAULT_GRATITUDE;
+    const seen = gratSeenRef.current;
+    const shownTexts = new Set(gratShuffle.map((g) => g.text));
+    const untickedCount = gratShuffle.filter((g, i) => !answers.gratitudeAcked[i]).length;
+
+    let candidates = pool.filter((g) => !shownTexts.has(g.text) && !seen.has(g.text)).sort(() => Math.random() - 0.5);
+    if (candidates.length < untickedCount) {
+      // Use the last unseen items, then begin a new cycle: forget all but the pinned.
+      const usedTexts = new Set(candidates.map((g) => g.text));
+      seen.clear();
+      gratShuffle.forEach((g, i) => { if (answers.gratitudeAcked[i]) seen.add(g.text); });
+      const rest = pool.filter((g) => !shownTexts.has(g.text) && !usedTexts.has(g.text) && !seen.has(g.text)).sort(() => Math.random() - 0.5);
+      candidates = [...candidates, ...rest];
+    }
+    const reshuffledUnticked = gratShuffle.filter((g, i) => !answers.gratitudeAcked[i]).sort(() => Math.random() - 0.5);
+    const fillers = [...candidates, ...reshuffledUnticked];
+    let fi = 0;
+    const next = gratShuffle.map((g, i) => (answers.gratitudeAcked[i] ? g : (fillers[fi++] || g)));
+    next.forEach((g) => seen.add(g.text));
+    setGratShuffle(next);
+  };
 
   const set = (patch) => setAnswers((a) => ({ ...a, ...patch }));
 
@@ -106,7 +139,7 @@ function CheckinModal({ open, onClose, onComplete, gratitudeLibrary = [], user =
       case 'diet': return answers.dietRating > 0;
       case 'afd': return answers.afd !== null;
       case 'calm': return answers.calmRating > 0;
-      case 'gratitude': return answers.gratitudeAcked.every(Boolean);
+      case 'gratitude': return answers.gratitudeAcked.filter(Boolean).length >= Math.min(2, gratShuffle.length || 2);
       case 'partner': return answers.partnerTime !== null;
       case 'spirit': return answers.spirit !== null;
       case 'weekPlan': return Array.isArray(answers.workoutDays) && answers.workoutDays.length > 0;
@@ -227,9 +260,10 @@ function CheckinModal({ open, onClose, onComplete, gratitudeLibrary = [], user =
             <TierGuide tiers={CALM_TIERS} value={answers.calmRating} />
           </CIQuestion>
         );
-      case 'gratitude':
+      case 'gratitude': {
+        const tickedCount = answers.gratitudeAcked.filter(Boolean).length;
         return (
-          <CIQuestion tag="MIND · 7 / 9" title="GRATITUDE" accent="SHUFFLE." sub="Three items from your library. Tap each to acknowledge it. Read each one slowly.">
+          <CIQuestion tag="MIND · 7 / 9" title="GRATITUDE" accent="SHUFFLE." sub="Six from your library. Tick the ones that ring true tonight — at least two. Refresh swaps the rest.">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 14 }}>
               {gratShuffle.map((g, i) => {
                 const acked = answers.gratitudeAcked[i];
@@ -273,6 +307,18 @@ function CheckinModal({ open, onClose, onComplete, gratitudeLibrary = [], user =
                 );
               })}
             </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 }}>
+              <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 1.4, color: tickedCount >= 2 ? C.accent : C.textLow }}>
+                {tickedCount} / 2+ TICKED
+              </span>
+              <button
+                onClick={refreshGratitude}
+                style={{ background: 'transparent', border: 0, color: C.accent, cursor: 'pointer', fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 1.4, display: 'flex', alignItems: 'center', gap: 6, padding: 4 }}
+              >
+                <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M12 7 A5 5 0 1 1 10.5 3.5 M12 1.5 V4 H9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                REFRESH THE REST
+              </button>
+            </div>
             <div style={{ marginTop: 16 }}>
               <FieldLabel>Anything new today? (optional)</FieldLabel>
               <input
@@ -290,6 +336,7 @@ function CheckinModal({ open, onClose, onComplete, gratitudeLibrary = [], user =
             </div>
           </CIQuestion>
         );
+      }
       case 'partner':
         return (
           <CIQuestion

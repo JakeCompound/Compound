@@ -40,5 +40,10 @@ import './home-extras.jsx';
 import './quick-log.jsx';
 import './body-progress.jsx';
 import { App } from './app.jsx';
+import { AuthGate } from './auth-gate.jsx';
 
-createRoot(document.getElementById('root')).render(<App />);
+createRoot(document.getElementById('root')).render(
+  <AuthGate>
+    <App />
+  </AuthGate>,
+);

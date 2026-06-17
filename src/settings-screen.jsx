@@ -1,6 +1,7 @@
 import React from 'react';
 import { C, DateWheel, FieldLabel, SelectCard, Stepper, TextInput, TimeWheel, computeAge } from './compound-ui.jsx';
 import { ScreenGratitudeBuilder } from './onboarding-screens.jsx';
+import { supabase, supabaseConfigured } from './supabase.js';
 
 // settings-screen.jsx — Full settings, accessible via Home cog
 // Profile, goals, reminders, equipment, gratitude management, account, danger zone.
@@ -147,6 +148,17 @@ function SettingsScreen({ user, set, onClose, onReset, onRecalc }) {
           <SettingsRow icon={<IconInfo />} label="About COMPOUND" hint="Version 1.0 · changelog" onClick={() => setSection('about')} />
           <SettingsRow icon={<IconStar />} label="Rate the app" onClick={() => alert("Thanks. Five stars only.")} />
         </SettingsGroup>
+
+        {supabaseConfigured && (
+          <SettingsGroup label="ACCOUNT">
+            <SettingsRow
+              icon={<IconUser />}
+              label="Sign out"
+              hint="You'll need to sign back in on this device"
+              onClick={async () => { if (confirm('Sign out of COMPOUND?')) { try { await supabase.auth.signOut(); } catch (e) {} } }}
+            />
+          </SettingsGroup>
+        )}
 
         {/* Danger zone */}
         <div style={{ marginTop: 22 }}>

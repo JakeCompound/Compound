@@ -1,6 +1,7 @@
 import React from 'react';
 import { C } from './compound-ui.jsx';
 import { supabase, supabaseConfigured } from './supabase.js';
+import { syncOnLogin, teardownSync } from './cloud-sync.js';
 
 // auth-gate.jsx — gates the app behind Supabase email/password auth.
 // When Supabase isn't configured (no env keys) it's a no-op pass-through so the
@@ -10,6 +11,7 @@ import { supabase, supabaseConfigured } from './supabase.js';
 function AuthGate({ children }) {
   const [ready, setReady] = React.useState(!supabaseConfigured);
   const [session, setSession] = React.useState(null);
+  const [synced, setSynced] = React.useState(false);
 
   React.useEffect(() => {
     if (!supabaseConfigured) return;
@@ -19,20 +21,37 @@ function AuthGate({ children }) {
       setSession(data.session);
       setReady(true);
     });
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => setSession(s));
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
+      setSession(s);
+      if (!s) { setSynced(false); teardownSync(); }
+    });
     return () => { active = false; sub.subscription.unsubscribe(); };
   }, []);
+
+  // Hydrate localStorage from the cloud (or import on first login) before showing the app.
+  const userId = session && session.user ? session.user.id : null;
+  React.useEffect(() => {
+    if (!supabaseConfigured || !userId) return;
+    let active = true;
+    setSynced(false);
+    syncOnLogin(userId)
+      .catch((e) => console.warn('[sync] login sync failed:', e.message))
+      .finally(() => { if (active) setSynced(true); });
+    return () => { active = false; };
+  }, [userId]);
 
   if (!supabaseConfigured) return children;   // local-only mode
   if (!ready) return <Splash />;
   if (!session) return <AuthScreen />;
+  if (!synced) return <Splash label="Syncing your data…" />;
   return children;
 }
 
-function Splash() {
+function Splash({ label }) {
   return (
-    <div style={{ minHeight: '100vh', background: '#050507', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <div style={{ minHeight: '100vh', background: '#050507', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
       <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, letterSpacing: 3, color: C.accent }}>◆ COMPOUND</div>
+      {label && <div style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12, color: C.textMid }}>{label}</div>}
     </div>
   );
 }

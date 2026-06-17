@@ -8,8 +8,11 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY;
+// Public values (the anon/publishable key is meant for the browser and already
+// ships in the client bundle) — hardcoded as a fallback so JWT verification
+// never depends on a specific Vercel env-var name reaching the function runtime.
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || 'https://jzlimmbllpbbovyvssfp.supabase.co';
+const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || 'sb_publishable_TJ3WQjGO5pAvz37WjnzRXA_gktZf6LE';
 // Sonnet 4.6: vision-capable, good cost/quality (matches the RUNBOOK's Sonnet
 // choice). Override with ANTHROPIC_MODEL if needed.
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
@@ -26,7 +29,7 @@ export default async function handler(req, res) {
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
   if (!token) return res.status(401).json({ error: 'Not signed in' });
   try {
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
     const { data, error } = await supabase.auth.getUser(token);
     if (error || !data || !data.user) return res.status(401).json({ error: 'Invalid session' });
   } catch (e) {

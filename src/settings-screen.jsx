@@ -3,6 +3,7 @@ import { C, DateWheel, FieldLabel, SelectCard, Stepper, TextInput, TimeWheel, co
 import { ScreenGratitudeBuilder } from './onboarding-screens.jsx';
 import { supabase, supabaseConfigured } from './supabase.js';
 import { pushSupported, notifPermission, isSubscribed, subscribePush, unsubscribePush } from './push.js';
+import { clearAllCloudData } from './cloud-sync.js';
 
 // settings-screen.jsx — Full settings, accessible via Home cog
 // Profile, goals, reminders, equipment, gratitude management, account, danger zone.
@@ -27,6 +28,7 @@ function fmtWorkoutSchedule(user) {
 
 function SettingsScreen({ user, set, onClose, onReset, onRecalc }) {
   const [section, setSection] = React.useState(null); // null = main, else section id
+  const [showClear, setShowClear] = React.useState(false); // "clear all cloud data" modal
 
   if (section === 'profile') {
     return <SettingsProfileEdit user={user} set={set} onBack={() => setSection(null)} />;
@@ -185,11 +187,145 @@ function SettingsScreen({ user, set, onClose, onReset, onRecalc }) {
               </svg>
               Restart onboarding
             </button>
+
+            {supabaseConfigured && (
+              <button
+                onClick={() => setShowClear(true)}
+                style={{
+                  width: '100%', textAlign: 'left', marginTop: 8,
+                  padding: '14px 14px',
+                  background: 'transparent', border: `1px solid ${C.danger}`,
+                  borderRadius: 12, cursor: 'pointer',
+                  color: C.danger,
+                  fontFamily: 'Barlow Condensed, sans-serif', fontSize: 15, fontWeight: 700,
+                  letterSpacing: 1, textTransform: 'uppercase',
+                  display: 'flex', alignItems: 'center', gap: 10,
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" style={{ color: C.danger }}>
+                  <path d="M3 4 H13 M6.5 4 V2.5 H9.5 V4 M4.5 4 L5 13.5 H11 L11.5 4" stroke="currentColor" strokeWidth="1.2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                Clear all cloud data
+              </button>
+            )}
           </SettingsGroup>
         </div>
 
+        {showClear && <ClearDataModal onClose={() => setShowClear(false)} />}
+
         <div style={{ textAlign: 'center', marginTop: 24, fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: C.textLow, letterSpacing: 2 }}>
           ◆ COMPOUND · v 1.0
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Destructive: re-auth with the password, then wipe every cloud row + local data.
+// A 60-second countdown + password gate make it hard to fire by accident.
+function ClearDataModal({ onClose }) {
+  const [email, setEmail] = React.useState('');
+  const [password, setPassword] = React.useState('');
+  const [seconds, setSeconds] = React.useState(60);
+  const [pending, setPending] = React.useState(false);
+  const [err, setErr] = React.useState('');
+  const [doneMsg, setDoneMsg] = React.useState('');
+
+  // Prefill the signed-in email (shown read-only).
+  React.useEffect(() => {
+    let on = true;
+    supabase.auth.getUser().then(({ data }) => { if (on && data && data.user) setEmail(data.user.email || ''); });
+    return () => { on = false; };
+  }, []);
+
+  // 60s countdown — restarts each time the modal mounts (i.e. is reopened).
+  React.useEffect(() => {
+    if (seconds <= 0) return undefined;
+    const t = setTimeout(() => setSeconds((s) => s - 1), 1000);
+    return () => clearTimeout(t);
+  }, [seconds]);
+
+  const canDelete = seconds <= 0 && password.length > 0 && !pending && !doneMsg;
+
+  const doDelete = async () => {
+    if (!canDelete) return;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) { setErr("You're offline. Connect and try again."); return; }
+    setPending(true); setErr('');
+    // 1) Re-authenticate — confirms it's really them before anything is deleted.
+    const { error: authErr } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+    if (authErr) { setErr('Email or password incorrect. Try again.'); setPending(false); setPassword(''); setSeconds(60); return; }
+    // 2) Delete every cloud row for this user.
+    try {
+      const { data } = await supabase.auth.getUser();
+      await clearAllCloudData(data.user.id);
+    } catch (e) {
+      setErr("Couldn't reach the server. Check your connection and try again."); setPending(false); setSeconds(60); return;
+    }
+    // 3) Wipe local data, then sign out → AuthGate returns to the sign-in screen.
+    try { Object.keys(localStorage).filter((k) => k.startsWith('compound:')).forEach((k) => localStorage.removeItem(k)); } catch (e) {}
+    setPending(false); setDoneMsg('All data cleared. Signing out…');
+    setTimeout(async () => { try { await supabase.auth.signOut(); } catch (e) {} }, 1000);
+  };
+
+  const label = pending ? 'One sec…' : seconds > 0 ? `Delete everything (${seconds}s)` : 'Delete everything — no turning back';
+  const fieldStyle = (ro) => ({
+    width: '100%', boxSizing: 'border-box', height: 50,
+    background: ro ? C.surf2 : C.surf1, border: `1.5px solid ${C.line}`,
+    borderRadius: 12, color: ro ? C.textMid : C.text, fontFamily: 'Outfit, sans-serif', fontSize: 16,
+    padding: '0 14px', outline: 'none',
+  });
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: C.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 24px' }}>
+      <div style={{ width: '100%', maxWidth: 340 }}>
+        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, letterSpacing: 3, color: C.accent, marginBottom: 16 }}>◆ COMPOUND</div>
+        <h1 style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 800, fontSize: 28, letterSpacing: 0.5, color: C.danger, margin: 0, textTransform: 'uppercase' }}>Warning</h1>
+        <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 13.5, color: C.textMid, lineHeight: 1.5, margin: '10px 0 6px' }}>
+          This permanently deletes <strong style={{ color: C.text }}>all your data</strong> from our servers — every workout, meal, weigh-in, check-in and note. <strong style={{ color: C.text }}>This cannot be undone.</strong>
+        </p>
+        <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 13.5, color: C.textMid, lineHeight: 1.5, margin: '0 0 20px' }}>
+          To confirm, re-enter your password.
+        </p>
+
+        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 2, color: C.textLow, marginBottom: 8 }}>EMAIL</div>
+        <input type="email" value={email} readOnly style={fieldStyle(true)} />
+        <div style={{ height: 14 }} />
+        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 2, color: C.textLow, marginBottom: 8 }}>PASSWORD</div>
+        <input
+          type="password" value={password} placeholder="Your password" autoFocus
+          onChange={(e) => setPassword(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') doDelete(); }}
+          style={fieldStyle(false)}
+        />
+
+        {err && <div style={{ fontFamily: 'Outfit, sans-serif', fontSize: 13, color: C.danger, marginTop: 14, lineHeight: 1.4 }}>{err}</div>}
+        {doneMsg && <div style={{ fontFamily: 'Outfit, sans-serif', fontSize: 13, color: C.accent, marginTop: 14, lineHeight: 1.4 }}>{doneMsg}</div>}
+
+        <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
+          <button
+            onClick={onClose}
+            disabled={pending || !!doneMsg}
+            style={{
+              flex: 1, height: 52, background: 'transparent', border: `1px solid ${C.line}`, borderRadius: 12,
+              color: C.textMid, fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 16, letterSpacing: 1, textTransform: 'uppercase',
+              cursor: (pending || doneMsg) ? 'default' : 'pointer',
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={doDelete}
+            disabled={!canDelete}
+            style={{
+              flex: 1.4, height: 52, borderRadius: 12, border: 0,
+              background: canDelete ? C.danger : 'rgba(229,86,75,.28)',
+              color: canDelete ? '#fff' : 'rgba(255,255,255,.5)',
+              fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 15, letterSpacing: 0.6, textTransform: 'uppercase',
+              cursor: canDelete ? 'pointer' : 'default',
+            }}
+          >
+            {label}
+          </button>
         </div>
       </div>
     </div>

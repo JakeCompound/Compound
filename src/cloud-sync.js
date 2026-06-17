@@ -184,3 +184,22 @@ function installMirror() {
 }
 
 export function teardownSync() { uid = null; }
+
+// Permanently delete every cloud row for a user (used by Settings → Clear all
+// cloud data, after password re-auth). RLS lets a signed-in user delete their own
+// rows, so no service role is needed. push_sent is a server-only dedup log
+// (client can't and needn't touch it). The caller wipes localStorage + signs out.
+export async function clearAllCloudData(userId) {
+  if (!userId) throw new Error('No user');
+  const userKeyed = [
+    'weighins', 'checkins', 'workouts', 'saved_workouts', 'workout_week',
+    'food_entries', 'nip_days', 'measurements', 'todo_state', 'nutrition_messages',
+    'push_subscriptions',
+  ];
+  for (const t of userKeyed) {
+    const { error } = await supabase.from(t).delete().eq('user_id', userId);
+    if (error) throw new Error(`${t}: ${error.message}`);
+  }
+  const { error } = await supabase.from('profiles').delete().eq('id', userId);
+  if (error) throw new Error(`profiles: ${error.message}`);
+}

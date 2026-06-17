@@ -46,45 +46,14 @@
 <body>
   <div id="root"></div>
 
-  <!-- App icon data (sets window.COMPOUND_ICON_180 / _512) — must run before the manifest below -->
+  <!-- Static PWA manifest + icons (real files, so Chrome offers a true "Install app"
+       and mints a standalone WebAPK — a runtime blob: manifest is NOT installable). -->
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" href="/icon-192.png" />
+  <link rel="apple-touch-icon" href="/icon-180.png" />
+
+  <!-- App icon data (sets window.COMPOUND_ICON_180 / _512) — still used by the in-app shell. -->
   <script src="/app-icon.js"></script>
-  <script>
-    // Set up Add-to-Home-Screen icon + manifest at runtime (self-contained)
-    (function () {
-      try {
-        if (window.COMPOUND_ICON_180) {
-          var apple = document.createElement('link');
-          apple.rel = 'apple-touch-icon';
-          apple.href = window.COMPOUND_ICON_180;
-          document.head.appendChild(apple);
-          var fav = document.createElement('link');
-          fav.rel = 'icon';
-          fav.href = window.COMPOUND_ICON_180;
-          document.head.appendChild(fav);
-        }
-        var manifest = {
-          name: 'COMPOUND',
-          short_name: 'COMPOUND',
-          description: 'Consistency over perfection. Life tracking & training.',
-          display: 'standalone',
-          orientation: 'portrait',
-          background_color: '#070709',
-          theme_color: '#070709',
-          start_url: '.',
-          icons: [
-            { src: window.COMPOUND_ICON_512, sizes: '512x512', type: 'image/png', purpose: 'any' },
-            { src: window.COMPOUND_ICON_512, sizes: '512x512', type: 'image/png', purpose: 'maskable' },
-            { src: window.COMPOUND_ICON_180, sizes: '180x180', type: 'image/png' }
-          ]
-        };
-        var blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
-        var link = document.createElement('link');
-        link.rel = 'manifest';
-        link.href = URL.createObjectURL(blob);
-        document.head.appendChild(link);
-      } catch (e) {}
-    })();
-  </script>
 
   <script type="module" src="/src/main.jsx"></script>
 </body>

@@ -6,7 +6,6 @@
 // window.claude.complete(...) (see src/ai.js); the 5 existing AI call sites are
 // unchanged.
 import Anthropic from '@anthropic-ai/sdk';
-import { createClient } from '@supabase/supabase-js';
 
 // Public values (the anon/publishable key is meant for the browser and already
 // ships in the client bundle) — hardcoded as a fallback so JWT verification
@@ -29,9 +28,14 @@ export default async function handler(req, res) {
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
   if (!token) return res.status(401).json({ error: 'Not signed in' });
   try {
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
-    const { data, error } = await supabase.auth.getUser(token);
-    if (error || !data || !data.user) return res.status(401).json({ error: 'Invalid session' });
+    // Verify the token with a plain REST call to Supabase's /auth/v1/user.
+    // (We used to use supabase-js getUser() here, but it mishandled the new
+    // sb_publishable_… key format in this server runtime and rejected valid
+    // tokens. This direct call matches exactly what the browser does.)
+    const u = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${token}` },
+    });
+    if (!u.ok) return res.status(401).json({ error: 'Invalid session' });
   } catch (e) {
     return res.status(401).json({ error: 'Auth check failed' });
   }

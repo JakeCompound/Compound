@@ -22,8 +22,8 @@ self.addEventListener('push', (event) => {
     body: data.body || '',
     tag: data.tag || 'compound',          // same tag replaces an existing notif instead of stacking
     renotify: true,
-    icon: '/icon-180.png',
-    badge: '/icon-180.png',
+    icon: '/icon-180.png',   // full-colour COMPOUND logo (shown in the notification body)
+    badge: '/badge-96.png',  // monochrome ring mark (Android status bar — must be white/transparent)
     data: { url: data.url || '/' },
     vibrate: [80, 40, 80],
   };

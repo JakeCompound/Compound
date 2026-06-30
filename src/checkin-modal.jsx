@@ -23,6 +23,19 @@ const CALM_TIERS = [
   { stars: 5, label: 'Centred', body: 'Clear-minded, at peace.' },
 ];
 
+// In-progress check-in draft — survives a re-render/rotation that remounts the
+// modal. Keyed to the day so a stale draft never restores tomorrow.
+const CHECKIN_DRAFT_KEY = 'compound:checkinDraft';
+const ciToday = () => new Date().toISOString().slice(0, 10);
+function loadCheckinDraft() {
+  try { const d = JSON.parse(sessionStorage.getItem(CHECKIN_DRAFT_KEY)); if (d && d.date === ciToday()) return d; } catch (e) {}
+  return null;
+}
+function saveCheckinDraft(step, answers, gratShuffle) {
+  try { sessionStorage.setItem(CHECKIN_DRAFT_KEY, JSON.stringify({ date: ciToday(), step, answers, gratShuffle })); } catch (e) {}
+}
+function clearCheckinDraft() { try { sessionStorage.removeItem(CHECKIN_DRAFT_KEY); } catch (e) {} }
+
 function CheckinModal({ open, onClose, onComplete, gratitudeLibrary = [], user = {}, initialAnswers = null }) {
   const [step, setStep] = React.useState(0);
   const [answers, setAnswers] = React.useState({
@@ -52,23 +65,40 @@ function CheckinModal({ open, onClose, onComplete, gratitudeLibrary = [], user =
   // before repeating any (pinned/ticked items don't count against it).
   const gratSeenRef = React.useRef(new Set());
   React.useEffect(() => {
-    if (open) {
-      setStep(0);
-      const pool = gratitudeLibrary.length > 0 ? gratitudeLibrary : DEFAULT_GRATITUDE;
-      const shuf = [...pool].sort(() => Math.random() - 0.5).slice(0, 6);
-      setGratShuffle(shuf);
-      gratSeenRef.current = new Set(shuf.map((g) => g.text));
-      // Editing an existing check-in → prefill with what was logged today
-      // (pre-tick all so the min-2 gate is already satisfied).
-      if (initialAnswers) {
-        setAnswers((a) => ({ ...a, ...initialAnswers, gratitudeAcked: shuf.map(() => true), gratitudeNew: initialAnswers.gratitudeNew || '' }));
-      } else {
-        // Fresh open: prefill nips from today's live tally (logged via + Add).
-        var liveNips = window.loadNipsToday ? window.loadNipsToday() : 0;
-        setAnswers((a) => ({ ...a, gratitudeAcked: shuf.map(() => false), gratitudeNew: '', nips: liveNips, afd: liveNips > 0 ? false : a.afd }));
-      }
+    if (!open) return;
+    const pool = gratitudeLibrary.length > 0 ? gratitudeLibrary : DEFAULT_GRATITUDE;
+
+    // Restore an in-progress check-in if we remounted mid-session (e.g. a
+    // landscape rotation). Only for a fresh check-in, not when editing.
+    const draft = initialAnswers ? null : loadCheckinDraft();
+    if (draft && Array.isArray(draft.gratShuffle) && draft.gratShuffle.length) {
+      setStep(draft.step || 0);
+      setAnswers((a) => ({ ...a, ...draft.answers }));
+      setGratShuffle(draft.gratShuffle);
+      gratSeenRef.current = new Set(draft.gratShuffle.map((g) => g.text));
+      return;
+    }
+
+    setStep(0);
+    const shuf = [...pool].sort(() => Math.random() - 0.5).slice(0, 6);
+    setGratShuffle(shuf);
+    gratSeenRef.current = new Set(shuf.map((g) => g.text));
+    // Editing an existing check-in → prefill with what was logged today
+    // (pre-tick all so the min-2 gate is already satisfied).
+    if (initialAnswers) {
+      setAnswers((a) => ({ ...a, ...initialAnswers, gratitudeAcked: shuf.map(() => true), gratitudeNew: initialAnswers.gratitudeNew || '' }));
+    } else {
+      // Fresh open: prefill nips from today's live tally (logged via + Add).
+      var liveNips = window.loadNipsToday ? window.loadNipsToday() : 0;
+      setAnswers((a) => ({ ...a, gratitudeAcked: shuf.map(() => false), gratitudeNew: '', nips: liveNips, afd: liveNips > 0 ? false : a.afd }));
     }
   }, [open]);
+
+  // Persist the in-progress draft on every change so a remount can restore it.
+  React.useEffect(() => {
+    if (!open || gratShuffle.length === 0) return;
+    saveCheckinDraft(step, answers, gratShuffle);
+  }, [open, step, answers, gratShuffle]);
 
   // Re-roll the un-ticked slots, pulling items the user hasn't seen yet this
   // session, so Refresh works through the whole library before repeating any.
@@ -118,12 +148,15 @@ function CheckinModal({ open, onClose, onComplete, gratitudeLibrary = [], user =
 
   const advance = () => {
     if (step >= total - 1) {
+      clearCheckinDraft();
       onComplete && onComplete(answers);
     } else {
       setStep(step + 1);
     }
   };
   const back = () => setStep(Math.max(0, step - 1));
+  // Closing = cancelling the in-progress check-in → drop the draft.
+  const handleClose = () => { clearCheckinDraft(); onClose && onClose(); };
 
   // Auto-advance: a ref always points at the freshest advance() so a delayed
   // call (after the answer's re-render) completes with up-to-date answers.
@@ -417,7 +450,7 @@ function CheckinModal({ open, onClose, onComplete, gratitudeLibrary = [], user =
         transition: 'background .25s ease',
         display: 'flex', alignItems: 'flex-end',
       }}
-      onClick={onClose}
+      onClick={handleClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
@@ -445,7 +478,7 @@ function CheckinModal({ open, onClose, onComplete, gratitudeLibrary = [], user =
               CHECK-IN · {step + 1} / {total}
             </span>
             <button
-              onClick={onClose}
+              onClick={handleClose}
               style={{ background: 'transparent', border: 0, color: C.textLow, cursor: 'pointer', padding: 4, display: 'flex' }}
             >
               <svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 3 L11 11 M11 3 L3 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>

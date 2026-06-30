@@ -1,5 +1,6 @@
 import React from 'react';
 import { C } from './compound-ui.jsx';
+import { isJoinDay } from './mid-week-join.js';
 
 // todo-list.jsx — "Today's To-Do List" for Home.
 // Tasks with live countdowns; turn red on expiry, count into the negatives,
@@ -133,8 +134,12 @@ function TodayTodos({ user, set, state, onOpenCheckin, onWeighIn, onGoWorkout, o
     onChanged && onChanged();
   };
 
+  // On the join day, defer the daily weigh-in & check-in to tomorrow so day one
+  // is a clean start, not a list of things already "missed". Encouragement first.
+  const joinDay = isJoinDay();
+
   const todos = [
-    {
+    ...(joinDay ? [] : [{
       id: 'weighin',
       label: 'Daily Weigh-in',
       sub: 'Pre-water · one number',
@@ -149,7 +154,7 @@ function TodayTodos({ user, set, state, onOpenCheckin, onWeighIn, onGoWorkout, o
           <circle cx="10" cy="12" r="1.2" fill="currentColor" />
         </svg>
       ),
-    },
+    }]),
     ...(isWorkoutDay ? [{
       id: 'workout',
       label: 'Workout',
@@ -169,7 +174,7 @@ function TodayTodos({ user, set, state, onOpenCheckin, onWeighIn, onGoWorkout, o
         </svg>
       ),
     }] : []),
-    {
+    ...(joinDay ? [] : [{
       id: 'checkin',
       label: 'Daily Check-in',
       sub: '9 quick questions',
@@ -185,7 +190,7 @@ function TodayTodos({ user, set, state, onOpenCheckin, onWeighIn, onGoWorkout, o
           <line x1="15" y1="3" x2="15" y2="7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
         </svg>
       ),
-    },
+    }]),
   ].sort((a, b) => (a.time < b.time ? -1 : 1));
 
   const doneCount = todos.filter((t) => t.done).length;
@@ -196,15 +201,27 @@ function TodayTodos({ user, set, state, onOpenCheckin, onWeighIn, onGoWorkout, o
         <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 2.4, color: C.textLow }}>
           TODAY'S TO-DO LIST
         </span>
-        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, letterSpacing: 1, color: doneCount === todos.length ? C.success : C.accent }}>
-          {doneCount}/{todos.length} DONE
-        </span>
+        {todos.length > 0 && (
+          <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, letterSpacing: 1, color: doneCount === todos.length ? C.success : C.accent }}>
+            {doneCount}/{todos.length} DONE
+          </span>
+        )}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {todos.map((t) => (
           <TodoRow key={t.id} todo={t} now={now} dateKey={dateKey} />
         ))}
       </div>
+
+      {/* Join day: the daily weigh-in & check-in start tomorrow — set the tone. */}
+      {joinDay && (
+        <div style={{ marginTop: todos.length ? 10 : 2, padding: '12px 14px', background: C.surf1, border: `1px dashed ${C.accentDim}`, borderRadius: 12, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+          <span style={{ fontSize: 16, lineHeight: 1 }}>🌱</span>
+          <div style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: C.textMid, lineHeight: 1.45 }}>
+            Day one — nothing to catch up on. Your daily <strong style={{ color: C.text }}>weigh-in</strong> and <strong style={{ color: C.text }}>check-in</strong> start <strong style={{ color: C.accent }}>tomorrow</strong>. Settle in tonight.
+          </div>
+        </div>
+      )}
 
       {/* Nutrition Question to-do — appears when the AI has open meal questions */}
       {(() => {

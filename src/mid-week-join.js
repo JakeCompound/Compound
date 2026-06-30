@@ -43,3 +43,12 @@ export function isFirstWeekPostJoin(now = new Date()) {
   if (!start) return false;
   return atMidnight(now) < start;
 }
+
+// True only on the calendar day the user joined. Used to defer the daily
+// weigh-in / check-in to the next day so day one feels like a fresh start,
+// not a list of things already "missed".
+export function isJoinDay(now = new Date()) {
+  const j = getJoinedAt();
+  if (!j) return false;
+  return atMidnight(j).getTime() === atMidnight(now).getTime();
+}

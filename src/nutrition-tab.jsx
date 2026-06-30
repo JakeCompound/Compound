@@ -3,6 +3,7 @@ import { C } from './compound-ui.jsx';
 import { SectionLabel } from './home-components.jsx';
 import { NutritionChat } from './nutrition-screen.jsx';
 import { AddRow, FoodAdd, NipQuickAdd } from './add-button.jsx';
+import { alcoholOn } from './alcohol.js';
 
 // nutrition-tab.jsx — Redesigned Nutrition: Today (food tracker) / Ask (AI chat).
 
@@ -80,6 +81,10 @@ function NutritionToday({ user, onChanged }) {
 
   const kcalTarget = targets ? targets.calories : 0;
   const kcalLeft = Math.max(0, kcalTarget - totals.kcal);
+  // Alcohol kcal are in the ring total (dayTotals) but have no macro bar — show
+  // them as their own line so the breakdown reconciles with the total.
+  const alcKcal = window.loadAlcoholKcal ? window.loadAlcoholKcal() : 0;
+  const showAlcohol = alcoholOn(user) && alcKcal > 0;
 
   return (
     <div style={{ flex: 1, overflowY: 'auto', padding: '14px 22px 32px' }}>
@@ -90,6 +95,12 @@ function NutritionToday({ user, onChanged }) {
           <MacroBar label="PROTEIN" value={totals.p} target={targets ? targets.protein : 0} color={C.accent} />
           {targets && targets.carbs ? <MacroBar label="CARBS" value={totals.c} target={targets.carbs} color="#7CA8E0" /> : null}
           {targets && targets.fat ? <MacroBar label="FAT" value={totals.f} target={targets.fat} color="#7BB661" /> : null}
+          {showAlcohol && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 2, paddingTop: 8, borderTop: `1px solid ${C.line}` }}>
+              <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, letterSpacing: 1.4, color: '#E5564B' }}>ALCOHOL</span>
+              <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: C.textMid }}>{alcKcal} kcal</span>
+            </div>
+          )}
         </div>
       </div>
 

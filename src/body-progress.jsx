@@ -238,14 +238,57 @@ function LogMeasurementsModal({ onClose, onSave, entries }) {
 }
 
 // ── Progress photos ─────────────────────────────────────────────────────
+// Stored locally as downscaled JPEG data URLs (keeps localStorage small). Not
+// cloud-synced yet — that waits for Storage upload in a later pass.
+const PHOTOS_KEY = 'compound:photos'; // { [label]: dataURL }
+function loadPhotos() { try { return JSON.parse(localStorage.getItem(PHOTOS_KEY) || '{}'); } catch (e) { return {}; } }
+function savePhoto(label, dataURL) { const all = loadPhotos(); all[label] = dataURL; try { localStorage.setItem(PHOTOS_KEY, JSON.stringify(all)); } catch (e) {} }
+function removePhoto(label) { const all = loadPhotos(); delete all[label]; try { localStorage.setItem(PHOTOS_KEY, JSON.stringify(all)); } catch (e) {} }
+
+// Read a picked/taken image and downscale it so four photos don't blow the
+// localStorage quota.
+function fileToResizedDataURL(file, maxDim = 1000) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        try { resolve(canvas.toDataURL('image/jpeg', 0.82)); } catch (e) { resolve(reader.result); }
+      };
+      img.onerror = reject;
+      img.src = reader.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+const PHOTO_LABELS = ['START', '+4 WK', '+8 WK', '+12 WK'];
+
 function ProgressPhotosCard() {
-  const slots = [{ label: 'START' }, { label: '+4 WK' }, { label: '+8 WK' }, { label: '+12 WK' }];
+  const [photos, setPhotos] = React.useState(loadPhotos);
+  const refresh = () => setPhotos(loadPhotos());
+  const count = PHOTO_LABELS.filter((l) => photos[l]).length;
   return (
     <div>
-      <SectionLabel meta="NOT STARTED">PROGRESS PHOTOS</SectionLabel>
+      <SectionLabel meta={count ? `${count} / 4` : 'NOT STARTED'}>PROGRESS PHOTOS</SectionLabel>
       <div style={{ background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 14, padding: 14 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
-          {slots.map((s, i) => <PhotoSlot key={i} slot={s} />)}
+          {PHOTO_LABELS.map((label) => (
+            <PhotoSlot
+              key={label}
+              label={label}
+              url={photos[label] || null}
+              onSet={(dataURL) => { savePhoto(label, dataURL); refresh(); }}
+              onRemove={() => { removePhoto(label); refresh(); }}
+            />
+          ))}
         </div>
         <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: C.textMid, lineHeight: 1.5, margin: '12px 0 0' }}>
           Add your first photo, then one a month — same light, same pose, same time of day. The most honest data your phone can collect.
@@ -255,26 +298,89 @@ function ProgressPhotosCard() {
   );
 }
 
-function PhotoSlot({ slot }) {
+function PhotoSlot({ label, url, onSet, onRemove }) {
+  const [sheet, setSheet] = React.useState(false);
+  const camRef = React.useRef(null);
+  const libRef = React.useRef(null);
+  const handleFile = async (e) => {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = ''; // let the same file be re-picked later
+    if (!f) return;
+    try { const dataURL = await fileToResizedDataURL(f); onSet(dataURL); } catch (err) {}
+    setSheet(false);
+  };
   return (
+    <>
+      <button
+        onClick={() => setSheet(true)}
+        style={{
+          aspectRatio: '3 / 4', position: 'relative', overflow: 'hidden',
+          background: url ? `center/cover no-repeat url(${url})` : C.surf2,
+          border: `1px ${url ? 'solid' : 'dashed'} ${url ? C.accentDim : C.lineStrong}`, borderRadius: 8,
+          cursor: 'pointer', color: C.accent,
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, padding: 4,
+        }}
+      >
+        {!url && (
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <rect x="2.5" y="5" width="15" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.4" />
+            <circle cx="10" cy="11" r="3" stroke="currentColor" strokeWidth="1.4" />
+            <rect x="7" y="3" width="6" height="3" rx="1" stroke="currentColor" strokeWidth="1.4" fill="none" />
+          </svg>
+        )}
+        <span
+          style={{
+            fontFamily: 'JetBrains Mono, monospace', fontSize: 8, letterSpacing: 1, textAlign: 'center', lineHeight: 1.2,
+            color: url ? '#fff' : C.accent,
+            ...(url ? { position: 'absolute', bottom: 0, left: 0, right: 0, padding: '3px 0', background: 'rgba(0,0,0,.55)' } : {}),
+          }}
+        >
+          {label}
+        </span>
+      </button>
+      <input ref={camRef} type="file" accept="image/*" capture="environment" onChange={handleFile} style={{ display: 'none' }} />
+      <input ref={libRef} type="file" accept="image/*" onChange={handleFile} style={{ display: 'none' }} />
+      {sheet && (
+        <PhotoChooser
+          label={label}
+          hasPhoto={!!url}
+          onCamera={() => camRef.current && camRef.current.click()}
+          onLibrary={() => libRef.current && libRef.current.click()}
+          onRemove={() => { onRemove(); setSheet(false); }}
+          onClose={() => setSheet(false)}
+        />
+      )}
+    </>
+  );
+}
+
+// Action sheet: take a photo (native camera) vs choose from library.
+function PhotoChooser({ label, hasPhoto, onCamera, onLibrary, onRemove, onClose }) {
+  const row = (text, onClick, danger) => (
     <button
+      onClick={onClick}
       style={{
-        aspectRatio: '3 / 4',
-        background: C.surf2, border: `1px dashed ${C.lineStrong}`, borderRadius: 8,
-        cursor: 'pointer', color: C.accent,
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6,
-        padding: 4,
+        width: '100%', padding: '14px 16px', textAlign: 'left', cursor: 'pointer',
+        background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 12,
+        color: danger ? C.danger : C.text, fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700,
+        fontSize: 16, letterSpacing: 0.6, textTransform: 'uppercase',
       }}
     >
-      <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-        <rect x="2.5" y="5" width="15" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.4" />
-        <circle cx="10" cy="11" r="3" stroke="currentColor" strokeWidth="1.4" />
-        <rect x="7" y="3" width="6" height="3" rx="1" stroke="currentColor" strokeWidth="1.4" fill="none" />
-      </svg>
-      <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 8, letterSpacing: 1, textAlign: 'center', lineHeight: 1.2 }}>
-        {slot.label}
-      </span>
+      {text}
     </button>
+  );
+  return (
+    <div onClick={onClose} style={{ position: 'absolute', inset: 0, zIndex: 220, background: 'rgba(0,0,0,.72)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'flex-end' }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', background: C.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: '20px 22px 24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 3, borderRadius: 2, background: 'rgba(255,255,255,.18)' }} /></div>
+        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.accent, letterSpacing: 2.4, marginBottom: 12 }}>PROGRESS PHOTO · {label}</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {row('📸  Take a photo', onCamera)}
+          {row('🖼️  Choose from library', onLibrary)}
+          {hasPhoto && row('Remove photo', onRemove, true)}
+        </div>
+      </div>
+    </div>
   );
 }
 

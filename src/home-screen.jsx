@@ -1,6 +1,6 @@
 import React from 'react';
 import { C } from './compound-ui.jsx';
-import { DayDot, SectionLabel, WeekStrip } from './home-components.jsx';
+import { DayDot, LifeBalanceRadar, SectionLabel, WeekStrip } from './home-components.jsx';
 import { computeLifeScore, getTodayCopy } from './home-data.jsx';
 import { BirthdayCard, ComebackCard, WeighInModal } from './home-extras.jsx';
 import { ThreeRings } from './three-rings.jsx';
@@ -124,6 +124,13 @@ function HomeScreen({ user, set, state, onOpenCheckin, onGoTo, onOpenSettings, o
         />
       </div>
 
+      {/* Life balance — compact radar, tap through to the full Reports view */}
+      {state.radar && Object.keys(state.radar).length > 0 && (
+        <div style={{ marginTop: 16 }}>
+          <LifeBalanceCard radar={state.radar} onOpen={() => onGoTo && onGoTo('reports')} />
+        </div>
+      )}
+
       {/* Real logged steps/sleep ribbon removed per request */}
 
       {/* Today's To-Do list (check-in + weigh-in with live countdowns) */}
@@ -207,6 +214,37 @@ function WelcomeBanner() {
         <svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 3 L11 11 M11 3 L3 11" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
       </button>
     </div>
+  );
+}
+
+// Compact Life-Balance radar on Home. The whole card is tappable and carries a
+// clear "FULL REPORT →" cue so it reads as a doorway into the Reports tab.
+function LifeBalanceCard({ radar, onOpen }) {
+  const [pressed, setPressed] = React.useState(false);
+  return (
+    <button
+      onClick={onOpen}
+      onPointerDown={() => setPressed(true)}
+      onPointerUp={() => setPressed(false)}
+      onPointerLeave={() => setPressed(false)}
+      aria-label="Open your full life-balance report"
+      style={{
+        width: '100%', textAlign: 'left', cursor: 'pointer', display: 'block',
+        background: 'linear-gradient(165deg, #17130D 0%, #100E0B 100%)',
+        border: `1px solid ${C.line}`, borderRadius: 16,
+        padding: '14px 16px 10px',
+        transform: pressed ? 'scale(0.985)' : 'scale(1)', transition: 'transform .1s',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 2.4, color: C.textLow }}>LIFE BALANCE</span>
+        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9.5, letterSpacing: 1.4, color: C.accent, display: 'flex', alignItems: 'center', gap: 5 }}>
+          FULL REPORT
+          <svg width="11" height="11" viewBox="0 0 12 12"><path d="M3 6 H9 M6 3 L9 6 L6 9" stroke="currentColor" strokeWidth="1.6" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        </span>
+      </div>
+      <LifeBalanceRadar values={radar} size={160} />
+    </button>
   );
 }
 

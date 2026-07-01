@@ -350,6 +350,7 @@ function App() {
             onComplete={() => {
               setActiveSession(null);
               setWorkoutView('home');
+              setNutTick((x) => x + 1); // recompute liveState so "This Week" reflects the just-logged session
             }}
           />
         );

@@ -95,10 +95,15 @@ function computeStreaks(history) {
   };
 }
 
-// Build Mon→Sun strip for the current week from real entries.
+// Build the Sun→Sat strip for the current week from real entries.
 function buildWeek(history) {
   const byDate = {};
   history.forEach((h) => { byDate[h.date] = h; });
+  // Actually-logged workout sessions count as a workout for that day — not just
+  // the check-in "did you work out?" answer. This makes the week strip and the
+  // workouts ring read ONE source (a day is a workout day from either signal).
+  const workoutDates = new Set();
+  try { (window.loadWorkouts ? window.loadWorkouts() : []).forEach((w) => { if (w && w.date) workoutDates.add(w.date); }); } catch (e) {}
   const today = new Date();
   today.setHours(12, 0, 0, 0);
   const todayKey = isoDate(today);
@@ -113,11 +118,12 @@ function buildWeek(history) {
     const isToday = key === todayKey;
     const isFuture = d > today && !isToday;
     if (isFuture) return { day: lab, future: true };
-    if (!e) return { day: lab, checkin: false, workout: false, spirit: false, afd: false, today: isToday };
+    const loggedWorkout = workoutDates.has(key);
+    if (!e) return { day: lab, checkin: false, workout: loggedWorkout, spirit: false, afd: false, today: isToday };
     return {
       day: lab,
       checkin: true,
-      workout: !!e.answers.workoutToday,
+      workout: !!e.answers.workoutToday || loggedWorkout,
       spirit: !!e.answers.spirit,
       afd: !!e.answers.afd,
       today: isToday,
@@ -156,12 +162,9 @@ function deriveLiveState(user, history) {
   let weeklyNips = computeWeeklyNips(history);
   // Add today's live tally if today's check-in isn't logged yet (avoids double count).
   if (!todayEntry) { try { weeklyNips += (window.loadNipsToday ? window.loadNipsToday() : 0); } catch (e) {} }
-  let weeklyWorkouts = workoutsDone;
-  try {
-    if (window.sessionsThisWeek && window.loadWorkouts) {
-      weeklyWorkouts = Math.max(workoutsDone, window.sessionsThisWeek(window.loadWorkouts()));
-    }
-  } catch (e) {}
+  // Single source: workoutsDone already counts days with a logged session OR a
+  // check-in "worked out" (see buildWeek), so it needs no separate reconciliation.
+  const weeklyWorkouts = workoutsDone;
   let nipLimit = 55;
   try {
     const stored = parseInt(localStorage.getItem('compound:nipLimit'), 10);

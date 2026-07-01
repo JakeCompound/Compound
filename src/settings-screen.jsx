@@ -4,6 +4,7 @@ import { ScreenGratitudeBuilder } from './onboarding-screens.jsx';
 import { supabase, supabaseConfigured } from './supabase.js';
 import { pushSupported, notifPermission, isSubscribed, subscribePush, unsubscribePush } from './push.js';
 import { clearAllCloudData } from './cloud-sync.js';
+import { alcoholOn } from './alcohol.js';
 
 // settings-screen.jsx — Full settings, accessible via Home cog
 // Profile, goals, reminders, equipment, gratitude management, account, danger zone.
@@ -129,11 +130,20 @@ function SettingsScreen({ user, set, onClose, onReset, onRecalc }) {
             onClick={() => set({ dietTracking: !user.dietTracking })}
           />
           <SettingsRow
-            icon={<IconBell />}
-            label="Weekly nip limit"
-            hint="The cap the Weekly Nips ring tracks against"
-            onClick={() => setSection('niplimit')}
+            icon={<IconBolt />}
+            label="Alcohol tracking"
+            hint={alcoholOn(user) ? 'On · nips ring, drinks & AFD streaks' : 'Off · hidden everywhere'}
+            value={alcoholOn(user) ? 'ON' : 'OFF'}
+            onClick={() => set({ trackAlcohol: !alcoholOn(user) })}
           />
+          {alcoholOn(user) && (
+            <SettingsRow
+              icon={<IconBell />}
+              label="Weekly nip limit"
+              hint="The cap the Weekly Nips ring tracks against"
+              onClick={() => setSection('niplimit')}
+            />
+          )}
         </SettingsGroup>
 
         <SettingsGroup label="DATA">

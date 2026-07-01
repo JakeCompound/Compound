@@ -1,6 +1,7 @@
 import React from 'react';
 import { C, FieldLabel, MultiChip, StarRating, StepBar, Stepper } from './compound-ui.jsx';
 import { FooterNav } from './onboarding-screens.jsx';
+import { alcoholOn } from './alcohol.js';
 
 // checkin-modal.jsx — Nightly 9-question check-in
 // Slides up from bottom over the Home screen.
@@ -135,8 +136,8 @@ function CheckinModal({ open, onClose, onComplete, gratitudeLibrary = [], user =
   const seq = (() => {
     const s = ['workout'];
     if (answers.workoutToday === true) s.push('workoutGroups', 'workoutMinutes', 'workoutIntensity');
-    s.push('steps', 'sleep', 'diet', 'afd');
-    if (answers.afd === false) s.push('nips');
+    s.push('steps', 'sleep', 'diet');
+    if (alcoholOn(user)) { s.push('afd'); if (answers.afd === false) s.push('nips'); }
     s.push('calm', 'gratitude', 'partner', 'spirit');
     if (answers.spirit === true) s.push('spiritDetail');
     if (isSunday) s.push('weekPlan');

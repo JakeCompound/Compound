@@ -3,7 +3,7 @@ import { C } from './compound-ui.jsx';
 
 // add-button.jsx — Floating "+" on Home → Alcohol (nip) + Food (when diet tracking on).
 
-function AddButton({ dietTracking, onChanged, onGoNutrition }) {
+function AddButton({ dietTracking, alcohol = true, onChanged, onGoNutrition }) {
   const [menu, setMenu] = React.useState(false);
   const [sheet, setSheet] = React.useState(null); // 'nip' | 'food'
   return (
@@ -28,7 +28,7 @@ function AddButton({ dietTracking, onChanged, onGoNutrition }) {
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 3, borderRadius: 2, background: 'rgba(255,255,255,.18)' }} /></div>
             <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.accent, letterSpacing: 2.4, marginBottom: 12 }}>ADD TO TODAY</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <AddRow label="Alcohol" sub="Log a nip / beer / wine" glyph="🍺" onClick={() => { setMenu(false); setSheet('nip'); }} />
+              {alcohol && <AddRow label="Alcohol" sub="Log a nip / beer / wine" glyph="🍺" onClick={() => { setMenu(false); setSheet('nip'); }} />}
               {dietTracking && <AddRow label="Food" sub="Photo or describe — AI does the macros" glyph="🍽️" onClick={() => { setMenu(false); setSheet('food'); }} />}
             </div>
           </div>

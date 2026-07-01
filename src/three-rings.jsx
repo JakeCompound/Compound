@@ -85,7 +85,7 @@ function NorthStarRing({ size, fraction, color, glow, onClick, top, value, unit,
   );
 }
 
-function ThreeRings({ state, onOpenCheckin, onGoWorkout, onChanged }) {
+function ThreeRings({ state, onOpenCheckin, onGoWorkout, onChanged, alcohol = true }) {
   const limit = state.nipLimit || 55;
   const [showNip, setShowNip] = React.useState(false);
 
@@ -114,16 +114,18 @@ function ThreeRings({ state, onOpenCheckin, onGoWorkout, onChanged }) {
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, marginTop: 8 }}>
-        <NorthStarRing
-          size={ringSize}
-          fraction={overLimit ? 1 : nipFraction}
-          color={nipColor}
-          glow={overLimit}
-          onClick={() => setShowNip(true)}
-          value={nips}
-          sub={`/ ${limit}`}
-          label="Wk Nips"
-        />
+        {alcohol && (
+          <NorthStarRing
+            size={ringSize}
+            fraction={overLimit ? 1 : nipFraction}
+            color={nipColor}
+            glow={overLimit}
+            onClick={() => setShowNip(true)}
+            value={nips}
+            sub={`/ ${limit}`}
+            label="Wk Nips"
+          />
+        )}
         <NorthStarRing
           size={ringSize}
           fraction={wFraction}
@@ -147,22 +149,30 @@ function ThreeRings({ state, onOpenCheckin, onGoWorkout, onChanged }) {
       </div>
 
       {/* Status line */}
-      <div
-        style={{
-          marginTop: 12, padding: '8px 14px',
-          background: overLimit ? 'rgba(229,86,75,.10)' : C.surf1,
-          border: `1px solid ${overLimit ? 'rgba(229,86,75,.35)' : C.line}`,
-          borderRadius: 10,
-          display: 'flex', alignItems: 'center', gap: 8,
-        }}
-      >
-        <span style={{ width: 7, height: 7, borderRadius: 4, background: overLimit ? C.danger : nipColor, flexShrink: 0 }} />
-        <span style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: overLimit ? C.text : C.textMid, lineHeight: 1.4 }}>
-          {overLimit
-            ? `${nips - limit} over your weekly limit.`
-            : `${Math.max(0, limit - nips)} nips left this week. ${wComplete ? 'Workouts done.' : wUnmakeable ? `${wLeft} workouts, ${daysLeft} days — tight.` : `${wLeft} workouts to go.`}`}
-        </span>
-      </div>
+      {(() => {
+        const workoutMsg = wComplete ? 'Workouts done.' : wUnmakeable ? `${wLeft} workouts, ${daysLeft} days — tight.` : `${wLeft} workouts to go.`;
+        const alarm = alcohol && overLimit;
+        return (
+          <div
+            style={{
+              marginTop: 12, padding: '8px 14px',
+              background: alarm ? 'rgba(229,86,75,.10)' : C.surf1,
+              border: `1px solid ${alarm ? 'rgba(229,86,75,.35)' : C.line}`,
+              borderRadius: 10,
+              display: 'flex', alignItems: 'center', gap: 8,
+            }}
+          >
+            <span style={{ width: 7, height: 7, borderRadius: 4, background: alarm ? C.danger : (alcohol ? nipColor : wColor), flexShrink: 0 }} />
+            <span style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: alarm ? C.text : C.textMid, lineHeight: 1.4 }}>
+              {!alcohol
+                ? workoutMsg
+                : overLimit
+                  ? `${nips - limit} over your weekly limit.`
+                  : `${Math.max(0, limit - nips)} nips left this week. ${workoutMsg}`}
+            </span>
+          </div>
+        );
+      })()}
 
       {showNip && window.NipQuickAdd && (
         <window.NipQuickAdd onClose={() => setShowNip(false)} onChanged={onChanged} />

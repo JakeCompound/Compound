@@ -6,6 +6,7 @@ import { BirthdayCard, ComebackCard, WeighInModal } from './home-extras.jsx';
 import { ThreeRings } from './three-rings.jsx';
 import { TodayTodos } from './todo-list.jsx';
 import { isFirstWeekPostJoin } from './mid-week-join.js';
+import { alcoholOn } from './alcohol.js';
 
 // home-screen.jsx — The Home tab — assembles all the components
 
@@ -116,6 +117,7 @@ function HomeScreen({ user, set, state, onOpenCheckin, onGoTo, onOpenSettings, o
       <div style={{ marginTop: 14 }}>
         <ThreeRings
           state={state}
+          alcohol={alcoholOn(user)}
           onOpenCheckin={onOpenCheckin}
           onGoWorkout={() => onGoTo && onGoTo('workout')}
           onChanged={onChanged}

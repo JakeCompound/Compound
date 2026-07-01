@@ -9,7 +9,8 @@ import { deriveLiveState, isoDate, loadCheckins, recordCheckin, saveCheckins } f
 import { MacroCalculator } from './macro-calc-screen.jsx';
 import { InstallPrompt, ResponsiveFrame, useIsMobile } from './mobile-shell.jsx';
 import { NutritionTab } from './nutrition-tab.jsx';
-import { ExitedScreen, SaveExitModal, Screen1RM, ScreenAge, ScreenCheckInTime, ScreenComplete, ScreenEquipment, ScreenFitnessLevel, ScreenGratitudeBuilder, ScreenGratitudeIntro, ScreenName, ScreenStepsSleep, ScreenTrackFood, ScreenTrainingDays, ScreenWeighInTime, ScreenWeight, ScreenWelcome } from './onboarding-screens.jsx';
+import { ExitedScreen, SaveExitModal, Screen1RM, ScreenAge, ScreenAlcohol, ScreenCheckInTime, ScreenComplete, ScreenEquipment, ScreenFitnessLevel, ScreenGratitudeBuilder, ScreenGratitudeIntro, ScreenName, ScreenStepsSleep, ScreenTrackFood, ScreenTrainingDays, ScreenWeighInTime, ScreenWeight, ScreenWelcome } from './onboarding-screens.jsx';
+import { alcoholOn } from './alcohol.js';
 import { ReportsScreen } from './reports-screen.jsx';
 import { SettingsScreen } from './settings-screen.jsx';
 import { markJoined } from './mid-week-join.js';
@@ -43,6 +44,7 @@ const TONE_HEADLINES = {
     fl: { t: 'WHERE ARE YOU', a: 'STARTING FROM?', s: 'Be honest — overshooting only slows your progress. The AI calibrates from here.' },
     rm: { t: 'CURRENT', a: 'ESTIMATES.', s: "Roughly what you'd grind out for one rep, today, fresh. Skip if you're not sure — we'll learn it from session 1." },
     tf: { t: 'WANT TO TRACK', a: 'FOOD & CALORIES?', s: "Optional. If yes, we'll calculate your targets and you can log meals. If no, we still track weight." },
+    al: { t: 'DO YOU WANT TO', a: 'TRACK ALCOHOL?', s: 'Optional. If yes, set a weekly nip limit — Home shows the week, Nutrition shows each day, and you build alcohol-free-day streaks. If no, we hide all of it.' },
   },
   quiet: {
     name: { t: 'YOUR', a: 'NAME.', s: 'First name.' },
@@ -57,6 +59,7 @@ const TONE_HEADLINES = {
     fl: { t: 'STARTING', a: 'POINT.', s: 'Calibration only.' },
     rm: { t: '1RM', a: 'ESTIMATES.', s: 'Optional. Skippable.' },
     tf: { t: 'TRACK', a: 'FOOD?', s: 'Optional. Sets your targets.' },
+    al: { t: 'TRACK', a: 'ALCOHOL?', s: 'Optional. Weekly nip limit.' },
   },
   editorial: {
     name: { t: 'INTRODUCTIONS', a: 'FIRST.', s: 'Tell us who is doing the work. We use names sparingly, only where they matter.' },
@@ -71,6 +74,7 @@ const TONE_HEADLINES = {
     fl: { t: 'A STARTING', a: 'POSITION.', s: 'No judgement, no flattery. The number that lets the program meet you accurately.' },
     rm: { t: 'STRENGTH', a: 'POSITIONS.', s: "Best estimates only. If you don't know yet, the first session will write them for us." },
     tf: { t: 'CALORIE', a: 'TRACKING?', s: 'Optional. Choose yes to set calorie and protein targets; no keeps weight tracking only.' },
+    al: { t: 'ALCOHOL', a: 'TRACKING?', s: 'Optional. A weekly nip ceiling, daily detail, and alcohol-free-day streaks — or hide it entirely.' },
   },
 };
 
@@ -148,7 +152,7 @@ function App() {
   const setDemoFlag = (k, v) => setDemoFlags((f) => ({ ...f, [k]: v }));
 
   // ── Onboarding step machine ──────────────────────────────────────────────
-  const TOTAL_STEPS = 13;
+  const TOTAL_STEPS = 14;
   const [step, setStep] = React.useState(() => {
     const s = Number(localStorage.getItem('compound:step') || 0);
     return Number.isFinite(s) ? s : 0;
@@ -282,6 +286,7 @@ function App() {
             onBack={back}
           />
         );
+      case 14: return <ScreenAlcohol data={data} set={set} ctx={ctxFor(14, 'al')} onNext={next} onBack={back} />;
       default: return <ScreenComplete data={data} onFinish={finishOnboarding} />;
     }
   };
@@ -435,6 +440,7 @@ function App() {
               {tab === 'home' && (
                 <AddButton
                   dietTracking={!!data.dietTracking}
+                  alcohol={alcoholOn(data)}
                   onChanged={() => setNutTick((x) => x + 1)}
                   onGoNutrition={() => setTab('nutrition')}
                 />

@@ -149,7 +149,7 @@ function NutritionToday({ user, onChanged }) {
             <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.accent, letterSpacing: 2.4, marginBottom: 12 }}>ADD TO TODAY</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <AddRow label="Meal" sub="Photo or describe — AI does the macros" glyph="🍽️" onClick={() => setSheet('food')} />
-              <AddRow label="Drink" sub="Log a nip / beer / wine" glyph="🍺" onClick={() => setSheet('drink')} />
+              {alcoholOn(user) && <AddRow label="Drink" sub="Log a nip / beer / wine" glyph="🍺" onClick={() => setSheet('drink')} />}
             </div>
           </div>
         </div>

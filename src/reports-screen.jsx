@@ -4,6 +4,7 @@ import { BodyMeasurementsCard, ProgressPhotosCard } from './body-progress.jsx';
 import { C } from './compound-ui.jsx';
 import { InsightCard, LifeBalanceRadar, SectionLabel, StreakCard } from './home-components.jsx';
 import { computeCorrelations, computeMonthCard, computeReports } from './reports-data.jsx';
+import { alcoholOn } from './alcohol.js';
 
 // reports-screen.jsx — Reports tab, fully derived from real check-in history.
 
@@ -123,7 +124,7 @@ function ReportsScreen({ user = {} }) {
               <StreakCard glyph="🔥" label="CHECK-INS" {...streaks.checkin} hot={streaks.checkin.current >= 7} />
               <StreakCard glyph="💪" label="WORKOUTS" {...streaks.workout} hot={streaks.workout.current >= 7} />
               <StreakCard glyph="📖" label="SPIRIT" {...streaks.spirit} hot={streaks.spirit.current >= 7} />
-              <StreakCard glyph="🚫" label="ALCOHOL FREE" {...streaks.afd} hot={streaks.afd.current >= 7} />
+              {alcoholOn(user) && <StreakCard glyph="🚫" label="ALCOHOL FREE" {...streaks.afd} hot={streaks.afd.current >= 7} />}
             </div>
           </div>
 
@@ -164,14 +165,16 @@ function ReportsScreen({ user = {} }) {
           </div>
 
           {/* AFD chart */}
-          <div style={{ marginTop: 22 }}>
-            <SectionLabel meta={`${R.afdWeeks.length} WK`}>ALCOHOL · AFDS + NIPS</SectionLabel>
-            {R.afdWeeks.length ? (
-              <div style={{ background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 12, padding: 16 }}>
-                <AfdChart data={R.afdWeeks} />
-              </div>
-            ) : <ReportsEmpty label="Log a few check-ins and your alcohol-free days plot here, week by week." />}
-          </div>
+          {alcoholOn(user) && (
+            <div style={{ marginTop: 22 }}>
+              <SectionLabel meta={`${R.afdWeeks.length} WK`}>ALCOHOL · AFDS + NIPS</SectionLabel>
+              {R.afdWeeks.length ? (
+                <div style={{ background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 12, padding: 16 }}>
+                  <AfdChart data={R.afdWeeks} />
+                </div>
+              ) : <ReportsEmpty label="Log a few check-ins and your alcohol-free days plot here, week by week." />}
+            </div>
+          )}
 
           {/* Weight trend */}
           <div style={{ marginTop: 22 }}>

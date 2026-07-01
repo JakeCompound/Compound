@@ -1077,6 +1077,48 @@ function LiftRow({ label, value, placeholder, onChange }) {
   );
 }
 
+// ── 12.6 TRACK ALCOHOL? (opt-in; sets the weekly nip limit) ─────────────────
+function ScreenAlcohol({ data, set, ctx, onNext, onBack }) {
+  const tracking = data.trackAlcohol === true;
+  const chosen = data.trackAlcohol === true || data.trackAlcohol === false;
+  const [limit, setLimit] = React.useState(() => { try { return parseInt(localStorage.getItem('compound:nipLimit'), 10) || 55; } catch (e) { return 55; } });
+  const saveLimit = (n) => { setLimit(n); try { localStorage.setItem('compound:nipLimit', String(n)); } catch (e) {} };
+  return (
+    <FormShell
+      {...ctx}
+      footer={<FooterNav onBack={onBack} onNext={onNext} nextDisabled={!chosen} nextLabel="Continue" />}
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <SelectCard
+          active={data.trackAlcohol === true}
+          onClick={() => set({ trackAlcohol: true })}
+          title="YES — TRACK IT"
+          subtitle="Weekly nip limit on Home, daily drinks in Nutrition, alcohol-free-day streaks."
+          glyph={<span style={{ fontSize: 20 }}>🍺</span>}
+        />
+        <SelectCard
+          active={data.trackAlcohol === false}
+          onClick={() => set({ trackAlcohol: false })}
+          title="NO — HIDE IT"
+          subtitle="No nip counter, no alcohol prompts anywhere. Turn it on later in Settings."
+          glyph={<span style={{ fontSize: 20 }}>🚫</span>}
+        />
+      </div>
+      {tracking && (
+        <div style={{ marginTop: 18 }}>
+          <FieldLabel>Your weekly nip limit</FieldLabel>
+          <div style={{ marginTop: 10 }}>
+            <Stepper value={limit} onChange={saveLimit} min={0} max={150} step={1} unit="nips / week" large />
+          </div>
+          <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: C.textMid, lineHeight: 1.5, marginTop: 10 }}>
+            A nip ≈ a 30ml spirit; a beer ≈ 1.5, a glass of wine ≈ 2. Set a cap you can actually hold — you can change it any Sunday.
+          </p>
+        </div>
+      )}
+    </FormShell>
+  );
+}
+
 // ── 13 COMPLETION ──────────────────────────────────────────────────────────
 function ScreenComplete({ data, onFinish }) {
   const stats = [
@@ -1297,8 +1339,8 @@ Object.assign(window, {
   ScreenWelcome, ScreenName, ScreenAge, ScreenWeight, ScreenTrainingDays,
   ScreenStepsSleep, ScreenEquipment, ScreenCheckInTime, ScreenWeighInTime,
   ScreenGratitudeIntro, ScreenGratitudeBuilder, ScreenFitnessLevel,
-  Screen1RM, ScreenTrackFood, ScreenComplete, SaveExitModal, ExitedScreen, FormShell, FooterNav,
+  Screen1RM, ScreenTrackFood, ScreenAlcohol, ScreenComplete, SaveExitModal, ExitedScreen, FormShell, FooterNav,
   GRATITUDE_CATEGORIES, LIFTS,
 });
 
-export { BellHint, DeltaCard, ExitedScreen, FooterNav, FormShell, GRATITUDE_CATEGORIES, IconGym, IconHome, LIFTS, LiftRow, SaveExitModal, Screen1RM, ScreenAge, ScreenCheckInTime, ScreenComplete, ScreenEquipment, ScreenFitnessLevel, ScreenGratitudeBuilder, ScreenGratitudeIntro, ScreenName, ScreenStepsSleep, ScreenTrackFood, ScreenTrainingDays, ScreenWeighInTime, ScreenWeight, ScreenWelcome };
+export { BellHint, DeltaCard, ExitedScreen, FooterNav, FormShell, GRATITUDE_CATEGORIES, IconGym, IconHome, LIFTS, LiftRow, SaveExitModal, Screen1RM, ScreenAge, ScreenAlcohol, ScreenCheckInTime, ScreenComplete, ScreenEquipment, ScreenFitnessLevel, ScreenGratitudeBuilder, ScreenGratitudeIntro, ScreenName, ScreenStepsSleep, ScreenTrackFood, ScreenTrainingDays, ScreenWeighInTime, ScreenWeight, ScreenWelcome };

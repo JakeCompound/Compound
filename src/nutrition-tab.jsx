@@ -133,8 +133,8 @@ function NutritionToday({ user, onChanged }) {
             {(() => {
               const nips = window.loadNipsToday ? window.loadNipsToday() : 0;
               const akcal = window.loadAlcoholKcal ? window.loadAlcoholKcal() : 0;
-              if (nips <= 0 && akcal <= 0) return null;
-              return <AlcoholRow nips={nips} kcal={akcal} />;
+              if (!alcoholOn(user) || (nips <= 0 && akcal <= 0)) return null;
+              return <AlcoholRow nips={nips} kcal={akcal} onAdd={() => setSheet('drink')} />;
             })()}
             {foods.map((f) => <FoodRow key={f.id} food={f} onChanged={refresh} />)}
           </div>
@@ -451,9 +451,12 @@ function NutritionWeek({ user }) {
   );
 }
 
-function AlcoholRow({ nips, kcal }) {
+function AlcoholRow({ nips, kcal, onAdd }) {
   return (
-    <div style={{ background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 12, display: 'flex', alignItems: 'center', gap: 12, padding: '12px 12px' }}>
+    <button
+      onClick={onAdd}
+      style={{ width: '100%', textAlign: 'left', background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 12, display: 'flex', alignItems: 'center', gap: 12, padding: '12px 12px', cursor: 'pointer' }}
+    >
       <div style={{ width: 46, height: 46, borderRadius: 9, background: C.surf2, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 20 }}>🍺</div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 16, letterSpacing: 0.5, color: C.text, textTransform: 'uppercase', lineHeight: 1.05 }}>Alcohol</div>
@@ -462,7 +465,7 @@ function AlcoholRow({ nips, kcal }) {
         </div>
       </div>
       <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: C.accent, letterSpacing: 1.2, background: C.accentSoft, padding: '3px 7px', borderRadius: 6 }}>+ ADD</span>
-    </div>
+    </button>
   );
 }
 

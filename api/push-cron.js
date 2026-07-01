@@ -139,6 +139,15 @@ export default async function handler(req, res) {
   const got = (req.headers['x-cron-secret'] || '').trim();
   if (!CRON_SECRET || got !== CRON_SECRET) return res.status(401).json({ error: 'Unauthorized' });
 
+  // Synthetic event dry-run — pure logic, needs no subscriptions/DB. Debug only.
+  if (req.body && req.body.eventsDryRun === true && req.body.sample) {
+    const s = req.body.sample;
+    const prof = { onboarding: s.onboarding || {}, notif_prefs: s.notif_prefs || {} };
+    const ud = { checkins: new Set(s.checkins || []), workouts: new Set(s.workouts || []) };
+    const now = s.now || localNow(s.timezone);
+    return res.status(200).json({ dryRun: true, sample: true, now, events: eventKinds(prof, now, ud, true).map((e) => e.kind) });
+  }
+
   if (!VAPID_PRIVATE) return res.status(500).json({ error: 'VAPID_PRIVATE_KEY not set' });
   if (!SERVICE_ROLE) return res.status(500).json({ error: 'SUPABASE_SERVICE_ROLE_KEY not set' });
   webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE);

@@ -74,6 +74,64 @@ function dueKinds(prof, now) {
   return out;
 }
 
+// ── Event-based reminders (streaks / missed / comeback / urgency / report) ──
+// Computed from the user's stored check-ins + workouts. Each fires at one local
+// time per day when its condition holds; push_sent dedups.
+const STREAK_MILESTONES = [7, 14, 30, 60, 90, 180, 365];
+const EVENT_TIME = { streaks: '21:30', missed: '20:00', comeback: '18:00', urgency: '12:30', report: '09:00' };
+const EVENT_MSG = {
+  streaks: (n) => ({ title: 'COMPOUND', body: `${n}-day check-in streak. Don't break the chain. 🔥`, tag: 'streak', url: '/' }),
+  missed: { title: 'COMPOUND', body: "Missed today's workout? Move it to another day — a short one still counts.", tag: 'missed', url: '/' },
+  comeback: { title: 'COMPOUND', body: "It's been a few days. One check-in gets you back — no judgement.", tag: 'comeback', url: '/' },
+  urgency: { title: 'COMPOUND', body: "Midday nudge: the week's tight on workouts. A quick session keeps it on track.", tag: 'urgency', url: '/' },
+  report: { title: 'COMPOUND', body: 'Your monthly report is ready — see how last month stacked up.', tag: 'report', url: '/' },
+};
+const isoFromUTC = (ms) => new Date(ms).toISOString().slice(0, 10);
+const dnum = (s) => { const [y, m, d] = String(s).split('-').map(Number); return Date.UTC(y, (m || 1) - 1, d || 1); };
+const daysBetween = (a, b) => Math.round((dnum(b) - dnum(a)) / 86400000);
+function streakEndingOn(dateSet, endStr) {
+  let n = 0; let cur = dnum(endStr);
+  while (dateSet.has(isoFromUTC(cur))) { n += 1; cur -= 86400000; }
+  return n;
+}
+
+// Returns [{kind, msg}] of event reminders due now. ignoreTime skips the
+// time-of-day gate (used by the dry-run debug path).
+function eventKinds(prof, now, ud, ignoreTime) {
+  const prefs = (prof && prof.notif_prefs) || {};
+  const onb = (prof && prof.onboarding) || {};
+  const on = (k) => prefs[k] !== false;
+  const at = (k) => ignoreTime || now.hhmm === EVENT_TIME[k];
+  const ci = (ud && ud.checkins) || new Set();
+  const wo = (ud && ud.workouts) || new Set();
+  const out = [];
+
+  if (on('streaks') && at('streaks')) {
+    const s = streakEndingOn(ci, now.date);
+    if (STREAK_MILESTONES.includes(s)) out.push({ kind: `streak-${s}`, msg: EVENT_MSG.streaks(s) });
+  }
+  if (on('missed') && at('missed')) {
+    const days = Array.isArray(onb.workoutDays) ? onb.workoutDays : [];
+    if (days.includes(now.dow) && !wo.has(now.date)) out.push({ kind: 'missed', msg: EVENT_MSG.missed });
+  }
+  if (on('comeback') && at('comeback') && ci.size) {
+    const last = [...ci].sort().pop();
+    if (daysBetween(last, now.date) >= 3) out.push({ kind: 'comeback', msg: EVENT_MSG.comeback });
+  }
+  if (on('urgency') && at('urgency')) {
+    const target = (Array.isArray(onb.workoutDays) && onb.workoutDays.length) ? onb.workoutDays.length : (onb.trainingDays || 3);
+    const weekStart = isoFromUTC(dnum(now.date) - now.dow * 86400000);
+    let done = 0; wo.forEach((d) => { if (d >= weekStart && d <= now.date) done += 1; });
+    const daysLeft = 7 - now.dow; // includes today
+    const remaining = Math.max(0, target - done);
+    if (remaining > 0 && remaining >= daysLeft) out.push({ kind: 'urgency', msg: EVENT_MSG.urgency });
+  }
+  if (on('report') && at('report') && parseInt(now.date.slice(8, 10), 10) === 1) {
+    out.push({ kind: 'report', msg: EVENT_MSG.report });
+  }
+  return out;
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') { res.setHeader('Allow', 'POST'); return res.status(405).json({ error: 'Method not allowed' }); }
 
@@ -93,10 +151,35 @@ export default async function handler(req, res) {
   if (!subs || !subs.length) return res.status(200).json({ checked: 0, sent: 0 });
 
   const isTest = req.body && req.body.test === true;
+  const isDry = req.body && req.body.eventsDryRun === true; // debug: compute events, don't send
   let profMap = {};
+  const udByUser = {};
   if (!isTest) {
     const { data: profs } = await supa.from('profiles').select('id,onboarding,notif_prefs');
     (profs || []).forEach((p) => { profMap[p.id] = p; });
+    // Event reminders need the user's check-in + workout dates.
+    const ensure = (u) => (udByUser[u] = udByUser[u] || { checkins: new Set(), workouts: new Set() });
+    const { data: cRows } = await supa.from('checkins').select('user_id,date');
+    const { data: wRows } = await supa.from('workouts').select('user_id,date');
+    (cRows || []).forEach((r) => ensure(r.user_id).checkins.add(r.date));
+    (wRows || []).forEach((r) => ensure(r.user_id).workouts.add(r.date));
+  }
+
+  if (isDry) {
+    // Synthetic-sample path: verify the event logic in isolation, no real data.
+    if (req.body.sample) {
+      const s = req.body.sample;
+      const prof = { onboarding: s.onboarding || {}, notif_prefs: s.notif_prefs || {} };
+      const ud = { checkins: new Set(s.checkins || []), workouts: new Set(s.workouts || []) };
+      const now = s.now || localNow(s.timezone);
+      return res.status(200).json({ dryRun: true, sample: true, now, events: eventKinds(prof, now, ud, true).map((e) => e.kind) });
+    }
+    const rows = subs.map((sub) => ({
+      endpoint: sub.endpoint.slice(-12),
+      now: localNow(sub.timezone),
+      events: eventKinds(profMap[sub.user_id], localNow(sub.timezone), udByUser[sub.user_id], true).map((e) => e.kind),
+    }));
+    return res.status(200).json({ dryRun: true, subs: rows });
   }
 
   const send = async (sub, payload) => {
@@ -135,6 +218,19 @@ export default async function handler(req, res) {
       const ok = await send(sub, MSG[kind]);
       if (ok) sent++;
       else { errors.push(`${kind}:${sub.endpoint.slice(-12)}`); await supa.from('push_sent').delete().match({ endpoint: sub.endpoint, kind, sent_on: now.date }); }
+    }
+
+    // Event-based reminders (same atomic-claim + dedup pattern).
+    const events = eventKinds(profMap[sub.user_id], now, udByUser[sub.user_id], false);
+    for (const ev of events) {
+      const { data: claimed } = await supa
+        .from('push_sent')
+        .upsert({ endpoint: sub.endpoint, kind: ev.kind, sent_on: now.date }, { onConflict: 'endpoint,kind,sent_on', ignoreDuplicates: true })
+        .select();
+      if (!claimed || !claimed.length) continue;
+      const ok = await send(sub, ev.msg);
+      if (ok) sent++;
+      else { errors.push(`${ev.kind}:${sub.endpoint.slice(-12)}`); await supa.from('push_sent').delete().match({ endpoint: sub.endpoint, kind: ev.kind, sent_on: now.date }); }
     }
   }
 

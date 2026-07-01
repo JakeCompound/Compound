@@ -30,6 +30,7 @@ function fmtWorkoutSchedule(user) {
 function SettingsScreen({ user, set, onClose, onReset, onRecalc }) {
   const [section, setSection] = React.useState(null); // null = main, else section id
   const [showClear, setShowClear] = React.useState(false); // "clear all cloud data" modal
+  const [measureUnit, setMeasureUnit] = React.useState(() => { try { return localStorage.getItem('compound:measureUnit') === 'in' ? 'in' : 'cm'; } catch (e) { return 'cm'; } });
 
   if (section === 'profile') {
     return <SettingsProfileEdit user={user} set={set} onBack={() => setSection(null)} />;
@@ -107,6 +108,13 @@ function SettingsScreen({ user, set, onClose, onReset, onRecalc }) {
           <SettingsRow icon={<IconTarget />} label="Goals" hint={`${user.weight}kg → ${user.weightGoal}kg · ${user.stepGoal} steps · ${user.sleepGoal}h`} onClick={() => setSection('goals')} />
           <SettingsRow icon={<IconBolt />} label="Equipment" hint={user.equipment === 'home' ? 'Home (bodyweight)' : 'Gym / garage'} onClick={() => setSection('equipment')} />
           <SettingsRow icon={<IconStar />} label="Workout schedule" hint={fmtWorkoutSchedule(user)} onClick={() => setSection('workoutschedule')} />
+          <SettingsRow
+            icon={<IconTarget />}
+            label="Measurement units"
+            hint={measureUnit === 'in' ? 'Inches' : 'Centimetres'}
+            value={measureUnit.toUpperCase()}
+            onClick={() => { const next = measureUnit === 'cm' ? 'in' : 'cm'; try { localStorage.setItem('compound:measureUnit', next); } catch (e) {} setMeasureUnit(next); }}
+          />
         </SettingsGroup>
 
         <SettingsGroup label="HABITS">

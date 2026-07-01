@@ -190,7 +190,7 @@ function ReportsScreen({ user = {} }) {
 
           {/* Body measurements */}
           <div style={{ marginTop: 22 }}>
-            <BodyMeasurementsCard />
+            <BodyMeasurementsCard user={user} />
           </div>
 
           {/* Progress photos */}

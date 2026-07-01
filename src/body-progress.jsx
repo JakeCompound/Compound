@@ -26,9 +26,56 @@ function deriveMetric(entries, key) {
   return { current: vals[vals.length - 1], history: vals, delta: +(vals[vals.length - 1] - vals[0]).toFixed(1) };
 }
 
-function BodyMeasurementsCard() {
+// ── Units (cm / inches) ────────────────────────────────────────────────────
+// Lengths are ALWAYS stored canonically in cm; we only convert for display and
+// input. Body fat is a %, unit-agnostic. This keeps historical trends consistent
+// when the user flips units.
+const UNIT_KEY = 'compound:measureUnit';
+const LENGTH_KEYS = ['chest', 'waist', 'arm', 'thigh'];
+const isLength = (key) => LENGTH_KEYS.includes(key);
+function loadUnit() { try { return localStorage.getItem(UNIT_KEY) === 'in' ? 'in' : 'cm'; } catch (e) { return 'cm'; } }
+function saveUnit(u) { try { localStorage.setItem(UNIT_KEY, u === 'in' ? 'in' : 'cm'); } catch (e) {} }
+const unitLabel = (key, unit) => (isLength(key) ? unit : '%');
+const round1 = (n) => Math.round(n * 10) / 10;
+function toDisplay(key, cmVal, unit) { if (cmVal == null || cmVal === '') return cmVal; return isLength(key) && unit === 'in' ? round1(cmVal / 2.54) : cmVal; }
+function toCanonical(key, dispVal, unit) { if (dispVal == null || dispVal === '') return dispVal; return isLength(key) && unit === 'in' ? round1(Number(dispVal) * 2.54) : Number(dispVal); }
+
+// ── Plausibility check (AI-first, local fallback) ───────────────────────────
+// All values here are canonical (cm / %). Returns flags [{key, reason, suggestion}].
+const PLAUSIBLE_CM = { chest: [55, 170], waist: [45, 170], arm: [18, 65], thigh: [28, 95], bf: [3, 60] };
+function localPlausibility(cmValues, last) {
+  const flags = [];
+  Object.entries(cmValues).forEach(([k, v]) => {
+    const r = PLAUSIBLE_CM[k];
+    if (!r || typeof v !== 'number' || Number.isNaN(v)) return;
+    if (v < r[0] || v > r[1]) {
+      const suggestion = v > r[1] * 3 ? round1(v / 10) : null; // likely a misplaced decimal
+      flags.push({ key: k, reason: `that seems off for ${k === 'bf' ? 'body-fat %' : k}`, suggestion });
+    } else if (last && typeof last[k] === 'number' && Math.abs(v - last[k]) > (k === 'bf' ? 15 : 20)) {
+      flags.push({ key: k, reason: `a big jump from your last entry`, suggestion: null });
+    }
+  });
+  return flags;
+}
+async function plausibilityCheck(cmValues, ctx) {
+  try {
+    if (!window.claude || !window.claude.complete) throw new Error('no ai');
+    const prompt = `Validate these body measurements. Length fields (chest, waist, arm, thigh) are in CENTIMETRES; "bf" is body-fat %.${ctx.height ? ` The person's height is ${ctx.height} cm.` : ''}${ctx.last && Object.keys(ctx.last).length ? ` Previous entry: ${JSON.stringify(ctx.last)}.` : ''} Entered now: ${JSON.stringify(cmValues)}. Flag any value that is implausible for a human, an obvious typo (a decimal in the wrong place), or an implausible change from the previous entry. Respond ONLY with JSON: {"flags":[{"key":"<field>","reason":"<short friendly note>","suggestion":<corrected number in cm/% or null>}]}. Return an empty flags array if everything looks plausible.`;
+    const raw = await window.claude.complete(prompt);
+    const m = (typeof raw === 'string' ? raw : '').match(/\{[\s\S]*\}/);
+    if (!m) throw new Error('no json');
+    const obj = JSON.parse(m[0]);
+    if (!Array.isArray(obj.flags)) throw new Error('bad shape');
+    return obj.flags.filter((f) => f && cmValues[f.key] != null);
+  } catch (e) {
+    return localPlausibility(cmValues, ctx.last);
+  }
+}
+
+function BodyMeasurementsCard({ user = {} }) {
   const [open, setOpen] = React.useState(false);
   const [entries, setEntries] = React.useState(() => loadMeasurements());
+  const unit = loadUnit();
   const hasData = entries.length > 0;
   return (
     <div>
@@ -38,7 +85,7 @@ function BodyMeasurementsCard() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
             {BODY_METRICS.map((m) => {
               const d = deriveMetric(entries, m.key);
-              return d ? <MeasurementMini key={m.key} metric={m} data={d} /> : null;
+              return d ? <MeasurementMini key={m.key} metric={m} data={d} unit={unit} /> : null;
             })}
           </div>
         ) : (
@@ -63,6 +110,7 @@ function BodyMeasurementsCard() {
       {open && (
         <LogMeasurementsModal
           entries={entries}
+          height={typeof user.height === 'number' ? user.height : null}
           onClose={() => setOpen(false)}
           onSave={(vals) => {
             const next = [...entries, { date: (window.isoDate ? window.isoDate(new Date()) : new Date().toISOString().slice(0,10)), values: vals }];
@@ -76,9 +124,13 @@ function BodyMeasurementsCard() {
   );
 }
 
-function MeasurementMini({ metric, data }) {
+function MeasurementMini({ metric, data, unit = 'cm' }) {
   const positive = (metric.key === 'waist' || metric.key === 'bf') ? data.delta < 0 : data.delta > 0;
   const deltaColor = data.delta === 0 ? C.textMid : positive ? C.success : C.danger;
+  const uLabel = unitLabel(metric.key, unit);
+  const curDisp = toDisplay(metric.key, data.current, unit);
+  const deltaDisp = isLength(metric.key) && unit === 'in' ? round1(data.delta / 2.54) : data.delta;
+  const histDisp = (data.history || []).map((v) => toDisplay(metric.key, v, unit));
   return (
     <div
       style={{
@@ -93,18 +145,18 @@ function MeasurementMini({ metric, data }) {
           {metric.label}
         </span>
         <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: deltaColor, letterSpacing: 1 }}>
-          {data.delta > 0 ? '+' : ''}{data.delta}{metric.unit}
+          {deltaDisp > 0 ? '+' : ''}{deltaDisp}{uLabel}
         </span>
       </div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 3 }}>
         <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 18, fontWeight: 600, color: C.text, fontVariantNumeric: 'tabular-nums' }}>
-          {data.current}
+          {curDisp}
         </span>
         <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.textMid }}>
-          {metric.unit}
+          {uLabel}
         </span>
       </div>
-      <MiniSpark history={data.history} positive={positive} />
+      <MiniSpark history={histDisp} positive={positive} />
     </div>
   );
 }
@@ -130,108 +182,157 @@ function MiniSpark({ history, positive }) {
   );
 }
 
-function LogMeasurementsModal({ onClose, onSave, entries }) {
+function LogMeasurementsModal({ onClose, onSave, entries, height }) {
   const last = entries && entries.length ? entries[entries.length - 1].values : {};
+  const [unit, setUnit] = React.useState(loadUnit);
   const [values, setValues] = React.useState(() => {
     const out = {};
-    BODY_METRICS.forEach((m) => { out[m.key] = last[m.key] != null ? last[m.key] : ''; });
+    const u = loadUnit();
+    BODY_METRICS.forEach((m) => { out[m.key] = last[m.key] != null ? String(toDisplay(m.key, last[m.key], u)) : ''; });
     return out;
   });
+  const [phase, setPhase] = React.useState('input'); // input | checking | confirm
+  const [flags, setFlags] = React.useState([]);
+  const [pendingCm, setPendingCm] = React.useState(null);
+
   const set = (k, v) => setValues((s) => ({ ...s, [k]: v }));
-  const commit = () => {
-    const vals = {};
-    BODY_METRICS.forEach((m) => { if (values[m.key] !== '' && values[m.key] != null) vals[m.key] = Number(values[m.key]); });
-    onSave(vals);
+  const changeUnit = (u) => {
+    if (u === unit) return;
+    setValues((s) => {
+      const out = {};
+      BODY_METRICS.forEach((m) => {
+        const raw = s[m.key];
+        out[m.key] = (raw === '' || raw == null) ? '' : String(toDisplay(m.key, toCanonical(m.key, raw, unit), u));
+      });
+      return out;
+    });
+    setUnit(u); saveUnit(u);
   };
+
+  const buildCm = () => {
+    const cm = {};
+    BODY_METRICS.forEach((m) => { if (values[m.key] !== '' && values[m.key] != null) cm[m.key] = toCanonical(m.key, values[m.key], unit); });
+    return cm;
+  };
+
+  const attemptSave = async () => {
+    const cm = buildCm();
+    if (Object.keys(cm).length === 0) { onClose(); return; }
+    setPhase('checking');
+    const f = await plausibilityCheck(cm, { height, last });
+    if (f && f.length) { setPendingCm(cm); setFlags(f); setPhase('confirm'); }
+    else onSave(cm);
+  };
+  const useSuggestion = (flag) => {
+    if (flag.suggestion == null) return;
+    set(flag.key, String(toDisplay(flag.key, flag.suggestion, unit)));
+    setFlags([]); setPhase('input');
+  };
+
+  const metricLabel = (key) => (BODY_METRICS.find((m) => m.key === key) || { label: key }).label;
+
   return (
     <div
       onClick={onClose}
-      style={{
-        position: 'absolute', inset: 0, zIndex: 220,
-        background: 'rgba(0,0,0,.72)', backdropFilter: 'blur(8px)',
-        display: 'flex', alignItems: 'flex-end',
-      }}
+      style={{ position: 'absolute', inset: 0, zIndex: 220, background: 'rgba(0,0,0,.72)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'flex-end' }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{
-          width: '100%', background: C.bg,
-          borderTopLeftRadius: 24, borderTopRightRadius: 24,
-          padding: '20px 22px 22px',
-        }}
+        style={{ width: '100%', maxHeight: '92%', overflowY: 'auto', background: C.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: '20px 22px 22px' }}
       >
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
           <div style={{ width: 36, height: 3, borderRadius: 2, background: 'rgba(255,255,255,.18)' }} />
         </div>
-        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.accent, letterSpacing: 2.4, marginBottom: 8 }}>
-          NEW MEASUREMENT
-        </div>
-        <h3
-          style={{
-            fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 26,
-            lineHeight: 1, letterSpacing: 0.5, color: C.text, margin: 0, textTransform: 'uppercase',
-          }}
-        >
-          MORNING<br /><span style={{ color: C.accent }}>MEASUREMENTS.</span>
-        </h3>
-        <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 13, color: C.textMid, lineHeight: 1.5, margin: '10px 0 14px' }}>
-          Take these under consistent conditions — same time, same state, same tape position.
-        </p>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
-          {BODY_METRICS.map((m) => (
-            <div
-              key={m.key}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                padding: '10px 14px',
-                background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 10,
-              }}
-            >
-              <span style={{ flex: 1, fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 600, fontSize: 15, color: C.text, letterSpacing: 1, textTransform: 'uppercase' }}>
-                {m.label}
-              </span>
-              <input
-                type="number"
-                value={values[m.key]}
-                onChange={(e) => set(m.key, Number(e.target.value))}
-                style={{
-                  width: 70,
-                  background: C.surf2, border: `1px solid ${C.line}`,
-                  borderRadius: 6, padding: '6px 10px',
-                  color: C.accent, fontFamily: 'JetBrains Mono, monospace', fontSize: 16, fontWeight: 600,
-                  outline: 0, textAlign: 'right',
-                }}
-              />
-              <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.textMid, letterSpacing: 1, width: 20 }}>
-                {m.unit}
-              </span>
+
+        {phase === 'confirm' ? (
+          <>
+            <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: '#E5564B', letterSpacing: 2.4, marginBottom: 8 }}>QUICK SANITY CHECK</div>
+            <h3 style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 26, lineHeight: 1, letterSpacing: 0.5, color: C.text, margin: '0 0 6px', textTransform: 'uppercase' }}>
+              DOES THIS<br /><span style={{ color: C.accent }}>LOOK RIGHT?</span>
+            </h3>
+            <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 13, color: C.textMid, lineHeight: 1.5, margin: '8px 0 14px' }}>
+              A couple of numbers look unusual. Fix them, or save as-is if they're correct.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+              {flags.map((f) => {
+                const enteredDisp = toDisplay(f.key, pendingCm[f.key], unit);
+                const suggDisp = f.suggestion != null ? toDisplay(f.key, f.suggestion, unit) : null;
+                return (
+                  <div key={f.key} style={{ padding: '12px 14px', background: 'rgba(229,86,75,.08)', border: '1px solid rgba(229,86,75,.35)', borderRadius: 10 }}>
+                    <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 15, letterSpacing: 0.6, color: C.text, textTransform: 'uppercase' }}>
+                      {metricLabel(f.key)} · {enteredDisp}{unitLabel(f.key, unit)}
+                    </div>
+                    <div style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: C.textMid, lineHeight: 1.45, margin: '3px 0 0' }}>
+                      {f.reason}{suggDisp != null ? ` — did you mean ${suggDisp}${unitLabel(f.key, unit)}?` : ''}
+                    </div>
+                    {suggDisp != null && (
+                      <button onClick={() => useSuggestion(f)} style={{ marginTop: 8, padding: '7px 12px', background: C.accent, border: 0, borderRadius: 8, color: '#0A0A0C', fontFamily: 'JetBrains Mono, monospace', fontSize: 10, fontWeight: 600, letterSpacing: 1, cursor: 'pointer' }}>
+                        USE {suggDisp}{unitLabel(f.key, unit)}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
-          ))}
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            onClick={onClose}
-            style={{
-              flex: 1, height: 48,
-              background: C.surf2, border: `1px solid ${C.line}`, borderRadius: 12,
-              color: C.text, fontFamily: 'Barlow Condensed, sans-serif', fontSize: 14, fontWeight: 600,
-              letterSpacing: 1.4, textTransform: 'uppercase', cursor: 'pointer',
-            }}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={commit}
-            style={{
-              flex: 2, height: 48,
-              background: C.accent, border: 0, borderRadius: 12, color: '#0A0A0C',
-              fontFamily: 'Barlow Condensed, sans-serif', fontSize: 14, fontWeight: 700,
-              letterSpacing: 1.4, textTransform: 'uppercase', cursor: 'pointer',
-            }}
-          >
-            Save
-          </button>
-        </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => { setPhase('input'); setFlags([]); }} style={{ flex: 1, height: 48, background: C.surf2, border: `1px solid ${C.line}`, borderRadius: 12, color: C.text, fontFamily: 'Barlow Condensed, sans-serif', fontSize: 14, fontWeight: 600, letterSpacing: 1.4, textTransform: 'uppercase', cursor: 'pointer' }}>
+                Back to edit
+              </button>
+              <button onClick={() => onSave(pendingCm)} style={{ flex: 2, height: 48, background: C.accent, border: 0, borderRadius: 12, color: '#0A0A0C', fontFamily: 'Barlow Condensed, sans-serif', fontSize: 14, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', cursor: 'pointer' }}>
+                Save anyway
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+              <div>
+                <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.accent, letterSpacing: 2.4, marginBottom: 8 }}>NEW MEASUREMENT</div>
+                <h3 style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 26, lineHeight: 1, letterSpacing: 0.5, color: C.text, margin: 0, textTransform: 'uppercase' }}>
+                  MORNING<br /><span style={{ color: C.accent }}>MEASUREMENTS.</span>
+                </h3>
+              </div>
+              {/* cm / in unit toggle */}
+              <div style={{ display: 'flex', background: C.surf2, border: `1px solid ${C.line}`, borderRadius: 8, overflow: 'hidden', flexShrink: 0 }}>
+                {['cm', 'in'].map((u) => (
+                  <button key={u} onClick={() => changeUnit(u)} style={{ padding: '6px 12px', background: unit === u ? C.accent : 'transparent', border: 0, color: unit === u ? '#0A0A0C' : C.textMid, fontFamily: 'JetBrains Mono, monospace', fontSize: 11, fontWeight: 600, letterSpacing: 1, cursor: 'pointer', textTransform: 'uppercase' }}>
+                    {u}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 13, color: C.textMid, lineHeight: 1.5, margin: '10px 0 14px' }}>
+              Take these under consistent conditions — same time, same state, same tape position.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+              {BODY_METRICS.map((m) => (
+                <div key={m.key} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 10 }}>
+                  <span style={{ flex: 1, fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 600, fontSize: 15, color: C.text, letterSpacing: 1, textTransform: 'uppercase' }}>
+                    {m.label}
+                  </span>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    value={values[m.key]}
+                    onChange={(e) => set(m.key, e.target.value)}
+                    style={{ width: 70, background: C.surf2, border: `1px solid ${C.line}`, borderRadius: 6, padding: '6px 10px', color: C.accent, fontFamily: 'JetBrains Mono, monospace', fontSize: 16, fontWeight: 600, outline: 0, textAlign: 'right' }}
+                  />
+                  <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.textMid, letterSpacing: 1, width: 22 }}>
+                    {unitLabel(m.key, unit)}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={onClose} disabled={phase === 'checking'} style={{ flex: 1, height: 48, background: C.surf2, border: `1px solid ${C.line}`, borderRadius: 12, color: C.text, fontFamily: 'Barlow Condensed, sans-serif', fontSize: 14, fontWeight: 600, letterSpacing: 1.4, textTransform: 'uppercase', cursor: phase === 'checking' ? 'default' : 'pointer', opacity: phase === 'checking' ? 0.6 : 1 }}>
+                Cancel
+              </button>
+              <button onClick={attemptSave} disabled={phase === 'checking'} style={{ flex: 2, height: 48, background: C.accent, border: 0, borderRadius: 12, color: '#0A0A0C', fontFamily: 'Barlow Condensed, sans-serif', fontSize: 14, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', cursor: phase === 'checking' ? 'default' : 'pointer', opacity: phase === 'checking' ? 0.7 : 1 }}>
+                {phase === 'checking' ? 'Checking…' : 'Save'}
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

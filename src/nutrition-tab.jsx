@@ -263,11 +263,25 @@ function Badge({ title, color, glyph, onClick, ring, alert }) {
 }
 
 // ── Meal Questions flow — zero friction: photo + question, tap/custom → next ──
+// Small inline spinner (SMIL — no global keyframes needed).
+function Spinner({ size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden>
+      <circle cx="8" cy="8" r="6" stroke={C.line} strokeWidth="2" fill="none" />
+      <path d="M8 2 a6 6 0 0 1 6 6" stroke={C.accent} strokeWidth="2" fill="none" strokeLinecap="round">
+        <animateTransform attributeName="transform" type="rotate" from="0 8 8" to="360 8 8" dur="0.8s" repeatCount="indefinite" />
+      </path>
+    </svg>
+  );
+}
+
 function MealQuestionsFlow({ onClose, onChanged }) {
   const [queue] = React.useState(() => window.openMealQuestions()); // snapshot at open
   const [idx, setIdx] = React.useState(0);
   const [custom, setCustom] = React.useState('');
   const [delta, setDelta] = React.useState(null); // {kcal} last adjustment to flash
+  const [chosen, setChosen] = React.useState(null); // the answer just tapped (instant highlight)
+  const [status, setStatus] = React.useState('idle'); // 'idle' | 'loading' | 'error'
 
   if (queue.length === 0 || idx >= queue.length) {
     return <QuestionsDone onClose={onClose} answered={queue.length} />;
@@ -275,6 +289,12 @@ function MealQuestionsFlow({ onClose, onChanged }) {
   const item = queue[idx];
 
   const answer = async (ans) => {
+    // (a) Register the tap instantly — highlight the chosen chip + show loading —
+    // before the (potentially slow) AI re-estimate runs.
+    setChosen(ans);
+    setStatus('loading');
+    setDelta(null);
+
     // Record the answer on the food entry's question
     const all = window.loadFood();
     const k = window.todayKey();
@@ -284,29 +304,35 @@ function MealQuestionsFlow({ onClose, onChanged }) {
       food.questions[item.qIndex].answer = ans;
     }
     window.saveFood(all);
+    onChanged && onChanged(); // the answer is saved regardless of the re-estimate
 
-    // Re-estimate this meal with the new answer (visible macro update)
+    // (b) Re-estimate this meal with the new answer (visible macro update).
     try {
       const answered = (food.questions || []).filter((q) => q.answer != null).map((q) => `${q.q} → ${q.answer}`).join('; ');
       const prompt = `Re-estimate this meal's calories and macros using the extra detail. Meal: "${food.name}". Prior estimate: ${food.kcal}kcal ${food.p}p ${food.c}c ${food.f}f. New detail: ${answered}. Respond ONLY JSON: {"kcal":int,"p":int,"c":int,"f":int,"confidence":"low|medium|high","info":"one warm sentence"}`;
       const raw = await window.claude.complete(prompt);
       const m = (typeof raw === 'string' ? raw : '').match(/\{[\s\S]*\}/);
-      if (m) {
-        const obj = JSON.parse(m[0]);
-        const before = food.kcal;
-        window.updateFood(food.id, {
-          kcal: Math.round(obj.kcal ?? food.kcal), p: Math.round(obj.p ?? food.p),
-          c: Math.round(obj.c ?? food.c), f: Math.round(obj.f ?? food.f),
-          confidence: obj.confidence || food.confidence, info: obj.info || food.info,
-        });
-        setDelta({ kcal: Math.round((obj.kcal ?? before) - before) });
-      }
-    } catch (e) {}
-    onChanged && onChanged();
-    setCustom('');
-    // Auto-advance to next question after a brief flash
-    setTimeout(() => { setDelta(null); setIdx((i) => i + 1); }, 650);
+      if (!m) throw new Error('Unreadable estimate');
+      const obj = JSON.parse(m[0]);
+      const before = food.kcal;
+      window.updateFood(food.id, {
+        kcal: Math.round(obj.kcal ?? food.kcal), p: Math.round(obj.p ?? food.p),
+        c: Math.round(obj.c ?? food.c), f: Math.round(obj.f ?? food.f),
+        confidence: obj.confidence || food.confidence, info: obj.info || food.info,
+      });
+      setDelta({ kcal: Math.round((obj.kcal ?? before) - before) });
+      setStatus('idle');
+      onChanged && onChanged();
+      setCustom('');
+      // Auto-advance to next question after a brief "updated" flash.
+      setTimeout(() => { setDelta(null); setChosen(null); setIdx((i) => i + 1); }, 650);
+    } catch (e) {
+      // Don't silently swallow — the answer stuck, but the estimate didn't.
+      setStatus('error');
+    }
   };
+
+  const skipCurrent = () => { setDelta(null); setChosen(null); setStatus('idle'); setCustom(''); setIdx((i) => i + 1); };
 
   return (
     <div style={{ position: 'absolute', inset: 0, zIndex: 240, background: C.bg, display: 'flex', flexDirection: 'column' }}>
@@ -333,22 +359,65 @@ function MealQuestionsFlow({ onClose, onChanged }) {
         ) : (
           <>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {(item.options || []).map((opt, i) => (
-                <button key={i} onClick={() => answer(opt)} style={{ width: '100%', textAlign: 'left', padding: '14px 16px', background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 12, cursor: 'pointer', fontFamily: 'Outfit, sans-serif', fontSize: 15, color: C.text }}>
-                  {opt}
-                </button>
-              ))}
+              {(item.options || []).map((opt, i) => {
+                const active = chosen === opt;
+                const busy = status === 'loading';
+                return (
+                  <button
+                    key={i}
+                    onClick={() => answer(opt)}
+                    disabled={busy}
+                    style={{
+                      width: '100%', textAlign: 'left', padding: '14px 16px',
+                      background: active ? C.accentDim : C.surf1,
+                      border: `1px solid ${active ? C.accent : C.line}`,
+                      borderRadius: 12, cursor: busy ? 'default' : 'pointer',
+                      fontFamily: 'Outfit, sans-serif', fontSize: 15,
+                      color: active ? C.accent : C.text,
+                      opacity: busy && !active ? 0.45 : 1,
+                      transition: 'background .12s, border-color .12s',
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+                    }}
+                  >
+                    <span>{opt}</span>
+                    {active && status === 'loading' && <Spinner />}
+                  </button>
+                );
+              })}
             </div>
-            <div style={{ marginTop: 14 }}>
-              <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: C.textLow, letterSpacing: 1.6, marginBottom: 6 }}>OR WRITE YOUR OWN</div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <input value={custom} onChange={(e) => setCustom(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && custom.trim()) answer(custom.trim()); }} placeholder="Type an answer…" style={{ flex: 1, background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 10, color: C.text, fontFamily: 'Outfit, sans-serif', fontSize: 14, padding: '12px 14px', outline: 'none' }} />
-                <button onClick={() => custom.trim() && answer(custom.trim())} disabled={!custom.trim()} style={{ width: 46, background: custom.trim() ? C.accent : C.surf2, color: custom.trim() ? '#0A0A0C' : C.textLow, border: 0, borderRadius: 10, fontSize: 20, cursor: custom.trim() ? 'pointer' : 'default' }}>→</button>
+
+            {status === 'loading' ? (
+              <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 10, fontFamily: 'Outfit, sans-serif', fontSize: 13.5, color: C.textMid }}>
+                <Spinner /> Updating your macros…
               </div>
-            </div>
-            <button onClick={() => answer('Not sure')} style={{ width: '100%', marginTop: 12, background: 'transparent', border: 0, color: C.textLow, fontFamily: 'JetBrains Mono, monospace', fontSize: 11, letterSpacing: 1.5, cursor: 'pointer', padding: 8 }}>
-              SKIP — NOT SURE
-            </button>
+            ) : status === 'error' ? (
+              <div style={{ marginTop: 14 }}>
+                <div style={{ fontFamily: 'Outfit, sans-serif', fontSize: 13, color: C.danger, lineHeight: 1.45, marginBottom: 10 }}>
+                  Couldn't refresh the estimate just now — your answer is saved. Try again?
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => answer(chosen)} style={{ flex: 1, padding: '11px 0', background: C.accent, border: 0, borderRadius: 10, color: '#0A0A0C', fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 14, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer' }}>
+                    Try again
+                  </button>
+                  <button onClick={skipCurrent} style={{ flex: 1, padding: '11px 0', background: 'transparent', border: `1px solid ${C.line}`, borderRadius: 10, color: C.textMid, fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 14, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer' }}>
+                    Skip for now
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div style={{ marginTop: 14 }}>
+                  <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: C.textLow, letterSpacing: 1.6, marginBottom: 6 }}>OR WRITE YOUR OWN</div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input value={custom} onChange={(e) => setCustom(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && custom.trim()) answer(custom.trim()); }} placeholder="Type an answer…" style={{ flex: 1, background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 10, color: C.text, fontFamily: 'Outfit, sans-serif', fontSize: 14, padding: '12px 14px', outline: 'none' }} />
+                    <button onClick={() => custom.trim() && answer(custom.trim())} disabled={!custom.trim()} style={{ width: 46, background: custom.trim() ? C.accent : C.surf2, color: custom.trim() ? '#0A0A0C' : C.textLow, border: 0, borderRadius: 10, fontSize: 20, cursor: custom.trim() ? 'pointer' : 'default' }}>→</button>
+                  </div>
+                </div>
+                <button onClick={() => answer('Not sure')} style={{ width: '100%', marginTop: 12, background: 'transparent', border: 0, color: C.textLow, fontFamily: 'JetBrains Mono, monospace', fontSize: 11, letterSpacing: 1.5, cursor: 'pointer', padding: 8 }}>
+                  SKIP — NOT SURE
+                </button>
+              </>
+            )}
           </>
         )}
       </div>

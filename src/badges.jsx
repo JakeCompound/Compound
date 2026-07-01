@@ -1,8 +1,13 @@
 import React from 'react';
 import { C } from './compound-ui.jsx';
 import { SectionLabel } from './home-components.jsx';
+import { BADGE_LIBRARY, BL_NEW_GLYPHS, BADGE_LIB_CATEGORIES } from './badge-library.jsx';
+import { alcoholOn } from './alcohol.js';
 
 // badges.jsx — Achievements / badges wall for Reports tab
+// Backed by the 500-badge library. We ship only the PROVABLE subset (badges
+// whose `track` maps to a store that exists today); the rest stay in the file
+// as a roadmap and light up automatically when their tracker ships.
 
 // Each badge: id, label, desc, category, glyph, earned (bool), earnedDate, progress optional
 // Glyphs are inline SVGs — geometric, brand-aligned.
@@ -34,58 +39,16 @@ const BADGE_GLYPHS = {
   rocket: <svg viewBox="0 0 24 24" width="100%" height="100%"><path d="M12 2 C16 4 18 9 18 14 L18 17 L6 17 L6 14 C6 9 8 4 12 2 Z" fill="currentColor" /><circle cx="12" cy="10" r="2" fill="#0A0A0C" /><path d="M6 17 L4 21 L8 19 M18 17 L20 21 L16 19" fill="currentColor" /></svg>,
 };
 
-// Badge catalog — earned/locked status decided per demo state
-const BADGES = [
-  // CONSISTENCY ────────────────────────────────────
-  { id: 'first-checkin',  label: 'FIRST LIGHT',        desc: 'Logged your first check-in.',           cat: 'CONSISTENCY', glyph: 'sparkle',  earned: true,  earnedDate: '12 APR 2026' },
-  { id: 'checkin-7',      label: 'WEEK ONE',           desc: '7-day check-in streak.',                cat: 'CONSISTENCY', glyph: 'flame',    earned: true,  earnedDate: '19 APR 2026', tier: '7D' },
-  { id: 'checkin-14',     label: 'FORTNIGHT',          desc: '14-day check-in streak.',               cat: 'CONSISTENCY', glyph: 'flame',    earned: true,  earnedDate: '26 APR 2026', tier: '14D' },
-  { id: 'checkin-30',     label: 'MONTH IN',           desc: '30 days of check-ins, no gaps.',        cat: 'CONSISTENCY', glyph: 'flame',    earned: false, progress: { current: 27, target: 30 }, tier: '30D' },
-  { id: 'checkin-100',    label: 'CENTURION',          desc: '100-day check-in streak.',              cat: 'CONSISTENCY', glyph: 'flame',    earned: false, progress: { current: 27, target: 100 }, tier: '100D' },
-  { id: 'checkin-365',    label: 'A FULL YEAR',        desc: '365 days of showing up.',               cat: 'CONSISTENCY', glyph: 'crown',    earned: false, tier: '365D' },
-  { id: 'perfect-week',   label: 'PERFECT WEEK',       desc: 'All check-ins, all workouts, all AFDs.', cat: 'CONSISTENCY', glyph: 'hexagon', earned: true,  earnedDate: '20 APR 2026' },
-  { id: 'perfect-month',  label: 'PERFECT MONTH',      desc: 'Four perfect weeks in a row.',          cat: 'CONSISTENCY', glyph: 'diamond',  earned: false, progress: { current: 1, target: 4 } },
+// Merge the library's new glyphs into the dictionary.
+Object.assign(BADGE_GLYPHS, BL_NEW_GLYPHS);
 
-  // STRENGTH ────────────────────────────────────────
-  { id: 'first-workout',  label: 'FIRST REP',          desc: 'Logged your first workout.',            cat: 'STRENGTH',    glyph: 'dumbbell', earned: true,  earnedDate: '13 APR 2026' },
-  { id: 'first-pb',       label: 'FIRST PB',           desc: 'Set your first personal record.',       cat: 'STRENGTH',    glyph: 'star',     earned: true,  earnedDate: '17 APR 2026' },
-  { id: 'bench-bw',       label: 'BENCH BODYWEIGHT',   desc: 'Bench pressed your bodyweight.',        cat: 'STRENGTH',    glyph: 'arrowUp',  earned: true,  earnedDate: '02 MAY 2026' },
-  { id: 'squat-100',      label: '100KG SQUAT',        desc: 'Estimated 1RM squat hit 100kg.',        cat: 'STRENGTH',    glyph: 'mountain', earned: true,  earnedDate: '12 MAY 2026' },
-  { id: 'bench-100',      label: '100KG BENCH',        desc: 'Estimated 1RM bench hit 100kg.',        cat: 'STRENGTH',    glyph: 'mountain', earned: false, progress: { current: 87, target: 100, unit: 'kg' } },
-  { id: 'pullup-1',       label: 'FIRST PULL-UP',      desc: 'Logged your first bodyweight pull-up.', cat: 'STRENGTH',    glyph: 'arrowUp',  earned: false },
-  { id: 'pullup-10',      label: 'TEN PULL-UPS',       desc: 'Unbroken set of 10 pull-ups.',          cat: 'STRENGTH',    glyph: 'pulse',    earned: false },
-  { id: 'pb-3lifts',      label: 'TRIPLE THREAT',      desc: 'PBs on 3 different lifts in one month.', cat: 'STRENGTH',   glyph: 'sparkle',  earned: true,  earnedDate: '22 MAY 2026' },
-  { id: 'pb-allsix',      label: 'GRAND SLAM',         desc: 'Hit a PB on all six tracked lifts.',    cat: 'STRENGTH',    glyph: 'crown',    earned: false, progress: { current: 4, target: 6 } },
+// Ship only badges whose data source EXISTS today. Add a key here when a new
+// tracker ships and its badges light up automatically — no data migration.
+const READY_TRACKS = ['nips', 'checkins', 'food', 'workouts', 'measurements'];
+const PROVABLE = BADGE_LIBRARY.filter((b) => READY_TRACKS.includes(b.track));
 
-  // DISCIPLINE ─────────────────────────────────────
-  { id: 'workout-7',      label: 'SEVEN STRONG',       desc: '7 workouts logged.',                    cat: 'DISCIPLINE',  glyph: 'dumbbell', earned: true,  earnedDate: '24 APR 2026', tier: '7' },
-  { id: 'workout-25',     label: 'TWENTY-FIVE',        desc: '25 workouts logged.',                   cat: 'DISCIPLINE',  glyph: 'dumbbell', earned: true,  earnedDate: '15 MAY 2026', tier: '25' },
-  { id: 'workout-50',     label: 'HALF A HUNDRED',     desc: '50 workouts logged.',                   cat: 'DISCIPLINE',  glyph: 'dumbbell', earned: false, progress: { current: 32, target: 50 }, tier: '50' },
-  { id: 'workout-100',    label: 'CENTURY',            desc: '100 workouts logged.',                  cat: 'DISCIPLINE',  glyph: 'trophy',   earned: false, progress: { current: 32, target: 100 }, tier: '100' },
-  { id: 'volume-10t',     label: 'TEN TONNES',         desc: 'Total volume passed 10,000kg.',         cat: 'DISCIPLINE',  glyph: 'rocket',   earned: true,  earnedDate: '08 MAY 2026' },
-  { id: 'volume-100t',    label: 'A HUNDRED TONNES',   desc: 'Total volume passed 100,000kg.',        cat: 'DISCIPLINE',  glyph: 'rocket',   earned: false, progress: { current: 38, target: 100, unit: 't' } },
-  { id: 'streak-target',  label: 'TARGET HIT',         desc: 'Hit weekly workout target 4 weeks straight.', cat: 'DISCIPLINE', glyph: 'target', earned: true, earnedDate: '17 MAY 2026' },
-  { id: 'early-bird',     label: 'EARLY BIRD',         desc: 'Logged a workout before 6 AM.',         cat: 'DISCIPLINE',  glyph: 'sun',      earned: false },
-  { id: 'night-owl',      label: 'NIGHT OWL',          desc: 'Logged a workout after 9 PM.',          cat: 'DISCIPLINE',  glyph: 'moon',     earned: true,  earnedDate: '03 MAY 2026' },
-
-  // MIND & BODY ────────────────────────────────────
-  { id: 'afd-7',          label: 'DRY WEEK',           desc: '7 alcohol-free days in a row.',         cat: 'MIND',        glyph: 'noDrink',  earned: true,  earnedDate: '21 APR 2026', tier: '7D' },
-  { id: 'afd-30',         label: 'DRY MONTH',          desc: '30 alcohol-free days in a row.',        cat: 'MIND',        glyph: 'noDrink',  earned: false, progress: { current: 12, target: 30 }, tier: '30D' },
-  { id: 'afd-90',         label: 'DRY QUARTER',        desc: '90 alcohol-free days. Major.',          cat: 'MIND',        glyph: 'shield',   earned: false, tier: '90D' },
-  { id: 'calm-4',         label: 'STEADY HAND',        desc: 'Calm rating averaged 4+ for a week.',   cat: 'MIND',        glyph: 'feather',  earned: true,  earnedDate: '10 MAY 2026' },
-  { id: 'spirit-7',       label: 'WEEK OF QUIET',      desc: '7 straight days of spiritual reading.', cat: 'MIND',        glyph: 'book',     earned: true,  earnedDate: '15 MAY 2026', tier: '7D' },
-  { id: 'spirit-30',      label: 'MONTH OF QUIET',     desc: '30 straight days of spiritual reading.', cat: 'MIND',       glyph: 'book',     earned: false, progress: { current: 9, target: 30 }, tier: '30D' },
-  { id: 'sleep-8',        label: 'WELL RESTED',        desc: 'Sleep averaged 8+ hours for a week.',   cat: 'MIND',        glyph: 'moon',     earned: false, progress: { current: 7.2, target: 8, unit: 'h' } },
-  { id: 'partner-30',     label: 'PRESENT',            desc: '30 quality time days with partner.',    cat: 'MIND',        glyph: 'heart',    earned: true,  earnedDate: '18 MAY 2026' },
-
-  // SPECIAL ────────────────────────────────────────
-  { id: 'gratitude-20',   label: 'DEEP WELL',          desc: 'Built a gratitude library of 20+ items.', cat: 'SPECIAL',   glyph: 'sparkle',  earned: true,  earnedDate: '12 APR 2026' },
-  { id: 'comeback',       label: 'COMEBACK',           desc: 'Returned to logging after 3+ missed days.', cat: 'SPECIAL', glyph: 'bolt',     earned: false },
-  { id: 'birthday',       label: 'ANOTHER ORBIT',      desc: 'Logged on your birthday.',              cat: 'SPECIAL',     glyph: 'cake',     earned: false },
-  { id: 'weigh-12',       label: 'TWELVE FRIDAYS',     desc: '12 consecutive Friday weigh-ins.',      cat: 'SPECIAL',     glyph: 'scales',   earned: false, progress: { current: 8, target: 12 } },
-];
-
-const BADGE_CATEGORIES = ['ALL', 'CONSISTENCY', 'STRENGTH', 'DISCIPLINE', 'MIND', 'SPECIAL'];
+// firstInt('7-day check-in streak') → 7 ; 'Log 10,000 steps' → 10000
+function firstInt(s) { const m = String(s).match(/(\d[\d,]*)/); return m ? parseInt(m[1].replace(/,/g, ''), 10) : null; }
 
 // Build a real context from the user's actual stores.
 function buildBadgeContext() {
@@ -106,53 +69,62 @@ function buildBadgeContext() {
   const earlyBird = workouts.some(w => { const h = new Date(w.ts).getHours(); return h < 6; });
   const nightOwl = workouts.some(w => { const h = new Date(w.ts).getHours(); return h >= 21; });
   const pullupLogged = workouts.some(w => w.exercises.some(e => (e.exId==='pullup' || e.exId==='chinup') && e.sets.some(s=>s.complete)));
+  const afdTotal = checkins.filter((h) => h.answers && h.answers.afd).length;
+  let measurements = 0, photos = 0, mealsTotal = 0, foodDays = 0;
+  try { measurements = (window.loadMeasurements ? window.loadMeasurements() : []).length; } catch (e) {}
+  try { photos = Object.keys(JSON.parse(localStorage.getItem('compound:photos') || '{}')).length; } catch (e) {}
+  try {
+    const food = window.loadFood ? window.loadFood() : {};
+    Object.values(food || {}).forEach((meals) => { if (meals && meals.length) { foodDays += 1; mealsTotal += meals.length; } });
+  } catch (e) {}
   return {
     checkins: checkins.length, checkinStreak: streaks.checkin.current,
-    afdStreak: streaks.afd.current, spiritStreak: streaks.spirit.current,
+    afdStreak: streaks.afd.current, afdTotal, spiritStreak: streaks.spirit.current,
     calm7, sleep7, workouts: workouts.length, totalVolume,
     best, pbLifts, partnerDays, weighins: weighins.length,
     gratitude: (onboarding.gratitude||[]).length,
     bodyweight: onboarding.weight || 999,
     earlyBird, nightOwl, pullupLogged,
+    measurements, photos, mealsTotal, foodDays,
   };
 }
 
-// Returns {earned, progress?} for a badge id given real context. Unknown → locked.
-function evaluateBadge(id, c) {
-  const done = (cur, tgt, unit) => cur >= tgt ? { earned: true } : { earned: false, progress: { current: +(+cur).toFixed(1), target: tgt, unit } };
-  switch (id) {
-    case 'first-checkin': return { earned: c.checkins >= 1 };
-    case 'checkin-7':   return done(c.checkinStreak, 7);
-    case 'checkin-14':  return done(c.checkinStreak, 14);
-    case 'checkin-30':  return done(c.checkinStreak, 30);
-    case 'checkin-100': return done(c.checkinStreak, 100);
-    case 'checkin-365': return done(c.checkinStreak, 365);
-    case 'first-workout': return { earned: c.workouts >= 1 };
-    case 'first-pb':    return { earned: c.pbLifts >= 1 };
-    case 'bench-bw':    return c.best.bench ? { earned: c.best.bench >= c.bodyweight } : { earned: false };
-    case 'squat-100':   return done(c.best.squat || 0, 100, 'kg');
-    case 'bench-100':   return done(c.best.bench || 0, 100, 'kg');
-    case 'pullup-1':    return { earned: c.pullupLogged };
-    case 'pb-allsix':   return done(c.pbLifts, 6);
-    case 'workout-7':   return done(c.workouts, 7);
-    case 'workout-25':  return done(c.workouts, 25);
-    case 'workout-50':  return done(c.workouts, 50);
-    case 'workout-100': return done(c.workouts, 100);
-    case 'volume-10t':  return done(c.totalVolume, 10000);
-    case 'volume-100t': return done(+(c.totalVolume/1000).toFixed(0), 100, 't');
-    case 'early-bird':  return { earned: c.earlyBird };
-    case 'night-owl':   return { earned: c.nightOwl };
-    case 'afd-7':       return done(c.afdStreak, 7);
-    case 'afd-30':      return done(c.afdStreak, 30);
-    case 'afd-90':      return done(c.afdStreak, 90);
-    case 'calm-4':      return c.calm7 ? { earned: c.calm7 >= 4 } : { earned: false };
-    case 'spirit-7':    return done(c.spiritStreak, 7);
-    case 'spirit-30':   return done(c.spiritStreak, 30);
-    case 'sleep-8':     return c.sleep7 ? done(c.sleep7, 8, 'h') : { earned: false };
-    case 'partner-30':  return done(c.partnerDays, 30);
-    case 'gratitude-20': return done(c.gratitude, 20);
-    case 'weigh-12':    return done(c.weighins, 12);
-    default: return { earned: false }; // perfect-week/month, comeback, birthday, pullup-10, pb-3lifts, streak-target — not yet computed
+// Returns {earned, progress?} for a LIBRARY badge given real context. Only the
+// clearly-derivable conditions (counts, streaks, cumulative totals, PBs) are
+// computed; anything needing finer tracking than we store stays LOCKED — never
+// fake-earned. As trackers ship, extend the rules here and they light up.
+function evaluateLibBadge(b, c) {
+  const lc = (b.cond || '').toLowerCase();
+  const N = firstInt(b.cond);
+  const done = (cur, tgt, unit) => (tgt == null) ? { earned: false } : (cur >= tgt ? { earned: true } : { earned: false, progress: { current: +(+cur).toFixed(1), target: tgt, unit } });
+
+  switch (b.cat) {
+    case 'AFD':
+      // "N consecutive AFDs" → streak; "1 AFD"/"3 AFDs" → cumulative total.
+      return /consecutive/.test(lc) ? done(c.afdStreak, N || 1) : done(c.afdTotal, N || 1);
+    case 'CHECKIN':
+      if (/first/.test(lc)) return { earned: c.checkins >= 1 };
+      if (/streak/.test(lc)) return done(c.checkinStreak, N);
+      return { earned: false }; // time-of-day / calendar-month / location — not tracked
+    case 'NUTRITION':
+      if (/first meal/.test(lc)) return { earned: c.mealsTotal >= 1 };
+      if (/total meals/.test(lc)) return done(c.mealsTotal, N);
+      if (/(cumulative days|total days|day logger)/.test(lc) || /log (calories|food) for \d+/.test(lc)) return done(c.foodDays, N);
+      return { earned: false }; // per-day targets, water, macros, meal-types — not tracked at that grain
+    case 'WORKOUT':
+      if (/first/.test(lc) && /workout/.test(lc)) return { earned: c.workouts >= 1 };
+      if (/complete \d+ workouts/.test(lc)) return done(c.workouts, N);
+      if (/(pb|personal best)/.test(lc)) return (/log a pb|first/.test(lc)) ? { earned: c.pbLifts >= 1 } : done(c.pbLifts, N || 1);
+      return { earned: false }; // muscle-focus / cardio / distance / steps / times-of-day — not tracked
+    case 'BODY':
+      if (/first (body )?measurement/.test(lc)) return { earned: c.measurements >= 1 };
+      if (/upload your first|first progress photo/.test(lc)) return { earned: c.photos >= 1 };
+      if (/upload \d+ progress photos/.test(lc)) return done(c.photos, N);
+      return { earned: false }; // daily-log streaks / deltas / BMI — not tracked at that grain yet
+    case 'ALCOHOL':
+      return { earned: false }; // under-target history not stored yet
+    default:
+      return { earned: false };
   }
 }
 
@@ -161,21 +133,27 @@ function BadgesWall() {
   const [showLocked, setShowLocked] = React.useState(true);
   const [selected, setSelected] = React.useState(null);
 
-  // Evaluate every badge against the user's real data.
+  // Evaluate the provable subset against the user's real data. Alcohol-gated
+  // badges are hidden entirely when alcohol tracking is off.
   const ctx = buildBadgeContext();
-  const evaluated = BADGES.map((b) => {
-    const r = evaluateBadge(b.id, ctx);
-    return { ...b, earned: r.earned, progress: r.earned ? undefined : (r.progress || b.progress && !r.earned ? r.progress : undefined), earnedDate: r.earned ? (b.earnedDate || null) : undefined };
-  });
-
-  const filtered = evaluated.filter((b) => {
-    if (filter !== 'ALL' && b.cat !== filter) return false;
-    if (!showLocked && !b.earned) return false;
-    return true;
-  });
+  let onb = {}; try { onb = JSON.parse(localStorage.getItem('compound:onboarding') || '{}'); } catch (e) {}
+  const showAlcohol = alcoholOn(onb);
+  const evaluated = PROVABLE
+    .filter((b) => showAlcohol || b.gate !== 'alcohol')
+    .map((b) => ({ id: b.id, label: b.name, desc: b.cond, cat: b.cat, glyph: b.glyph, special: b.special, ...evaluateLibBadge(b, ctx) }));
 
   const earnedCount = evaluated.filter((b) => b.earned).length;
   const totalCount = evaluated.length;
+
+  const catLabel = {}; BADGE_LIB_CATEGORIES.forEach((c) => { catLabel[c.key] = c.label; });
+  const presentCats = BADGE_LIB_CATEGORIES.map((c) => c.key).filter((k) => evaluated.some((b) => b.cat === k));
+  const chips = ['ALL', ...presentCats];
+
+  const shown = evaluated.filter((b) => (filter === 'ALL' || b.cat === filter) && (showLocked || b.earned));
+  const sections = presentCats
+    .filter((k) => filter === 'ALL' || k === filter)
+    .map((k) => ({ key: k, label: catLabel[k], items: shown.filter((b) => b.cat === k) }))
+    .filter((s) => s.items.length > 0);
 
   return (
     <div>
@@ -228,7 +206,7 @@ function BadgesWall() {
 
       {/* Category filter */}
       <div style={{ display: 'flex', gap: 6, overflowX: 'auto', marginLeft: -22, marginRight: -22, paddingLeft: 22, paddingRight: 22, marginBottom: 12 }}>
-        {BADGE_CATEGORIES.map((c) => {
+        {chips.map((c) => {
           const active = filter === c;
           const count = c === 'ALL' ? evaluated.length : evaluated.filter((b) => b.cat === c).length;
           return (
@@ -248,7 +226,7 @@ function BadgesWall() {
                 display: 'flex', alignItems: 'center', gap: 6,
               }}
             >
-              <span>{c}</span>
+              <span>{c === 'ALL' ? 'ALL' : catLabel[c]}</span>
               <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: active ? C.accent : C.textLow, letterSpacing: 0.5 }}>
                 {count}
               </span>
@@ -289,18 +267,24 @@ function BadgesWall() {
         </button>
       </div>
 
-      {/* Grid */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(4, 1fr)',
-          gap: 8,
-        }}
-      >
-        {filtered.map((b) => (
-          <BadgeTile key={b.id} badge={b} onClick={() => setSelected(b)} />
-        ))}
-      </div>
+      {/* Per-category sections (keeps the 200+ tile wall from rendering as one flat grid) */}
+      {sections.map((s) => (
+        <div key={s.key} style={{ marginBottom: 18 }}>
+          <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9.5, letterSpacing: 1.6, color: C.textLow, margin: '2px 2px 8px' }}>
+            {s.label.toUpperCase()} · {s.items.length}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+            {s.items.map((b) => (
+              <BadgeTile key={b.id} badge={b} onClick={() => setSelected(b)} />
+            ))}
+          </div>
+        </div>
+      ))}
+      {sections.length === 0 && (
+        <div style={{ fontFamily: 'Outfit, sans-serif', fontSize: 13, color: C.textMid, textAlign: 'center', padding: '16px 0' }}>
+          {showLocked ? 'No badges here yet.' : 'None earned in this category yet — keep going.'}
+        </div>
+      )}
 
       {/* Detail modal */}
       {selected && <BadgeDetailModal badge={selected} onClose={() => setSelected(null)} />}
@@ -533,6 +517,6 @@ function BadgeDetailModal({ badge, onClose }) {
   );
 }
 
-Object.assign(window, { BadgesWall, BADGES, BADGE_CATEGORIES });
+Object.assign(window, { BadgesWall, BADGE_LIBRARY, PROVABLE, READY_TRACKS });
 
-export { BADGES, BADGE_CATEGORIES, BADGE_GLYPHS, BadgeDetailModal, BadgeTile, BadgesWall, buildBadgeContext, evaluateBadge };
+export { BADGE_GLYPHS, BADGE_LIB_CATEGORIES, BADGE_LIBRARY, PROVABLE, READY_TRACKS, BadgeDetailModal, BadgeTile, BadgesWall, buildBadgeContext, evaluateLibBadge };

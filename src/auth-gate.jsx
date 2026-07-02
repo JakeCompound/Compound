@@ -2,6 +2,7 @@ import React from 'react';
 import { C } from './compound-ui.jsx';
 import { supabase, supabaseConfigured } from './supabase.js';
 import { syncOnLogin, teardownSync } from './cloud-sync.js';
+import { InstallPrompt } from './mobile-shell.jsx';
 
 // auth-gate.jsx — gates the app behind Supabase email/password auth.
 // When Supabase isn't configured (no env keys) it's a no-op pass-through so the
@@ -42,7 +43,7 @@ function AuthGate({ children }) {
 
   if (!supabaseConfigured) return children;   // local-only mode
   if (!ready) return <Splash />;
-  if (!session) return <AuthScreen />;
+  if (!session) return <><AuthScreen /><InstallPrompt /></>;   // install nudge works pre-login too
   if (!synced) return <Splash label="Syncing your data…" />;
   return children;
 }

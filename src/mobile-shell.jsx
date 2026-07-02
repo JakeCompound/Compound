@@ -31,6 +31,20 @@ function isIOS() {
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 }
 
+// Chrome fires `beforeinstallprompt` ONCE, early in the page load — usually
+// before React mounts, and always before the signed-in <App/> renders (the
+// auth gate + cloud sync run first). Capture and stash it at module load so
+// InstallPrompt can adopt it whenever it mounts; otherwise the event is missed
+// and the install popup never shows.
+let stashedInstall = null;
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    stashedInstall = e;
+    try { window.dispatchEvent(new Event('compound:install-ready')); } catch (err) {}
+  });
+}
+
 // ── Install prompt ────────────────────────────────────────────────────────
 // Android/Chrome: captures beforeinstallprompt → native install.
 // iOS Safari: shows Share-sheet instructions (no programmatic API exists).
@@ -45,14 +59,17 @@ function InstallPrompt() {
   React.useEffect(() => {
     if (isStandalone() || dismissed) return;
 
-    // Android / desktop Chrome path
-    const onPrompt = (e) => {
-      e.preventDefault();
-      setDeferred(e);
+    // Android / desktop Chrome path — the event is captured at module load
+    // (see stashedInstall above); adopt it on mount, or when it arrives later.
+    let showTimer;
+    const adopt = () => {
+      if (!stashedInstall) return;
+      setDeferred(stashedInstall);
       setMode('android');
-      setTimeout(() => setVisible(true), 1200);
+      showTimer = setTimeout(() => setVisible(true), 1200);
     };
-    window.addEventListener('beforeinstallprompt', onPrompt);
+    adopt();
+    window.addEventListener('compound:install-ready', adopt);
 
     // iOS path — no event, decide by UA
     let iosTimer;
@@ -62,7 +79,8 @@ function InstallPrompt() {
     }
 
     return () => {
-      window.removeEventListener('beforeinstallprompt', onPrompt);
+      window.removeEventListener('compound:install-ready', adopt);
+      if (showTimer) clearTimeout(showTimer);
       if (iosTimer) clearTimeout(iosTimer);
     };
   }, [dismissed]);
@@ -80,6 +98,7 @@ function InstallPrompt() {
     if (outcome === 'accepted' || outcome === 'dismissed') {
       setVisible(false);
       setDeferred(null);
+      stashedInstall = null; // consumed — a prompt event can only be used once
     }
   };
 

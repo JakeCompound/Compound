@@ -89,9 +89,11 @@ function CheckinModal({ open, onClose, onComplete, gratitudeLibrary = [], user =
     if (initialAnswers) {
       setAnswers((a) => ({ ...a, ...initialAnswers, gratitudeAcked: shuf.map(() => true), gratitudeNew: initialAnswers.gratitudeNew || '' }));
     } else {
-      // Fresh open: prefill nips from today's live tally (logged via + Add).
+      // Fresh open: prefill nips + steps from today's live tallies (logged via
+      // + Add and the step ledger) — adjustable here as before.
       var liveNips = window.loadNipsToday ? window.loadNipsToday() : 0;
-      setAnswers((a) => ({ ...a, gratitudeAcked: shuf.map(() => false), gratitudeNew: '', nips: liveNips, afd: liveNips > 0 ? false : a.afd }));
+      var liveSteps = window.dayStepTotal ? window.dayStepTotal() : 0;
+      setAnswers((a) => ({ ...a, gratitudeAcked: shuf.map(() => false), gratitudeNew: '', nips: liveNips, afd: liveNips > 0 ? false : a.afd, steps: liveSteps > 0 ? liveSteps : a.steps }));
     }
   }, [open]);
 

@@ -19,6 +19,20 @@ const DEFAULT_STEPS = 7000;
 const DEFAULT_SESSIONS = 3;
 const DEFAULT_MINUTES = 45;
 
+// ── v2 "earned calories" model ────────────────────────────────────────────
+// The daily base assumes only a LIFESTYLE floor (deliberately low — pick lower
+// when unsure). Steps above the floor, walks/runs, and completed workouts are
+// EARNED into that day's allowance at 100% — the conservatism lives in the low
+// baseline, not in percentage haircuts. Targets carry `lifestyle` when made
+// with this model; legacy targets (no lifestyle) keep the old additive math
+// and simply don't earn.
+const LIFESTYLES = [
+  { key: 'sedentary', label: 'Sedentary',      sub: 'Desk-bound, driving, little walking',   mult: 1.20, baselineSteps: 2250 },
+  { key: 'light',     label: 'Lightly active', sub: 'Some walking, errands, on feet a bit',  mult: 1.35, baselineSteps: 5000 },
+  { key: 'active',    label: 'Active',         sub: 'On your feet for much of the day',      mult: 1.50, baselineSteps: 7500 },
+  { key: 'very',      label: 'Very active',    sub: 'Physical job, rarely sitting',          mult: 1.65, baselineSteps: 10000 },
+];
+
 const GOALS = {
   cut:     { label: 'Cut', sub: 'Lose fat, slow & steady' },
   maintain:{ label: 'Maintain', sub: 'Recomposition' },
@@ -57,15 +71,24 @@ function calcTargets(input) {
   if (input.inDeficit) bmr *= 0.95;
   if (input.weightReduced) bmr *= 0.97;
 
-  // Additive TDEE: moderate maintenance base + step-driven NEAT + training burn.
+  // TDEE:
+  //  • v2 (input.lifestyle set): bmr × lifestyle floor only — workouts and steps
+  //    above the floor are EARNED per-day, not assumed here.
+  //  • legacy: additive model (maintenance base + step NEAT + training ÷ 7).
   const steps = input.steps ?? DEFAULT_STEPS;
   const sessions = input.sessions ?? DEFAULT_SESSIONS;
   const minutes = input.minutes ?? DEFAULT_MINUTES;
-  const maintenanceBase = bmr * MAINTENANCE_MULT;
-  const stepsKcal = steps * wKg * STEPS_KCAL_FACTOR;
-  // 3.5 ml O₂/kg/min baseline; /200 → kcal/min; /7 spreads the week's training over the week.
-  const trainingKcalPerDay = (sessions * minutes * (LIFTING_MET * 3.5 * wKg / 200)) / 7;
-  const tdee = maintenanceBase + stepsKcal + trainingKcalPerDay;
+  const life = input.lifestyle ? LIFESTYLES.find((l) => l.key === input.lifestyle) : null;
+  let tdee;
+  if (life) {
+    tdee = bmr * life.mult;
+  } else {
+    const maintenanceBase = bmr * MAINTENANCE_MULT;
+    const stepsKcal = steps * wKg * STEPS_KCAL_FACTOR;
+    // 3.5 ml O₂/kg/min baseline; /200 → kcal/min; /7 spreads the week's training over the week.
+    const trainingKcalPerDay = (sessions * minutes * (LIFTING_MET * 3.5 * wKg / 200)) / 7;
+    tdee = maintenanceBase + stepsKcal + trainingKcalPerDay;
+  }
 
   let calories = tdee;
   if (input.goal === 'cut') {
@@ -94,6 +117,7 @@ function calcTargets(input) {
     bmr: Math.round(bmr), tdee: Math.round(tdee), calories,
     protein, fat, carbs,
     proteinPerLb, steps, sessions, minutes, goal: input.goal, rate: input.rate,
+    lifestyle: life ? life.key : undefined, // presence marks a v2 "earned calories" target
   };
 }
 
@@ -150,6 +174,68 @@ function setAlcoholKcal(kcal, date) {
 }
 function addAlcoholKcal(delta, date) { return setAlcoholKcal(loadAlcoholKcal(date) + delta, date); }
 
+// ── Step ledger + earned exercise kcal (v2 model) ──────────────────────────
+// Steps are logged in small increments through the day (ADHD-friendly small
+// wins); walks/runs live in the SAME ledger as accent-coloured "certified
+// effort" entries — one ledger means a walk's steps are never double-counted.
+const STEPLOG_KEY = 'compound:stepLog'; // { [date]: [{id, ts, kind:'update'|'walk'|'run', steps, kcal, distanceKm, durationMin, source}] }
+function loadStepLog() { try { return JSON.parse(localStorage.getItem(STEPLOG_KEY) || '{}'); } catch (e) { return {}; } }
+function saveStepLog(all) { try { localStorage.setItem(STEPLOG_KEY, JSON.stringify(all)); } catch (e) {} }
+function stepEntriesForDay(date) { const all = loadStepLog(); return all[date || todayKey()] || []; }
+function addStepEntry(entry, date) {
+  const all = loadStepLog();
+  const k = date || todayKey();
+  all[k] = [...(all[k] || []), { id: 's-' + Date.now(), ts: Date.now(), ...entry }];
+  saveStepLog(all);
+  return all[k];
+}
+function removeStepEntry(id, date) {
+  const all = loadStepLog();
+  const k = date || todayKey();
+  all[k] = (all[k] || []).filter((e) => e.id !== id);
+  saveStepLog(all);
+  return all[k];
+}
+function dayStepTotal(date) { return stepEntriesForDay(date).reduce((s, e) => s + (e.steps || 0), 0); }
+
+// Estimate a walk/run from distance (+ condition chips). Walking ≈ 0.53
+// kcal/kg/km, running ≈ 0.95 (pace folds into distance); chips nudge for
+// terrain / temperature / carrying load. Returns { steps, kcal }.
+function estimateCardioKcal({ kind, distanceKm, weightKg, chips = {} }) {
+  const perKm = kind === 'run' ? 0.95 : 0.53;
+  let kcal = (distanceKm || 0) * weightKg * perKm;
+  if (chips.hilly) kcal *= 1.10;
+  if (chips.hot) kcal *= 1.05;
+  if (chips.cold) kcal *= 1.05;
+  if (chips.load) kcal *= 1.10;
+  const steps = Math.round((distanceKm || 0) * (kind === 'run' ? 1150 : 1300));
+  return { steps, kcal: Math.round(kcal) };
+}
+
+// Earned kcal for a day: plain step-updates ABOVE the lifestyle baseline +
+// walks/runs at their own kcal + strength workouts (duration × MET), all at
+// 100% — the low lifestyle floor is the safety margin. Only v2 targets (with
+// a lifestyle) earn; legacy targets already assume activity in the base, so
+// earning would double-count.
+function dayEarnedKcal(date) {
+  const t = loadTargets();
+  if (!t || !t.lifestyle) return 0;
+  const life = LIFESTYLES.find((l) => l.key === t.lifestyle) || LIFESTYLES[0];
+  let wKg = 80;
+  try { const onb = JSON.parse(localStorage.getItem('compound:onboarding') || '{}'); if (onb.weight) wKg = onb.weight; } catch (e) {}
+  const entries = stepEntriesForDay(date);
+  const plainSteps = entries.filter((e) => e.kind === 'update').reduce((s, e) => s + (e.steps || 0), 0);
+  const plainKcal = Math.max(0, plainSteps - life.baselineSteps) * wKg * STEPS_KCAL_FACTOR;
+  const cardioKcal = entries.filter((e) => e.kind !== 'update').reduce((s, e) => s + (e.kcal != null ? e.kcal : Math.round((e.steps || 0) * wKg * STEPS_KCAL_FACTOR)), 0);
+  let workoutKcal = 0;
+  try {
+    const k = date || todayKey();
+    const ws = (window.loadWorkouts ? window.loadWorkouts() : []).filter((w) => w.date === k && w.kind !== 'cardio');
+    workoutKcal = ws.reduce((s, w) => s + (w.durationMin || 0) * (LIFTING_MET * 3.5 * wKg / 200), 0);
+  } catch (e) {}
+  return Math.round(plainKcal + cardioKcal + workoutKcal);
+}
+
 // All open meal questions today (across meals)
 function openMealQuestions(date) {
   const items = foodForDay(date);
@@ -175,11 +261,12 @@ function setNipsToday(n, date) {
 }
 
 Object.assign(window, {
-  GOALS, CUT_RATES, GAIN_RATES, calcTargets,
+  GOALS, CUT_RATES, GAIN_RATES, LIFESTYLES, calcTargets,
   loadTargets, saveTargets, loadFood, saveFood, foodForDay, addFood, updateFood, removeFood,
   dayTotals, openMealQuestions, todayKey: todayKey,
   loadNipsToday, setNipsToday,
   loadAlcoholKcal, setAlcoholKcal, addAlcoholKcal,
+  loadStepLog, stepEntriesForDay, addStepEntry, removeStepEntry, dayStepTotal, dayEarnedKcal, estimateCardioKcal,
 });
 
-export { ALC_KCAL_KEY, CUT_RATES, DEFAULT_MINUTES, DEFAULT_SESSIONS, DEFAULT_STEPS, FOOD_KEY, GAIN_RATES, GOALS, KCAL_PER_LB, LB_PER_KG, LIFTING_MET, MAINTENANCE_MULT, NIPS_KEY, STEPS_KCAL_FACTOR, TARGETS_KEY, addAlcoholKcal, addFood, calcTargets, dayTotals, foodForDay, loadAlcoholKcal, loadFood, loadNipsToday, loadTargets, openMealQuestions, removeFood, saveFood, saveTargets, setAlcoholKcal, setNipsToday, todayKey, updateFood };
+export { ALC_KCAL_KEY, CUT_RATES, DEFAULT_MINUTES, DEFAULT_SESSIONS, DEFAULT_STEPS, FOOD_KEY, GAIN_RATES, GOALS, KCAL_PER_LB, LB_PER_KG, LIFESTYLES, LIFTING_MET, MAINTENANCE_MULT, NIPS_KEY, STEPLOG_KEY, STEPS_KCAL_FACTOR, TARGETS_KEY, addAlcoholKcal, addFood, addStepEntry, calcTargets, dayEarnedKcal, dayStepTotal, dayTotals, estimateCardioKcal, foodForDay, loadAlcoholKcal, loadFood, loadNipsToday, loadStepLog, loadTargets, openMealQuestions, removeFood, removeStepEntry, saveFood, saveTargets, setAlcoholKcal, setNipsToday, stepEntriesForDay, todayKey, updateFood };

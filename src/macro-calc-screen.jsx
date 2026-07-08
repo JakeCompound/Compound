@@ -14,6 +14,9 @@ function MacroCalculator({ user, initial, onDone, onBack, oneTap }) {
   const [steps, setSteps] = React.useState(prior.steps ?? 7000);
   const [sessions, setSessions] = React.useState(prior.sessions ?? (user.trainingDays || 3));
   const [minutes, setMinutes] = React.useState(prior.minutes ?? 45);
+  // v2 earned-calories model: the base assumes only a lifestyle floor; workouts
+  // and steps above it are earned per-day. Default to the lowest honest option.
+  const [lifestyle, setLifestyle] = React.useState(prior.lifestyle || 'sedentary');
   const [goal, setGoal] = React.useState(prior.goal || (user.weightGoal < user.weight ? 'cut' : user.weightGoal > user.weight ? 'gain' : 'maintain'));
   const [rate, setRate] = React.useState(prior.rate || 0.5);
   const [fatPref, setFatPref] = React.useState(prior.fatPref || 'std');
@@ -25,7 +28,7 @@ function MacroCalculator({ user, initial, onDone, onBack, oneTap }) {
 
   const result = window.calcTargets({
     gender, age, weightKg, heightCm, bodyFat,
-    steps, sessions, minutes, goal, rate, fatPref,
+    steps, sessions, minutes, lifestyle, goal, rate, fatPref,
     inDeficit: goal === 'cut', proteinPerLb: 0.6,
   });
 
@@ -91,19 +94,25 @@ function MacroCalculator({ user, initial, onDone, onBack, oneTap }) {
         {step === 1 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <CalcHead tag={oneTap ? 'CONFIRM' : 'STEP 2 / 3'} title="ACTIVITY" accent="& GOAL." />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div>
-                <FieldLabel info="Your usual daily step count — not your goal. Drives the NEAT part of your burn.">Typical steps / day</FieldLabel>
-                <Stepper value={steps} onChange={setSteps} min={1000} max={25000} step={500} unit="steps" />
+            <div>
+              <FieldLabel info="Pick your everyday floor — desk job, errands, that kind of thing. When in doubt choose LOWER: workouts, walks, runs and logged steps all ADD calories on the day you actually do them.">Lifestyle (your baseline, not your ambitions)</FieldLabel>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
+                {(window.LIFESTYLES || []).map((l) => {
+                  const active = lifestyle === l.key;
+                  return (
+                    <button key={l.key} onClick={() => setLifestyle(l.key)}
+                      style={{ textAlign: 'left', padding: '11px 14px', borderRadius: 10, cursor: 'pointer',
+                        background: active ? C.accentDim : C.surf1, border: active ? `1px solid ${C.accent}` : `1px solid ${C.line}`,
+                        display: 'flex', alignItems: 'baseline', gap: 10 }}>
+                      <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 15, letterSpacing: 0.8, textTransform: 'uppercase', color: active ? C.accent : C.text }}>{l.label}</span>
+                      <span style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12, color: C.textMid }}>{l.sub}</span>
+                    </button>
+                  );
+                })}
               </div>
-              <div>
-                <FieldLabel>Strength sessions / week</FieldLabel>
-                <Stepper value={sessions} onChange={setSessions} min={0} max={14} unit="/ wk" />
-              </div>
-              <div>
-                <FieldLabel info="Average length of one training session.">Avg minutes / session</FieldLabel>
-                <Stepper value={minutes} onChange={setMinutes} min={10} max={120} step={5} unit="min" />
-              </div>
+              <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12, color: C.textMid, lineHeight: 1.5, margin: '10px 0 0' }}>
+                This sets your daily base only. Every workout, walk, run and step count you log is added to that day's allowance — you earn it by doing it.
+              </p>
             </div>
             <div>
               <FieldLabel>Goal</FieldLabel>

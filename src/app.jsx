@@ -236,6 +236,14 @@ function App() {
     if (answers) {
       // Keep today's live nip tally in sync with the check-in.
       if (window.setNipsToday) window.setNipsToday(answers.afd ? 0 : (answers.nips || 0));
+      // If the user raised the steps number at check-in, top the ledger up so
+      // the rings + earned kcal agree with what they reported.
+      try {
+        const ledger = window.dayStepTotal ? window.dayStepTotal() : 0;
+        if (typeof answers.steps === 'number' && answers.steps > ledger && window.addStepEntry) {
+          window.addStepEntry({ kind: 'update', steps: answers.steps - ledger, source: 'checkin' });
+        }
+      } catch (e) {}
       const updated = recordCheckin(answers, data);
       setCheckins(updated);
     }
@@ -325,6 +333,7 @@ function App() {
               setWorkoutView(v);
             }}
             hasInProgress={!!activeSession}
+            onChanged={() => setNutTick((x) => x + 1)}
           />
         );
       }

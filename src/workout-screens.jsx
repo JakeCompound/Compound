@@ -8,7 +8,9 @@ import { SavedWorkoutsButton } from './workout-enhancements.jsx';
 // workout-screens.jsx — Workout tab: internal home, new-workout flow, live session
 
 // ── Workout tab home (internal nav) ──────────────────────────────────────
-function WorkoutHome({ onNav, hasInProgress, user = {} }) {
+function WorkoutHome({ onNav, hasInProgress, user = {}, onChanged }) {
+  const [, force] = React.useReducer((x) => x + 1, 0);
+  const refresh = () => { force(); onChanged && onChanged(); };
   const history = window.loadWorkouts ? window.loadWorkouts() : [];
   const doneThisWeek = window.sessionsThisWeek ? window.sessionsThisWeek(history) : 0;
   const target = user.trainingDays || 3;
@@ -69,6 +71,11 @@ function WorkoutHome({ onNav, hasInProgress, user = {} }) {
       {/* Saved Workouts — named, reusable */}
       <div style={{ marginTop: 22 }}>
         <SavedWorkoutsButton onOpen={() => onNav('saved')} />
+      </div>
+
+      {/* Movement today — step ledger + walks/runs (earned calories) */}
+      <div style={{ marginTop: 22 }}>
+        <MovementToday user={user} onChanged={refresh} />
       </div>
 
       {/* Secondary actions */}
@@ -689,8 +696,215 @@ function NewStepHead({ tag, title, accent, sub }) {
   );
 }
 
+// ── Movement today — step ledger + walk/run logging ─────────────────────────
+// Small wins that stack: log steps any time (plain rows), log a walk/run (accent
+// rows — a certified effort), everything sums into one daily total that earns
+// calories above the lifestyle baseline. Prefills tonight's check-in.
+function MovementToday({ user, onChanged }) {
+  const [sheet, setSheet] = React.useState(null); // 'steps' | 'cardio'
+  const entries = window.stepEntriesForDay ? window.stepEntriesForDay() : [];
+  const total = window.dayStepTotal ? window.dayStepTotal() : 0;
+  const earned = window.dayEarnedKcal ? window.dayEarnedKcal() : 0;
+  const goal = user.stepGoal || 10000;
+  const fmtN = (n) => n.toLocaleString();
+  const del = (id) => { window.removeStepEntry(id); onChanged && onChanged(); };
+  return (
+    <div>
+      <SectionLabel meta={`${fmtN(total)} / ${fmtN(goal)} STEPS`}>MOVEMENT TODAY</SectionLabel>
+      <div style={{ background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 14, padding: 14 }}>
+        {/* progress strip */}
+        <div style={{ height: 5, background: C.surf2, borderRadius: 3, overflow: 'hidden', marginBottom: 10 }}>
+          <div style={{ width: `${Math.min(100, (total / goal) * 100)}%`, height: '100%', background: C.accent, transition: 'width .3s' }} />
+        </div>
+        {earned > 0 && (
+          <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 1.2, color: '#7BB661', marginBottom: 10 }}>
+            EARNED TODAY · +{earned} KCAL
+          </div>
+        )}
+        {entries.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
+            {entries.map((e) => {
+              const certified = e.kind !== 'update';
+              return (
+                <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 9, background: certified ? C.accentSoft : 'rgba(0,0,0,.18)', border: `1px solid ${certified ? C.accentDim : C.line}` }}>
+                  <span style={{ fontSize: 14 }}>{e.kind === 'run' ? '🏃' : e.kind === 'walk' ? '🚶' : '👣'}</span>
+                  <span style={{ flex: 1, fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: certified ? C.accent : C.text }}>
+                    {certified ? `${e.kind.toUpperCase()}${e.distanceKm ? ` · ${e.distanceKm}km` : ''}${e.durationMin ? ` · ${e.durationMin}min` : ''}` : `+${fmtN(e.steps || 0)} steps`}
+                  </span>
+                  <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.textMid }}>
+                    {certified ? `${fmtN(e.steps || 0)} st${e.kcal ? ` · +${e.kcal}` : ''}` : ''}
+                  </span>
+                  <button onClick={() => del(e.id)} aria-label="Remove" style={{ background: 'transparent', border: 0, color: C.textLow, cursor: 'pointer', padding: 2, lineHeight: 1 }}>
+                    <svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 2 L8 8 M8 2 L2 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={() => setSheet('steps')} style={{ flex: 1, padding: '11px 0', background: C.surf2, border: `1px solid ${C.line}`, borderRadius: 10, color: C.text, fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 14, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer' }}>
+            + Log steps
+          </button>
+          <button onClick={() => setSheet('cardio')} style={{ flex: 1, padding: '11px 0', background: C.accent, border: 0, borderRadius: 10, color: '#0A0A0C', fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 14, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer' }}>
+            + Walk / Run
+          </button>
+        </div>
+      </div>
+      {sheet === 'steps' && <StepLogSheet onClose={() => setSheet(null)} onChanged={onChanged} />}
+      {sheet === 'cardio' && <CardioSheet user={user} onClose={() => setSheet(null)} onChanged={onChanged} />}
+    </div>
+  );
+}
+
+// Quick step log — a number pad entry plus one-tap chips. Small wins, no friction.
+function StepLogSheet({ onClose, onChanged }) {
+  const [val, setVal] = React.useState('');
+  const add = (n) => {
+    const steps = Math.round(+n || 0);
+    if (steps <= 0) return;
+    window.addStepEntry({ kind: 'update', steps });
+    onChanged && onChanged();
+    onClose();
+  };
+  return (
+    <div onClick={onClose} style={{ position: 'absolute', inset: 0, zIndex: 220, background: 'rgba(0,0,0,.72)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'flex-end' }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', background: C.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: '20px 22px 24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 3, borderRadius: 2, background: 'rgba(255,255,255,.18)' }} /></div>
+        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.accent, letterSpacing: 2.4, marginBottom: 10 }}>LOG STEPS</div>
+        <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: C.textMid, lineHeight: 1.5, margin: '0 0 12px' }}>
+          Add what your watch shows since your last log — every entry stacks into today's total.
+        </p>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+          {[1000, 2500, 5000].map((n) => (
+            <button key={n} onClick={() => add(n)} style={{ flex: 1, padding: '12px 0', background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 10, color: C.text, fontFamily: 'JetBrains Mono, monospace', fontSize: 12, cursor: 'pointer' }}>
+              +{n.toLocaleString()}
+            </button>
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input
+            type="number" inputMode="numeric" value={val} placeholder="Exact steps…"
+            onChange={(e) => setVal(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') add(val); }}
+            style={{ flex: 1, background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 10, color: C.text, fontFamily: 'JetBrains Mono, monospace', fontSize: 15, padding: '12px 14px', outline: 'none' }}
+          />
+          <button onClick={() => add(val)} disabled={!(+val > 0)} style={{ width: 56, background: +val > 0 ? C.accent : C.surf2, color: +val > 0 ? '#0A0A0C' : C.textLow, border: 0, borderRadius: 10, fontSize: 18, cursor: +val > 0 ? 'pointer' : 'default' }}>→</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Walk / Run — two pathways: smartwatch calories, or distance + time (+ chips).
+function CardioSheet({ user, onClose, onChanged }) {
+  const [kind, setKind] = React.useState('walk');
+  const [path, setPath] = React.useState(null); // 'watch' | 'estimate'
+  const [watchKcal, setWatchKcal] = React.useState('');
+  const [watchSteps, setWatchSteps] = React.useState('');
+  const [km, setKm] = React.useState('');
+  const [mins, setMins] = React.useState('');
+  const [chips, setChips] = React.useState({});
+  const wKg = user.weight || 80;
+  const toggleChip = (k) => setChips((s) => ({ ...s, [k]: !s[k] }));
+
+  const est = (+km > 0) ? window.estimateCardioKcal({ kind, distanceKm: +km, weightKg: wKg, chips }) : null;
+  const canSaveWatch = +watchKcal > 0;
+  const canSaveEst = +km > 0 && +mins > 0;
+
+  const save = () => {
+    if (path === 'watch' && canSaveWatch) {
+      window.addStepEntry({ kind, steps: Math.round(+watchSteps || 0), kcal: Math.round(+watchKcal), source: 'watch' });
+    } else if (path === 'estimate' && canSaveEst) {
+      window.addStepEntry({ kind, steps: est.steps, kcal: est.kcal, distanceKm: +km, durationMin: Math.round(+mins), source: 'estimate' });
+    } else return;
+    onChanged && onChanged();
+    onClose();
+  };
+
+  const CHIP_DEFS = [{ k: 'hilly', l: 'HILLY' }, { k: 'hot', l: 'HOT DAY' }, { k: 'cold', l: 'COLD DAY' }, { k: 'load', l: 'CARRYING WEIGHT' }];
+  const segBtn = (active) => ({ flex: 1, padding: '11px 0', borderRadius: 10, cursor: 'pointer', background: active ? C.accentDim : C.surf1, border: active ? `1px solid ${C.accent}` : `1px solid ${C.line}`, color: active ? C.accent : C.text, fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 14, letterSpacing: 1, textTransform: 'uppercase' });
+  const inputStyle = { width: '100%', boxSizing: 'border-box', background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 10, color: C.text, fontFamily: 'JetBrains Mono, monospace', fontSize: 15, padding: '12px 14px', outline: 'none' };
+
+  return (
+    <div onClick={onClose} style={{ position: 'absolute', inset: 0, zIndex: 220, background: 'rgba(0,0,0,.72)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'flex-end' }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxHeight: '92%', overflowY: 'auto', background: C.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: '20px 22px 24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 3, borderRadius: 2, background: 'rgba(255,255,255,.18)' }} /></div>
+        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.accent, letterSpacing: 2.4, marginBottom: 10 }}>ADD A WALK / RUN</div>
+
+        <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+          <button onClick={() => setKind('walk')} style={segBtn(kind === 'walk')}>🚶 Walk</button>
+          <button onClick={() => setKind('run')} style={segBtn(kind === 'run')}>🏃 Run</button>
+        </div>
+
+        {!path ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <button onClick={() => setPath('watch')} style={{ textAlign: 'left', padding: '14px 14px', background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 12, cursor: 'pointer' }}>
+              <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 16, letterSpacing: 0.8, color: C.text, textTransform: 'uppercase' }}>⌚ From my smartwatch</div>
+              <div style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: C.textMid, marginTop: 2 }}>Type the calories (and steps) your watch showed.</div>
+            </button>
+            <button onClick={() => setPath('estimate')} style={{ textAlign: 'left', padding: '14px 14px', background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 12, cursor: 'pointer' }}>
+              <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 16, letterSpacing: 0.8, color: C.text, textTransform: 'uppercase' }}>📏 Estimate it for me</div>
+              <div style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: C.textMid, marginTop: 2 }}>Distance + time, plus conditions like hills or heat.</div>
+            </button>
+          </div>
+        ) : path === 'watch' ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div>
+              <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: C.textLow, letterSpacing: 1.6, marginBottom: 6 }}>CALORIES FROM YOUR WATCH</div>
+              <input type="number" inputMode="numeric" value={watchKcal} onChange={(e) => setWatchKcal(e.target.value)} placeholder="e.g. 240" style={inputStyle} />
+            </div>
+            <div>
+              <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: C.textLow, letterSpacing: 1.6, marginBottom: 6 }}>STEPS (OPTIONAL)</div>
+              <input type="number" inputMode="numeric" value={watchSteps} onChange={(e) => setWatchSteps(e.target.value)} placeholder="e.g. 5200" style={inputStyle} />
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: C.textLow, letterSpacing: 1.6, marginBottom: 6 }}>DISTANCE (KM)</div>
+                <input type="number" inputMode="decimal" value={km} onChange={(e) => setKm(e.target.value)} placeholder="5.0" style={inputStyle} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: C.textLow, letterSpacing: 1.6, marginBottom: 6 }}>TIME (MIN)</div>
+                <input type="number" inputMode="numeric" value={mins} onChange={(e) => setMins(e.target.value)} placeholder="45" style={inputStyle} />
+              </div>
+            </div>
+            <div>
+              <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: C.textLow, letterSpacing: 1.6, marginBottom: 6 }}>CONDITIONS (OPTIONAL)</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {CHIP_DEFS.map((ch) => (
+                  <button key={ch.k} onClick={() => toggleChip(ch.k)} style={{ padding: '7px 12px', borderRadius: 999, cursor: 'pointer', background: chips[ch.k] ? C.accentDim : C.surf1, border: chips[ch.k] ? `1px solid ${C.accent}` : `1px solid ${C.line}`, color: chips[ch.k] ? C.accent : C.text, fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 600, fontSize: 12, letterSpacing: 1, textTransform: 'uppercase' }}>
+                    {ch.l}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {est && (
+              <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: C.accent, letterSpacing: 1 }}>
+                ≈ {est.steps.toLocaleString()} STEPS · +{est.kcal} KCAL
+              </div>
+            )}
+          </div>
+        )}
+
+        {path && (
+          <button
+            onClick={save}
+            disabled={path === 'watch' ? !canSaveWatch : !canSaveEst}
+            style={{ width: '100%', height: 50, marginTop: 14, background: (path === 'watch' ? canSaveWatch : canSaveEst) ? C.accent : C.surf2, border: 0, borderRadius: 12, color: (path === 'watch' ? canSaveWatch : canSaveEst) ? '#0A0A0C' : C.textLow, fontFamily: 'Barlow Condensed, sans-serif', fontSize: 15, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', cursor: 'pointer' }}
+          >
+            Log {kind}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 Object.assign(window, {
   WorkoutHome, NewWorkoutFlow, statusColor,
 });
 
-export { BigCount, HeroCta, IconCal, IconChart, IconHistory, Legend, NewStepHead, NewWorkoutFlow, PreviewStat, ResumeCard, SecondaryCard, StepDuration, StepGroups, StepLocation, StepPreFeel, StepPreview, SwapExerciseSheet, WorkoutHome, statusColor };
+export { BigCount, CardioSheet, HeroCta, IconCal, IconChart, IconHistory, Legend, MovementToday, NewStepHead, NewWorkoutFlow, PreviewStat, ResumeCard, SecondaryCard, StepDuration, StepGroups, StepLocation, StepLogSheet, StepPreFeel, StepPreview, SwapExerciseSheet, WorkoutHome, statusColor };

@@ -123,6 +123,17 @@ const DOMAINS = [
     async pull() { const { data } = await supabase.from('measurements').select('*').eq('user_id', uid).order('date'); setJSON('compound:measurements', (data || []).map((r) => r.data)); },
   },
   {
+    name: 'step_log', keys: ['compound:stepLog'],
+    async push() { const o = J('compound:stepLog') || {}; await replaceRows('step_days', Object.entries(o).map(([date, entries]) => ({ user_id: uid, date, entries }))); },
+    async pull() {
+      // Throw on error so a missing table (schema not run yet) leaves the
+      // local ledger untouched instead of overwriting it with {}.
+      const { data, error } = await supabase.from('step_days').select('*').eq('user_id', uid);
+      if (error) throw error;
+      const o = {}; (data || []).forEach((r) => { o[r.date] = r.entries; }); setJSON('compound:stepLog', o);
+    },
+  },
+  {
     name: 'todo_state', keys: ['compound:todostate'],
     async push() { const o = J('compound:todostate') || {}; await replaceRows('todo_state', Object.entries(o).map(([date, d]) => ({ user_id: uid, date, data: d }))); },
     async pull() { const { data } = await supabase.from('todo_state').select('*').eq('user_id', uid); const o = {}; (data || []).forEach((r) => { o[r.date] = r.data; }); setJSON('compound:todostate', o); },

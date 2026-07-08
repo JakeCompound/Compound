@@ -165,6 +165,46 @@ function deriveLiveState(user, history) {
   // Single source: workoutsDone already counts days with a logged session OR a
   // check-in "worked out" (see buildWeek), so it needs no separate reconciliation.
   const weeklyWorkouts = workoutsDone;
+
+  // Steps — ledger-first (compound:stepLog); a day with no logs falls back to
+  // its check-in answer. Daily + weekly power the Steps ring's two faces.
+  const stepGoal = user.stepGoal || 10000;
+  let dailySteps = 0;
+  let weeklySteps = 0;
+  try {
+    const sunday = new Date(today); sunday.setHours(12, 0, 0, 0); sunday.setDate(sunday.getDate() - dow);
+    for (let i = 0; i <= dow; i++) {
+      const d = new Date(sunday.getTime() + i * 86400000);
+      const key = isoDate(d);
+      let s = window.dayStepTotal ? window.dayStepTotal(key) : 0;
+      if (!s) { const e = history.find((h) => h.date === key); if (e && e.answers && typeof e.answers.steps === 'number') s = e.answers.steps; }
+      if (key === todayKey) dailySteps = s;
+      weeklySteps += s;
+    }
+  } catch (e) {}
+
+  // Life Score — daily (today's metrics) is computed by the ring; weekly = the
+  // average score across this week's logged check-ins.
+  let weeklyLifeScore = 0;
+  try {
+    const scores = weekDays
+      .map((d, i) => {
+        if (d.future || !d.checkin) return null;
+        const sunday = new Date(today); sunday.setHours(12, 0, 0, 0); sunday.setDate(sunday.getDate() - dow);
+        const key = isoDate(new Date(sunday.getTime() + i * 86400000));
+        const e = history.find((h) => h.date === key);
+        return e && window.computeLifeScore ? window.computeLifeScore(e.metrics) : null;
+      })
+      .filter((s) => typeof s === 'number');
+    if (scores.length) weeklyLifeScore = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+  } catch (e) {}
+
+  // Today's earned exercise kcal (v2 targets only)
+  let earnedKcalToday = 0;
+  try { earnedKcalToday = window.dayEarnedKcal ? window.dayEarnedKcal() : 0; } catch (e) {}
+  // Today's live nips (for the nips ring's daily face)
+  let nipsToday = 0;
+  try { nipsToday = todayEntry ? (todayEntry.answers.nips || 0) : (window.loadNipsToday ? window.loadNipsToday() : 0); } catch (e) {}
   let nipLimit = 55;
   try {
     const stored = parseInt(localStorage.getItem('compound:nipLimit'), 10);
@@ -201,6 +241,8 @@ function deriveLiveState(user, history) {
     weeklyNips,
     weeklyWorkouts,
     nipLimit,
+    dailySteps, weeklySteps, stepGoal,
+    weeklyLifeScore, earnedKcalToday, nipsToday,
     radar,
     metrics,
     insight,

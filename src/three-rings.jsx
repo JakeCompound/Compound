@@ -87,28 +87,35 @@ function NorthStarRing({ size, fraction, color, glow, onClick, top, value, unit,
 
 function ThreeRings({ state, onOpenCheckin, onGoWorkout, onChanged, alcohol = true }) {
   const limit = state.nipLimit || 55;
-  const [showNip, setShowNip] = React.useState(false);
+  // Each ring flips between its weekly and daily face on tap.
+  const [mode, setMode] = React.useState({ nips: 'wk', steps: 'wk', life: 'day' });
+  const flip = (k) => setMode((m) => ({ ...m, [k]: m[k] === 'wk' ? 'day' : 'wk' }));
 
   const ringSize = 104;
-
-  // Nips
-  const nips = state.weeklyNips || 0;
-  const overLimit = nips > limit;
-  const nipColor = overLimit ? C.danger : nips >= limit * 0.85 ? '#E8A23F' : C.accent;
-  const nipFraction = limit > 0 ? nips / limit : 0;
-
-  // Workouts
-  const wTarget = state.workoutsTarget || 3;
-  const wDone = state.weeklyWorkouts != null ? state.weeklyWorkouts : (state.workoutsDone || 0);
-  const wLeft = Math.max(0, wTarget - wDone);
   const daysLeft = state.daysLeftInWeek != null ? state.daysLeftInWeek : 7;
-  const wComplete = wDone >= wTarget;
-  const wUnmakeable = !wComplete && wLeft > daysLeft;
-  const wColor = wComplete ? C.success : wUnmakeable ? C.danger : C.accent;
-  const wFraction = wTarget > 0 ? wDone / wTarget : 0;
 
-  // Life score
-  const score = window.computeLifeScore ? window.computeLifeScore(state.metrics || {}) : 0;
+  // Nips — week: total vs limit · day: today vs a live "pace" guide
+  // (what's left of the weekly limit spread over the days remaining).
+  const nips = state.weeklyNips || 0;
+  const nipsToday = state.nipsToday || 0;
+  const overLimit = nips > limit;
+  const dayGuide = Math.max(0, Math.round((limit - (nips - nipsToday)) / Math.max(1, daysLeft)));
+  const nipVal = mode.nips === 'wk' ? nips : nipsToday;
+  const nipCap = mode.nips === 'wk' ? limit : dayGuide;
+  const nipOver = nipCap > 0 ? nipVal > nipCap : nipVal > 0;
+  const nipColor = nipOver ? C.danger : nipVal >= nipCap * 0.85 ? '#E8A23F' : C.accent;
+
+  // Steps — week: total vs goal×7 · day: today vs goal.
+  const stepGoal = state.stepGoal || 10000;
+  const stepVal = mode.steps === 'wk' ? (state.weeklySteps || 0) : (state.dailySteps || 0);
+  const stepCap = mode.steps === 'wk' ? stepGoal * 7 : stepGoal;
+  const stepDone = stepVal >= stepCap;
+  const stepColor = stepDone ? C.success : C.accent;
+  const fmtSteps = (n) => (n >= 10000 ? `${Math.round(n / 100) / 10}k` : n.toLocaleString());
+
+  // Life score — day: today's score · week: average of the week's check-ins.
+  const dayScore = window.computeLifeScore ? window.computeLifeScore(state.metrics || {}) : 0;
+  const score = mode.life === 'day' ? dayScore : (state.weeklyLifeScore || 0);
   const scoreColor = score >= 80 ? C.success : score >= 40 ? C.accent : score > 0 ? '#E8A23F' : C.textLow;
 
   return (
@@ -117,40 +124,49 @@ function ThreeRings({ state, onOpenCheckin, onGoWorkout, onChanged, alcohol = tr
         {alcohol && (
           <NorthStarRing
             size={ringSize}
-            fraction={overLimit ? 1 : nipFraction}
+            fraction={nipCap > 0 ? (nipOver ? 1 : nipVal / nipCap) : 0}
             color={nipColor}
-            glow={overLimit}
-            onClick={() => setShowNip(true)}
-            value={nips}
-            sub={`/ ${limit}`}
-            label="Wk Nips"
+            glow={nipOver}
+            onClick={() => flip('nips')}
+            top={mode.nips === 'wk' ? 'WEEK' : 'TODAY'}
+            value={nipVal}
+            sub={`/ ${nipCap}`}
+            label={mode.nips === 'wk' ? 'Wk Nips' : 'Nips Today'}
           />
         )}
         <NorthStarRing
           size={ringSize}
-          fraction={wFraction}
-          color={wColor}
-          glow={wComplete}
-          onClick={onGoWorkout}
-          value={wDone}
-          sub={`/ ${wTarget}`}
-          label="Workouts"
+          fraction={stepCap > 0 ? Math.min(1, stepVal / stepCap) : 0}
+          color={stepColor}
+          glow={stepDone}
+          onClick={() => flip('steps')}
+          top={mode.steps === 'wk' ? 'WEEK' : 'TODAY'}
+          value={fmtSteps(stepVal)}
+          sub={`/ ${fmtSteps(stepCap)}`}
+          label="Steps"
         />
         <NorthStarRing
           size={ringSize}
           fraction={score / 100}
           color={scoreColor}
           glow={score >= 80}
-          onClick={onOpenCheckin}
+          onClick={() => flip('life')}
+          top={mode.life === 'day' ? 'TODAY' : 'WK AVG'}
           value={score}
           sub="/ 100"
           label="Life Score"
         />
       </div>
 
-      {/* Status line */}
+      {/* Status line — workouts live here now that steps took their ring */}
       {(() => {
-        const workoutMsg = wComplete ? 'Workouts done.' : wUnmakeable ? `${wLeft} workouts, ${daysLeft} days — tight.` : `${wLeft} workouts to go.`;
+        const wTarget = state.workoutsTarget || 3;
+        const wDone = state.weeklyWorkouts != null ? state.weeklyWorkouts : (state.workoutsDone || 0);
+        const wLeft = Math.max(0, wTarget - wDone);
+        const wComplete = wDone >= wTarget;
+        const wUnmakeable = !wComplete && wLeft > daysLeft;
+        const wColor = wComplete ? C.success : wUnmakeable ? C.danger : C.accent;
+        const workoutMsg = wComplete ? `Workouts ${wDone}/${wTarget} — done.` : wUnmakeable ? `${wLeft} workouts, ${daysLeft} days — tight.` : `Workouts ${wDone}/${wTarget} — ${wLeft} to go.`;
         const alarm = alcohol && overLimit;
         return (
           <div
@@ -174,9 +190,6 @@ function ThreeRings({ state, onOpenCheckin, onGoWorkout, onChanged, alcohol = tr
         );
       })()}
 
-      {showNip && window.NipQuickAdd && (
-        <window.NipQuickAdd onClose={() => setShowNip(false)} onChanged={onChanged} />
-      )}
     </div>
   );
 }

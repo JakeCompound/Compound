@@ -38,7 +38,7 @@ function NutritionTab({ user, dietTracking, onToggleTracking, onChanged, onSetup
     <div style={{ height: '100%', background: C.bg, display: 'flex', flexDirection: 'column' }}>
       <NutHeader view={view} onView={setView} showToggle />
       {view === 'today'
-        ? <NutritionToday user={user} onChanged={onChanged} />
+        ? <NutritionToday user={user} onChanged={onChanged} onSetupTargets={onSetupTargets} />
         : view === 'week'
         ? <NutritionWeek user={user} />
         : <div style={{ flex: 1, minHeight: 0 }}><NutritionChat user={user} /></div>}
@@ -68,7 +68,7 @@ function NutHeader({ view, onView, showToggle }) {
   );
 }
 
-function NutritionToday({ user, onChanged }) {
+function NutritionToday({ user, onChanged, onSetupTargets }) {
   const [, force] = React.useReducer((x) => x + 1, 0);
   const [qOpen, setQOpen] = React.useState(false);
   const [sheet, setSheet] = React.useState(null); // 'food' | 'drink' — reuses Home's add sheets
@@ -79,7 +79,11 @@ function NutritionToday({ user, onChanged }) {
 
   const refresh = () => { force(); onChanged && onChanged(); };
 
-  const kcalTarget = targets ? targets.calories : 0;
+  // Earned exercise kcal (v2 targets): today's steps above baseline + walks/
+  // runs + workouts, added straight onto today's allowance.
+  const earned = window.dayEarnedKcal ? window.dayEarnedKcal() : 0;
+  const legacyTargets = !!(targets && !targets.lifestyle); // pre-earn model → nudge to recalc
+  const kcalTarget = (targets ? targets.calories : 0) + earned;
   const kcalLeft = Math.max(0, kcalTarget - totals.kcal);
   // Alcohol kcal are in the ring total (dayTotals) but have no macro bar — show
   // them as their own line so the breakdown reconciles with the total.
@@ -95,6 +99,12 @@ function NutritionToday({ user, onChanged }) {
           <MacroBar label="PROTEIN" value={totals.p} target={targets ? targets.protein : 0} color={C.accent} />
           {targets && targets.carbs ? <MacroBar label="CARBS" value={totals.c} target={targets.carbs} color="#7CA8E0" /> : null}
           {targets && targets.fat ? <MacroBar label="FAT" value={totals.f} target={targets.fat} color="#7BB661" /> : null}
+          {earned > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 2, paddingTop: 8, borderTop: `1px solid ${C.line}` }}>
+              <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, letterSpacing: 1.4, color: '#7BB661' }}>EXERCISE</span>
+              <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: '#7BB661' }}>+{earned} kcal</span>
+            </div>
+          )}
           {showAlcohol && (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 2, paddingTop: 8, borderTop: `1px solid ${C.line}` }}>
               <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, letterSpacing: 1.4, color: '#E5564B' }}>ALCOHOL</span>
@@ -103,6 +113,20 @@ function NutritionToday({ user, onChanged }) {
           )}
         </div>
       </div>
+
+      {/* Legacy targets → invite the one-time recalc that unlocks earned calories */}
+      {legacyTargets && (
+        <button
+          onClick={() => onSetupTargets && onSetupTargets()}
+          style={{ width: '100%', textAlign: 'left', marginTop: 12, padding: '12px 14px', background: C.surf1, border: `1px dashed ${C.accentDim}`, borderRadius: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 }}
+        >
+          <span style={{ fontSize: 16 }}>⚡</span>
+          <span style={{ flex: 1, fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: C.textMid, lineHeight: 1.45 }}>
+            <strong style={{ color: C.text }}>Earn calories from movement.</strong> Recalculate your targets once (~30s) and every workout, walk, run and step count adds to that day's allowance.
+          </span>
+          <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, letterSpacing: 1.2, color: C.accent }}>RECALC →</span>
+        </button>
+      )}
 
       {/* Quick add — opens the same meal/drink sheets as Home's + button */}
       <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>

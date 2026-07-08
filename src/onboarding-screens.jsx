@@ -384,6 +384,60 @@ const WEEKDAYS = [
   { i: 0, l: 'SUN' }, { i: 1, l: 'MON' }, { i: 2, l: 'TUE' }, { i: 3, l: 'WED' },
   { i: 4, l: 'THU' }, { i: 5, l: 'FRI' }, { i: 6, l: 'SAT' },
 ];
+// Per-day time overrides — most people train at one usual time, but some days
+// differ (e.g. weekdays 5pm, Saturday 8am). Stored as
+// user.workoutTimes = { [dayIndex]: 'HH:MM' }; days without an entry fall back
+// to the usual user.workoutTime. Reminders + to-dos use the per-day time.
+function PerDayTimes({ days, workoutTime, workoutTimes = {}, onChange }) {
+  const [openDay, setOpenDay] = React.useState(null);
+  const sorted = (days || []).slice().sort((a, b) => a - b);
+  if (!sorted.length) return null;
+  const timeFor = (i) => workoutTimes[i] || workoutTime || '17:00';
+  const fmt = (hhmm) => { const [h, m] = hhmm.split(':').map(Number); const ap = h >= 12 ? 'pm' : 'am'; return `${((h + 11) % 12) + 1}:${String(m || 0).padStart(2, '0')}${ap}`; };
+  return (
+    <div style={{ marginTop: 16 }}>
+      <FieldLabel>Different time on some days? Tap one.</FieldLabel>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}>
+        {sorted.map((i) => {
+          const overridden = workoutTimes[i] != null;
+          const open = openDay === i;
+          return (
+            <div key={i} style={{ background: C.surf1, border: `1px solid ${overridden || open ? C.accentDim : C.line}`, borderRadius: 10 }}>
+              <button
+                onClick={() => setOpenDay(open ? null : i)}
+                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '11px 12px', background: 'transparent', border: 0, cursor: 'pointer' }}
+              >
+                <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 14, letterSpacing: 1, color: C.text }}>
+                  {(WEEKDAYS.find((d) => d.i === i) || { l: '?' }).l}
+                </span>
+                <span style={{ marginLeft: 'auto', fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: overridden ? C.accent : C.textMid }}>
+                  {fmt(timeFor(i))}{overridden ? '' : ' · usual'}
+                </span>
+                <svg width="10" height="10" viewBox="0 0 10 10" style={{ color: C.textLow, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }}>
+                  <path d="M2 3.5 L5 6.5 L8 3.5" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+              {open && (
+                <div style={{ padding: '0 12px 12px' }}>
+                  <TimeWheel value={timeFor(i)} onChange={(v) => onChange({ ...workoutTimes, [i]: v })} />
+                  {overridden && (
+                    <button
+                      onClick={() => { const next = { ...workoutTimes }; delete next[i]; onChange(next); }}
+                      style={{ marginTop: 8, padding: '7px 12px', background: 'transparent', border: `1px solid ${C.line}`, borderRadius: 8, color: C.textMid, fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 1.2, cursor: 'pointer' }}
+                    >
+                      BACK TO USUAL TIME
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function ScreenTrainingDays({ data, set, ctx, onNext, onBack }) {
   const selected = Array.isArray(data.workoutDays) ? data.workoutDays : [1, 3, 5];
   const toggle = (i) => {
@@ -430,12 +484,18 @@ function ScreenTrainingDays({ data, set, ctx, onNext, onBack }) {
       </div>
 
       <div style={{ marginTop: 22 }}>
-        <FieldLabel>Workout time</FieldLabel>
+        <FieldLabel>Usual workout time</FieldLabel>
         <div style={{ marginTop: 12 }}>
           <TimeWheel value={data.workoutTime || '17:00'} onChange={(v) => set({ workoutTime: v })} />
         </div>
+        <PerDayTimes
+          days={selected}
+          workoutTime={data.workoutTime || '17:00'}
+          workoutTimes={data.workoutTimes || {}}
+          onChange={(wt) => set({ workoutTimes: wt })}
+        />
         <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: C.textMid, marginTop: 12, lineHeight: 1.5 }}>
-          We'll remind you 30 minutes before, and nudge you midday if the week's running short on days.
+          We'll remind you 30 minutes before each session, and nudge you midday if the week's running short on days.
         </p>
       </div>
     </FormShell>
@@ -1343,4 +1403,4 @@ Object.assign(window, {
   GRATITUDE_CATEGORIES, LIFTS,
 });
 
-export { BellHint, DeltaCard, ExitedScreen, FooterNav, FormShell, GRATITUDE_CATEGORIES, IconGym, IconHome, LIFTS, LiftRow, SaveExitModal, Screen1RM, ScreenAge, ScreenAlcohol, ScreenCheckInTime, ScreenComplete, ScreenEquipment, ScreenFitnessLevel, ScreenGratitudeBuilder, ScreenGratitudeIntro, ScreenName, ScreenStepsSleep, ScreenTrackFood, ScreenTrainingDays, ScreenWeighInTime, ScreenWeight, ScreenWelcome };
+export { BellHint, DeltaCard, ExitedScreen, FooterNav, FormShell, GRATITUDE_CATEGORIES, IconGym, IconHome, LIFTS, LiftRow, PerDayTimes, SaveExitModal, Screen1RM, ScreenAge, ScreenAlcohol, ScreenCheckInTime, ScreenComplete, ScreenEquipment, ScreenFitnessLevel, ScreenGratitudeBuilder, ScreenGratitudeIntro, ScreenName, ScreenStepsSleep, ScreenTrackFood, ScreenTrainingDays, ScreenWeighInTime, ScreenWeight, ScreenWelcome };

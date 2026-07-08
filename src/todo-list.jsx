@@ -159,7 +159,7 @@ function TodayTodos({ user, set, state, onOpenCheckin, onWeighIn, onGoWorkout, o
       id: 'workout',
       label: 'Workout',
       sub: 'Scheduled day · 25 min counts',
-      time: user.workoutTime || '17:00',
+      time: (user.workoutTimes || {})[todayDow] || user.workoutTime || '17:00', // per-day override wins
       done: !!workoutDoneToday,
       onDo: onGoWorkout,
       canPostpone: true,

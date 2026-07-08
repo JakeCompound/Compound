@@ -65,7 +65,10 @@ function dueKinds(prof, now) {
   const out = [];
   const checkIn = normHHMM(onb.checkInTime);
   const weighIn = normHHMM(onb.weighInTime);
-  const workout = normHHMM(onb.workoutTime);
+  // Per-day workout time override (user.workoutTimes = { dayIndex: 'HH:MM' });
+  // falls back to the usual workoutTime.
+  const wtOverride = onb.workoutTimes && onb.workoutTimes[now.dow];
+  const workout = normHHMM(wtOverride != null ? wtOverride : onb.workoutTime);
   const days = Array.isArray(onb.workoutDays) ? onb.workoutDays : [];
 
   if (on('nightly') && checkIn && now.hhmm === checkIn) out.push('nightly');

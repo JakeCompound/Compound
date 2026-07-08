@@ -1,6 +1,6 @@
 import React from 'react';
 import { C, DateWheel, FieldLabel, SelectCard, Stepper, TextInput, TimeWheel, computeAge } from './compound-ui.jsx';
-import { ScreenGratitudeBuilder } from './onboarding-screens.jsx';
+import { PerDayTimes, ScreenGratitudeBuilder } from './onboarding-screens.jsx';
 import { supabase, supabaseConfigured } from './supabase.js';
 import { pushSupported, notifPermission, isSubscribed, subscribePush, unsubscribePush } from './push.js';
 import { clearAllCloudData } from './cloud-sync.js';
@@ -21,10 +21,25 @@ function fmtTime12(hhmm) {
   const h12 = ((h + 11) % 12) + 1;
   return `${h12}:${String(m || 0).padStart(2, '0')}${ap}`;
 }
-function fmtWorkoutSchedule(user) {
+// Group the user's training days by their effective time (per-day override or
+// the usual time) → [{ t: '5:00pm', days: ['Mon','Wed'] }, { t: '8:00am', days: ['Sat'] }]
+function workoutTimeGroups(user) {
   const days = Array.isArray(user.workoutDays) ? user.workoutDays.slice().sort((a, b) => a - b) : [];
-  if (!days.length) return 'No days set';
-  return `${days.map((i) => WS_DAYS[i].l[0] + WS_DAYS[i].l.slice(1).toLowerCase()).join(' · ')} · ${fmtTime12(user.workoutTime)}`;
+  const times = user.workoutTimes || {};
+  const groups = [];
+  days.forEach((i) => {
+    const t = fmtTime12(times[i] || user.workoutTime);
+    const lbl = WS_DAYS[i].l[0] + WS_DAYS[i].l.slice(1).toLowerCase();
+    const g = groups.find((x) => x.t === t);
+    if (g) g.days.push(lbl); else groups.push({ t, days: [lbl] });
+  });
+  return groups;
+}
+function fmtWorkoutSchedule(user) {
+  const groups = workoutTimeGroups(user);
+  if (!groups.length) return 'No days set';
+  if (groups.length === 1) return `${groups[0].days.join(' · ')} · ${groups[0].t}`;
+  return groups.map((g) => `${g.days.join(' · ')} ${g.t}`).join(', ');
 }
 
 function SettingsScreen({ user, set, onClose, onReset, onRecalc }) {
@@ -614,12 +629,18 @@ function SettingsWorkoutSchedule({ user, set, onBack }) {
               {selected.length} {selected.length === 1 ? 'DAY' : 'DAYS'} / WEEK
             </div>
             <div style={{ marginTop: 24 }}>
-              <FieldLabel>Workout time</FieldLabel>
+              <FieldLabel>Usual workout time</FieldLabel>
               <div style={{ marginTop: 12 }}>
                 <TimeWheel value={user.workoutTime || '17:00'} onChange={(v) => set({ workoutTime: v })} />
               </div>
+              <PerDayTimes
+                days={selected}
+                workoutTime={user.workoutTime || '17:00'}
+                workoutTimes={user.workoutTimes || {}}
+                onChange={(wt) => set({ workoutTimes: wt })}
+              />
               <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12, color: C.textMid, marginTop: 10, lineHeight: 1.5 }}>
-                A gentle reminder fires 30 minutes before, on each day you've picked.
+                A gentle reminder fires 30 minutes before each session — per-day times respected.
               </p>
             </div>
           </>
@@ -627,7 +648,9 @@ function SettingsWorkoutSchedule({ user, set, onBack }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
             <ReadField label="Workout days" value={selected.length ? selected.slice().sort((a, b) => a - b).map((i) => WS_DAYS[i].l).join(' · ') : 'None set'} />
             <ReadField label="Per week" value={`${selected.length} ${selected.length === 1 ? 'day' : 'days'}`} />
-            <ReadField label="Workout time" value={fmtTime12(user.workoutTime)} />
+            {workoutTimeGroups(user).map((g) => (
+              <ReadField key={g.t + g.days.join()} label={`Workout time · ${g.days.join(' · ')}`} value={g.t} />
+            ))}
           </div>
         )}
       </div>

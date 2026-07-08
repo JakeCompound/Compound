@@ -74,6 +74,21 @@
   logged** (not only if the check-in said so), and update immediately after a
   session is saved.
 
+## K. Per-day workout times (`onboarding-screens.jsx`, `settings-screen.jsx`, reminders)
+- Users can train at different times on different days (e.g. weekdays 5pm, Sat 8am).
+- Data: `user.workoutTime` = the **usual** time; `user.workoutTimes` = `{ dayIndex: 'HH:MM' }`
+  per-day overrides (empty = usual everywhere).
+- **Onboarding "Which days do you train?"**: the TimeWheel is relabelled **"Usual
+  workout time"**; below it, a new **`PerDayTimes`** list — one row per selected day
+  showing "MON — 5:00pm · usual"; tapping a row expands a TimeWheel for that day
+  (sets an override, row turns amber and drops "· usual"); an overridden day gets a
+  "BACK TO USUAL TIME" reset.
+- **Settings → Workout schedule**: edit mode reuses the same `PerDayTimes` control;
+  the read view shows one line per time group; the settings-list hint groups days by
+  time — e.g. **"Mon · Wed 5:00pm, Sat 8:00am"**.
+- The workout **to-do due-time** and the **30-min-before push reminder** both use
+  the day's own time.
+
 ---
 
 ### Not built yet (roadmap)

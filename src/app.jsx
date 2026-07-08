@@ -108,6 +108,7 @@ function App() {
       trainingDays: 3,
       workoutDays: [1, 3, 5],
       workoutTime: '17:00',
+      workoutTimes: {}, // per-day overrides { dayIndex: 'HH:MM' } — empty = usual time everywhere
       stepGoal: 10000,
       sleepGoal: 7.5,
       equipment: null,

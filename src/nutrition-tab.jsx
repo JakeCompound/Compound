@@ -197,6 +197,7 @@ function MacroBar({ label, value, target, color }) {
 
 function FoodRow({ food, onChanged }) {
   const [popup, setPopup] = React.useState(null); // 'confidence' | 'health' | 'info'
+  const [edit, setEdit] = React.useState(false);
   const nOpen = (food.questions || []).filter((q) => q.answer == null).length;
   const CONF_TEXT = {
     low: 'Low confidence — the AI is unsure on this estimate. Answer its meal question to sharpen it.',
@@ -211,15 +212,21 @@ function FoodRow({ food, onChanged }) {
   return (
     <div style={{ background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 12, overflow: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 12px' }}>
-        {food.photo
-          ? <img src={food.photo} alt="" style={{ width: 46, height: 46, borderRadius: 9, objectFit: 'cover', flexShrink: 0 }} />
-          : <div style={{ width: 46, height: 46, borderRadius: 9, background: C.surf2, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 20 }}>🍽️</div>}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 16, letterSpacing: 0.5, color: C.text, textTransform: 'uppercase', lineHeight: 1.05, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{food.name}</div>
-          <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.textMid, letterSpacing: 0.5, marginTop: 2 }}>
-            {food.kcal} kcal · {food.p}p {food.c}c {food.f}f
+        {/* Tap the meal itself to edit or delete it */}
+        <button
+          onClick={() => setEdit(true)}
+          style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0, background: 'transparent', border: 0, padding: 0, cursor: 'pointer', textAlign: 'left' }}
+        >
+          {food.photo
+            ? <img src={food.photo} alt="" style={{ width: 46, height: 46, borderRadius: 9, objectFit: 'cover', flexShrink: 0 }} />
+            : <div style={{ width: 46, height: 46, borderRadius: 9, background: C.surf2, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 20 }}>🍽️</div>}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 16, letterSpacing: 0.5, color: C.text, textTransform: 'uppercase', lineHeight: 1.05, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{food.name}</div>
+            <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.textMid, letterSpacing: 0.5, marginTop: 2 }}>
+              {food.kcal} kcal · {food.p}p {food.c}c {food.f}f
+            </div>
           </div>
-        </div>
+        </button>
         {/* 3 badges */}
         <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
           <Badge title="Estimate confidence" color={CONF_COLOR[food.confidence]} glyph="◎" alert={nOpen > 0} onClick={() => setPopup(popup === 'confidence' ? null : 'confidence')} />
@@ -247,6 +254,94 @@ function FoodRow({ food, onChanged }) {
           </div>
         </div>
       )}
+      {edit && <MealEditSheet food={food} onClose={() => setEdit(false)} onChanged={onChanged} />}
+    </div>
+  );
+}
+
+// Edit / delete a logged meal. Values save via updateFood; Delete asks once,
+// then removes the entry (and un-counts any nips a drink-meal added to the
+// weekly ring, so the tallies stay honest).
+function MealEditSheet({ food, onClose, onChanged }) {
+  const [name, setName] = React.useState(food.name || '');
+  const [vals, setVals] = React.useState({ kcal: food.kcal || 0, p: food.p || 0, c: food.c || 0, f: food.f || 0 });
+  const [confirmDel, setConfirmDel] = React.useState(false);
+  const setV = (k, v) => setVals((s) => ({ ...s, [k]: v }));
+
+  const save = () => {
+    window.updateFood(food.id, {
+      name: name.trim() || food.name,
+      kcal: Math.max(0, Math.round(+vals.kcal || 0)),
+      p: Math.max(0, Math.round(+vals.p || 0)),
+      c: Math.max(0, Math.round(+vals.c || 0)),
+      f: Math.max(0, Math.round(+vals.f || 0)),
+    });
+    onChanged && onChanged();
+    onClose();
+  };
+  const del = () => {
+    if (food.nips > 0 && window.setNipsToday && window.loadNipsToday) {
+      window.setNipsToday(Math.max(0, +(window.loadNipsToday() - food.nips).toFixed(2)));
+    }
+    window.removeFood(food.id);
+    onChanged && onChanged();
+    onClose();
+  };
+
+  const FIELDS = [{ k: 'kcal', label: 'KCAL' }, { k: 'p', label: 'PROTEIN g' }, { k: 'c', label: 'CARBS g' }, { k: 'f', label: 'FAT g' }];
+  return (
+    <div onClick={onClose} style={{ position: 'absolute', inset: 0, zIndex: 230, background: 'rgba(0,0,0,.72)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'flex-end' }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', background: C.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: '20px 22px 24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 3, borderRadius: 2, background: 'rgba(255,255,255,.18)' }} /></div>
+        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.accent, letterSpacing: 2.4, marginBottom: 10 }}>EDIT MEAL</div>
+
+        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: C.textLow, letterSpacing: 1.6, marginBottom: 6 }}>NAME</div>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          style={{ width: '100%', boxSizing: 'border-box', background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 10, color: C.text, fontFamily: 'Outfit, sans-serif', fontSize: 15, padding: '12px 14px', outline: 'none' }}
+        />
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 12 }}>
+          {FIELDS.map((fd) => (
+            <div key={fd.k} style={{ background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 10, padding: '10px 12px' }}>
+              <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 8.5, color: C.textLow, letterSpacing: 1.4, marginBottom: 4 }}>{fd.label}</div>
+              <input
+                type="number"
+                inputMode="numeric"
+                value={vals[fd.k]}
+                onChange={(e) => setV(fd.k, e.target.value)}
+                style={{ width: '100%', boxSizing: 'border-box', background: 'transparent', border: 0, color: C.accent, fontFamily: 'JetBrains Mono, monospace', fontSize: 18, fontWeight: 600, outline: 'none', padding: 0 }}
+              />
+            </div>
+          ))}
+        </div>
+
+        <button
+          onClick={save}
+          style={{ width: '100%', height: 50, marginTop: 14, background: C.accent, border: 0, borderRadius: 12, color: '#0A0A0C', fontFamily: 'Barlow Condensed, sans-serif', fontSize: 15, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', cursor: 'pointer' }}
+        >
+          Save changes
+        </button>
+
+        {confirmDel ? (
+          <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+            <button onClick={del} style={{ flex: 1, height: 46, background: C.danger, border: 0, borderRadius: 12, color: '#fff', fontFamily: 'Barlow Condensed, sans-serif', fontSize: 14, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', cursor: 'pointer' }}>
+              Yes — delete it
+            </button>
+            <button onClick={() => setConfirmDel(false)} style={{ flex: 1, height: 46, background: 'transparent', border: `1px solid ${C.line}`, borderRadius: 12, color: C.textMid, fontFamily: 'Barlow Condensed, sans-serif', fontSize: 14, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', cursor: 'pointer' }}>
+              Keep it
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setConfirmDel(true)}
+            style={{ width: '100%', height: 46, marginTop: 10, background: 'transparent', border: `1px solid rgba(229,86,75,.45)`, borderRadius: 12, color: C.danger, fontFamily: 'Barlow Condensed, sans-serif', fontSize: 14, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', cursor: 'pointer' }}
+          >
+            Delete this meal
+          </button>
+        )}
+      </div>
     </div>
   );
 }

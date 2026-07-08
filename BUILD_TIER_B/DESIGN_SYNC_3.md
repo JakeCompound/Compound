@@ -89,6 +89,14 @@
 - The workout **to-do due-time** and the **30-min-before push reminder** both use
   the day's own time.
 
+## L. Meals are editable / deletable (`nutrition-tab.jsx`)
+- Tapping a meal row in Today's Log (the photo/name area — badges keep their own
+  taps) opens an **"EDIT MEAL"** bottom sheet: name input, a 2×2 grid of numeric
+  fields (KCAL / PROTEIN g / CARBS g / FAT g), an amber **Save changes** button,
+  and a red-outline **"Delete this meal"** which flips to a confirm pair
+  ("Yes — delete it" / "Keep it"). Deleting a drink-meal also un-counts its nips
+  from the weekly ring.
+
 ---
 
 ### Not built yet (roadmap)

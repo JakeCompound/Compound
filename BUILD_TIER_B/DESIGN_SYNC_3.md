@@ -97,6 +97,20 @@
   ("Yes — delete it" / "Keep it"). Deleting a drink-meal also un-counts its nips
   from the weekly ring.
 
+## M. Behaviour changes with no new UI (FYI)
+- **Branded foods are label-accurate now**: the AI proxy has real web search, so a
+  text-only "Musashi 45g protein bar" comes back with official-label macros and
+  confidence "high" (the info line says it's from the label). Macros must also
+  reconcile with kcal (p×4 + c×4 + f×9) — no more impossible estimates.
+- **The install prompt can appear on the sign-in screen** (not just inside the
+  app) and no longer misses Chrome's one-shot install event.
+- **Event-based push reminders are live** alongside the scheduled three: streak
+  milestones (21:30), missed workout (20:00), comeback after 3+ days (18:00),
+  workout urgency (12:30), monthly report (09:00 on the 1st) — all honouring the
+  existing Notification-preferences toggles.
+- **Multi-user is real**: accounts are fully isolated per login (RLS); new users
+  see onboarding → the mid-week welcome + day-one deferral on first landing.
+
 ---
 
 ### Not built yet (roadmap)

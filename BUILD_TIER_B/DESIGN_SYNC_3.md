@@ -111,6 +111,34 @@
 - **Multi-user is real**: accounts are fully isolated per login (RLS); new users
   see onboarding → the mid-week welcome + day-one deferral on first landing.
 
+## N. Earned calories — lifestyle base, step ledger, walk/run, flip rings
+- **Calculator**: the activity steppers are replaced by a **Lifestyle** picker
+  (Sedentary / Lightly active / Active / Very active — "your baseline, not your
+  ambitions; when in doubt choose lower"). The daily target is the lifestyle
+  floor only; a note explains every workout/walk/run/step-log ADDS to that day's
+  allowance. Legacy users see a dashed ⚡ "Earn calories from movement —
+  RECALC →" nudge on the Nutrition tab.
+- **Workout tab — "MOVEMENT TODAY" card** (under Saved Workouts): progress strip
+  toward the daily step goal, meta "9,500 / 10,000 STEPS", a green "EARNED TODAY
+  · +N KCAL" line, the day's ledger rows (plain 👣 "+3,000 steps" rows in
+  neutral; 🚶/🏃 walk/run rows in accent — "certified efforts" — showing km/min/
+  steps/+kcal, each deletable ✕), and two buttons: **+ LOG STEPS** (grey) and
+  **+ WALK / RUN** (amber).
+- **Log steps sheet**: one-tap +1,000 / +2,500 / +5,000 chips or an exact-number
+  input. **Walk/Run sheet**: Walk|Run segment → two pathways: "⌚ From my
+  smartwatch" (calories + optional steps) or "📏 Estimate it for me" (distance +
+  time + optional HILLY / HOT DAY / COLD DAY / CARRYING WEIGHT chips, live
+  "≈ 6,500 STEPS · +235 KCAL" preview).
+- **Nutrition summary**: a green **EXERCISE +N kcal** line above the Alcohol
+  line; KCAL LEFT includes earned kcal live.
+- **Home rings**: **STEPS replaces the Workouts ring**. All three rings flip
+  weekly ↔ daily on tap, with a small top label (WEEK / TODAY / WK AVG):
+  Nips (week vs limit ↔ today vs remaining÷days-left guide), Steps (week vs
+  goal×7 ↔ today vs goal), Life Score (today ↔ week average). Workouts remain
+  in the status line ("Workouts 2/3 — 1 to go."), week strip, and their tab.
+- **Check-in**: the steps question prefills from the day's ledger; raising it
+  tops the ledger up.
+
 ---
 
 ### Not built yet (roadmap)

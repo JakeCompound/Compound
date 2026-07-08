@@ -16,7 +16,13 @@ const SUPABASE_ANON_KEY = 'sb_publishable_TJ3WQjGO5pAvz37WjnzRXA_gktZf6LE';
 // Sonnet 4.6: vision-capable, good cost/quality (matches the RUNBOOK's Sonnet
 // choice). Override with ANTHROPIC_MODEL if needed.
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
-const MAX_TOKENS = 2048;
+const MAX_TOKENS = 3000; // web-search answers carry citations → a little more headroom
+
+// Server-side web search — lets the model look up real nutrition labels for
+// branded products ("Musashi 45g protein bar") instead of guessing macros.
+// The model only searches when it decides it needs to; max_uses caps the cost
+// per request (searches are ~1c each).
+const WEB_SEARCH_TOOL = { type: 'web_search_20250305', name: 'web_search', max_uses: 3 };
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -55,12 +61,22 @@ export default async function handler(req, res) {
   if (!process.env.ANTHROPIC_API_KEY) return res.status(500).json({ error: 'AI not configured' });
   try {
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-    const msg = await anthropic.messages.create({
+    const base = {
       model: MODEL,
       max_tokens: MAX_TOKENS,
       thinking: { type: 'disabled' }, // fast, cheap — these are short structured tasks
       messages: [{ role: 'user', content }],
-    });
+    };
+    let msg;
+    try {
+      msg = await anthropic.messages.create({ ...base, tools: [WEB_SEARCH_TOOL] });
+    } catch (e) {
+      // If web search is unavailable (org setting / tool version), degrade to a
+      // plain estimate rather than failing the request.
+      if (e && e.status === 400) msg = await anthropic.messages.create(base);
+      else throw e;
+    }
+    // Join only the text blocks — search/tool blocks are interleaved in content.
     const text = (msg.content || []).map((c) => (c.type === 'text' ? c.text : '')).join('');
     return res.status(200).json({ text });
   } catch (e) {

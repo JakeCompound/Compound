@@ -309,7 +309,7 @@ function MealQuestionsFlow({ onClose, onChanged }) {
     // (b) Re-estimate this meal with the new answer (visible macro update).
     try {
       const answered = (food.questions || []).filter((q) => q.answer != null).map((q) => `${q.q} → ${q.answer}`).join('; ');
-      const prompt = `Re-estimate this meal's calories and macros using the extra detail. Meal: "${food.name}". Prior estimate: ${food.kcal}kcal ${food.p}p ${food.c}c ${food.f}f. New detail: ${answered}. Respond ONLY JSON: {"kcal":int,"p":int,"c":int,"f":int,"confidence":"low|medium|high","info":"one warm sentence"}`;
+      const prompt = `Re-estimate this meal's calories and macros using the extra detail. Meal: "${food.name}". Prior estimate: ${food.kcal}kcal ${food.p}p ${food.c}c ${food.f}f. New detail: ${answered}. If it's a branded/packaged product, search the web for the official nutrition label and use those values. kcal must ≈ p×4 + c×4 + f×9. Respond ONLY JSON: {"kcal":int,"p":int,"c":int,"f":int,"confidence":"low|medium|high","info":"one warm sentence"}`;
       const raw = await window.claude.complete(prompt);
       const m = (typeof raw === 'string' ? raw : '').match(/\{[\s\S]*\}/);
       if (!m) throw new Error('Unreadable estimate');

@@ -77,7 +77,9 @@ function calcTargets(input) {
     const calories = Math.round((maintenance - (female ? 350 : 500)) / 10) * 10;
     const protein = Math.round((calories * 0.30) / 4);
     const carbs = Math.round((calories * 0.35) / 4);
-    const fat = Math.max(0, Math.round((calories - protein * 4 - carbs * 4) / 9));
+    // Floor (not round) so the seeded macros never exceed the calorie target —
+    // the macros step disables "Lock in" when over, even by 2 kcal.
+    const fat = Math.max(0, Math.floor((calories - protein * 4 - carbs * 4) / 9));
     // Mifflin BMR kept for the plateau engine's safety floor.
     const mifflin = 10 * w + 6.25 * h - 5 * input.age + (female ? -161 : 5);
     return {

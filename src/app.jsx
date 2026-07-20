@@ -1,7 +1,7 @@
 import React from 'react';
 import { AddButton } from './add-button.jsx';
 import { CheckinCelebration, CheckinModal } from './checkin-modal.jsx';
-import { GrainOverlay } from './compound-ui.jsx';
+import { C, GrainOverlay } from './compound-ui.jsx';
 import { TabBar } from './home-components.jsx';
 import { DEMO_STATES } from './home-data.jsx';
 import { HomeScreen } from './home-screen.jsx';
@@ -141,6 +141,12 @@ function App() {
   // Settings overlay
   const [showSettings, setShowSettings] = React.useState(false);
   const [showCalc, setShowCalc] = React.useState(false);
+  // One-time (per app open) prompt when stored targets pre-date the current
+  // formula — the number can shift meaningfully, so it deserves a popup, not
+  // just the Nutrition-tab banner.
+  const [recalcPrompt, setRecalcPrompt] = React.useState(() => {
+    try { const t = JSON.parse(localStorage.getItem('compound:targets') || 'null'); return !!(t && t.formula !== 'leangains'); } catch (e) { return false; }
+  });
   const [nutTick, setNutTick] = React.useState(0);
   // Demo flags for Home variants (Tweak-controlled)
   const [demoFlags, setDemoFlags] = React.useState({
@@ -501,6 +507,33 @@ function App() {
           </div>
         )}
       </ResponsiveFrame>
+
+      {/* Stale-targets popup → one tap into the calculator */}
+      {view === 'app' && recalcPrompt && !showCalc && (
+        <div style={{ position: 'absolute', inset: 0, zIndex: 155, background: 'rgba(0,0,0,.72)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 28 }}>
+          <div style={{ width: '100%', maxWidth: 360, background: C.surf1, border: `1px solid ${C.accentDim}`, borderRadius: 18, padding: '24px 22px' }}>
+            <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.accent, letterSpacing: 2.4, marginBottom: 10 }}>CALORIE FORMULA UPDATED</div>
+            <h3 style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 26, lineHeight: 1, letterSpacing: 0.5, color: C.text, margin: '0 0 10px', textTransform: 'uppercase' }}>
+              YOUR TARGETS NEED<br /><span style={{ color: C.accent }}>A QUICK REFRESH.</span>
+            </h3>
+            <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 13.5, color: C.textMid, lineHeight: 1.5, margin: '0 0 18px' }}>
+              We've upgraded how your daily calories are calculated — your base number will change, and every workout, walk and step count now adds to the day you do it. Takes about 30 seconds: confirm your stats, see your new plan, lock it in.
+            </p>
+            <button
+              onClick={() => { setRecalcPrompt(false); setShowCalc(true); }}
+              style={{ width: '100%', height: 50, background: C.accent, border: 0, borderRadius: 12, color: '#0A0A0C', fontFamily: 'Barlow Condensed, sans-serif', fontSize: 15, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', cursor: 'pointer' }}
+            >
+              Update my targets
+            </button>
+            <button
+              onClick={() => setRecalcPrompt(false)}
+              style={{ width: '100%', height: 44, marginTop: 8, background: 'transparent', border: `1px solid ${C.line}`, borderRadius: 12, color: C.textMid, fontFamily: 'Barlow Condensed, sans-serif', fontSize: 13, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', cursor: 'pointer' }}
+            >
+              Not now
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Macro calculator overlay (Settings setup / recalculate) */}
       {view === 'app' && showCalc && (

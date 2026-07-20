@@ -26,11 +26,10 @@ function MacroCalculator({ user, initial, onDone, onBack, oneTap }) {
   const [editF, setEditF] = React.useState(null);
   const [step, setStep] = React.useState(oneTap ? 1 : 0); // 0 stats · 1 activity+goal · 2 macros
 
-  const result = window.calcTargets({
-    gender, age, weightKg, heightCm, bodyFat,
-    steps, sessions, minutes, lifestyle, goal, rate, fatPref,
-    inDeficit: goal === 'cut', proteinPerLb: 0.6,
-  });
+  // v3: the leangains formula (musclehacking.com) with fixed assumptions —
+  // body fat 20%+, standard muscle mass, 5,000 steps, −500 kcal (−350 women),
+  // 30% protein, 50-50 carb/fat. Only stats are asked; the rest is assumed.
+  const result = window.calcTargets({ formula: 'leangains', gender, age, weightKg, heightCm });
 
   const rateOpts = goal === 'cut' ? window.CUT_RATES : goal === 'gain' ? window.GAIN_RATES : [];
 
@@ -82,63 +81,14 @@ function MacroCalculator({ user, initial, onDone, onBack, oneTap }) {
               <FieldLabel>Weight</FieldLabel>
               <Stepper value={weightKg} onChange={setWeightKg} min={30} max={250} step={0.5} unit="kg" />
             </div>
-            <div>
-              <FieldLabel info="Optional. If you know it, the estimate uses lean mass (more accurate).">Body fat % (optional)</FieldLabel>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <Stepper value={bodyFat ?? 0} onChange={(v) => setBodyFat(v === 0 ? null : v)} min={0} max={60} unit={bodyFat == null ? 'skip' : '%'} />
-              </div>
-            </div>
           </div>
         )}
 
         {step === 1 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <CalcHead tag={oneTap ? 'CONFIRM' : 'STEP 2 / 3'} title="ACTIVITY" accent="& GOAL." />
-            <div>
-              <FieldLabel info="Pick your everyday floor — desk job, errands, that kind of thing. When in doubt choose LOWER: workouts, walks, runs and logged steps all ADD calories on the day you actually do them.">Lifestyle (your baseline, not your ambitions)</FieldLabel>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
-                {(window.LIFESTYLES || []).map((l) => {
-                  const active = lifestyle === l.key;
-                  return (
-                    <button key={l.key} onClick={() => setLifestyle(l.key)}
-                      style={{ textAlign: 'left', padding: '11px 14px', borderRadius: 10, cursor: 'pointer',
-                        background: active ? C.accentDim : C.surf1, border: active ? `1px solid ${C.accent}` : `1px solid ${C.line}`,
-                        display: 'flex', alignItems: 'baseline', gap: 10 }}>
-                      <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 15, letterSpacing: 0.8, textTransform: 'uppercase', color: active ? C.accent : C.text }}>{l.label}</span>
-                      <span style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12, color: C.textMid }}>{l.sub}</span>
-                    </button>
-                  );
-                })}
-              </div>
-              <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12, color: C.textMid, lineHeight: 1.5, margin: '10px 0 0' }}>
-                This sets your daily base only. Every workout, walk, run and step count you log is added to that day's allowance — you earn it by doing it.
-              </p>
-            </div>
-            <div>
-              <FieldLabel>Goal</FieldLabel>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginTop: 4 }}>
-                {Object.entries(window.GOALS).map(([k, g]) => (
-                  <button key={k} onClick={() => { setGoal(k); setRate(k === 'gain' ? 0.5 : 0.5); }}
-                    style={{ padding: '12px 6px', borderRadius: 10, cursor: 'pointer',
-                      background: goal === k ? C.accentDim : C.surf1, border: goal === k ? `1px solid ${C.accent}` : `1px solid ${C.line}`,
-                      color: goal === k ? C.accent : C.text, fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 15, letterSpacing: 0.8, textTransform: 'uppercase' }}>
-                    {g.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            {rateOpts.length > 0 && (
-              <div>
-                <FieldLabel>Pace</FieldLabel>
-                <SegRow value={rate} onChange={setRate} options={rateOpts.map((r) => ({ v: r.v, l: r.label }))} small />
-              </div>
-            )}
-            <div>
-              <FieldLabel>Fat preference</FieldLabel>
-              <SegRow value={fatPref} onChange={setFatPref} options={[{ v: 'low', l: 'Lower' }, { v: 'std', l: 'Standard' }, { v: 'high', l: 'Higher' }]} small />
-            </div>
+            <CalcHead tag={oneTap ? 'CONFIRM' : 'STEP 2 / 3'} title="YOUR" accent="PLAN." />
 
-            {/* Result preview */}
+            {/* Result preview — the leangains formula needs nothing more from you */}
             <div style={{ background: 'linear-gradient(160deg, #1A1612 0%, #100E0B 100%)', border: `1px solid ${C.accentDim}`, borderRadius: 14, padding: 16, marginTop: 4 }}>
               <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: C.accent, letterSpacing: 2, marginBottom: 8 }}>YOUR DAILY TARGET</div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
@@ -151,9 +101,15 @@ function MacroCalculator({ user, initial, onDone, onBack, oneTap }) {
                 <MacroPill label="FAT" value={`${result.fat}g`} color="#7BB661" />
               </div>
               <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: C.textLow, letterSpacing: 1, marginTop: 10 }}>
-                TDEE {result.tdee} · PROTEIN 0.6 g/lb · CARBS & FAT EDITABLE LATER
+                MAINTENANCE {result.tdee} − {gender === 'female' ? 350 : 500} · PROTEIN 30% · CARBS/FAT 50-50
               </div>
             </div>
+
+            <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: C.textMid, lineHeight: 1.55, margin: 0 }}>
+              This base assumes an ordinary day (about 5,000 steps, no training). Every workout, walk, run and
+              step count you log is <span style={{ color: C.accent }}>added to that day's allowance</span> — you earn it by doing it.
+              The gentle built-in deficit keeps weight moving down steadily; the weekly weigh-in fine-tunes from there.
+            </p>
           </div>
         )}
         {step === 2 && (

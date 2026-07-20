@@ -82,7 +82,7 @@ function NutritionToday({ user, onChanged, onSetupTargets }) {
   // Earned exercise kcal (v2 targets): today's steps above baseline + walks/
   // runs + workouts, added straight onto today's allowance.
   const earned = window.dayEarnedKcal ? window.dayEarnedKcal() : 0;
-  const legacyTargets = !!(targets && !targets.lifestyle); // pre-earn model → nudge to recalc
+  const legacyTargets = !!(targets && targets.formula !== 'leangains'); // pre-v3 targets → nudge to recalc
   const kcalTarget = (targets ? targets.calories : 0) + earned;
   const kcalLeft = Math.max(0, kcalTarget - totals.kcal);
   // Alcohol kcal are in the ring total (dayTotals) but have no macro bar — show

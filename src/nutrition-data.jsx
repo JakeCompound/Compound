@@ -55,7 +55,38 @@ const KCAL_PER_LB = 3500;
 
 function calcTargets(input) {
   // input: { gender, age, weightKg, heightCm, bodyFat (0-100 or null), activity, goal, rate,
-  //          inDeficit, weightReduced, fatPref ('low'|'std'|'high'), proteinPerLb (default 0.6) }
+  //          inDeficit, weightReduced, fatPref ('low'|'std'|'high'), proteinPerLb (default 0.6),
+  //          formula: 'leangains' → the musclehacking.com leangains model (below) }
+
+  // ── v3 'leangains' formula (musclehacking.com/calorie-calculator) ─────────
+  // James's fixed assumptions: metric, body fat 20%+ (−0.5), muscle mass
+  // standard (0), 5,000 steps/day (<6000 band → 0), goal −500 kcal (−350 for
+  // women), protein 30% of calories, remaining calories split 50-50 carbs/fat.
+  // maintenance = kg × base value; base = 28 (men) / 26 (women), adjusted for
+  // age and height bands.
+  if (input.formula === 'leangains') {
+    const w = input.weightKg;
+    const female = input.gender === 'female';
+    let base = female ? 26 : 28;
+    if (input.age < 25) base += 0.5; else if (input.age > 45) base -= 0.5;
+    const h = input.heightCm;
+    if (female) { if (h < 153) base -= 1; else if (h > 170) base += 1; }
+    else { if (h < 167) base -= 1; else if (h > 185) base += 1; }
+    base -= 0.5; // body fat 20%+ assumption
+    const maintenance = w * base;
+    const calories = Math.round((maintenance - (female ? 350 : 500)) / 10) * 10;
+    const protein = Math.round((calories * 0.30) / 4);
+    const carbs = Math.round((calories * 0.35) / 4);
+    const fat = Math.max(0, Math.round((calories - protein * 4 - carbs * 4) / 9));
+    // Mifflin BMR kept for the plateau engine's safety floor.
+    const mifflin = 10 * w + 6.25 * h - 5 * input.age + (female ? -161 : 5);
+    return {
+      bmr: Math.round(mifflin), tdee: Math.round(maintenance), calories,
+      protein, fat, carbs,
+      goal: 'cut', formula: 'leangains', baselineSteps: 5000,
+    };
+  }
+
   const wKg = input.weightKg;
   const wLb = wKg * LB_PER_KG;
   const hCm = input.heightCm;
@@ -219,8 +250,12 @@ function estimateCardioKcal({ kind, distanceKm, weightKg, chips = {} }) {
 // earning would double-count.
 function dayEarnedKcal(date) {
   const t = loadTargets();
-  if (!t || !t.lifestyle) return 0;
-  const life = LIFESTYLES.find((l) => l.key === t.lifestyle) || LIFESTYLES[0];
+  if (!t || !(t.lifestyle || t.formula === 'leangains')) return 0;
+  // Baseline steps already assumed in the base: leangains fixes 5,000; the
+  // v2 lifestyle model carries its own per-level baseline.
+  const life = t.formula === 'leangains'
+    ? { baselineSteps: t.baselineSteps || 5000 }
+    : (LIFESTYLES.find((l) => l.key === t.lifestyle) || LIFESTYLES[0]);
   let wKg = 80;
   try { const onb = JSON.parse(localStorage.getItem('compound:onboarding') || '{}'); if (onb.weight) wKg = onb.weight; } catch (e) {}
   const entries = stepEntriesForDay(date);

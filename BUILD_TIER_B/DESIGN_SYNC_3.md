@@ -139,6 +139,20 @@
 - **Check-in**: the steps question prefills from the day's ledger; raising it
   tops the ledger up.
 
+## O. Calculator v3 — leangains formula, near-zero questions
+- Supersedes N's lifestyle picker. The calculator now asks ONLY stats (gender /
+  age / height / weight — body-fat input removed). Everything else is assumed:
+  maintenance = kg × base value (28 men / 26 women, adjusted for age + height
+  bands), body fat 20%+, standard muscle, ~5,000 steps; deficit −500 (men) /
+  −350 (women); protein 30% of calories; remaining calories split 50-50
+  carbs/fat.
+- Step 2 is now titled **"YOUR PLAN."** and is just the target preview card —
+  footer line reads e.g. "MAINTENANCE 2420 − 500 · PROTEIN 30% · CARBS/FAT
+  50-50" — plus the earn explainer ("base assumes an ordinary day… you earn it
+  by doing it"). No goal/pace/fat-preference/lifestyle controls.
+- Earned-calories mechanics (section N) unchanged; step baseline is 5,000.
+- Users on older targets see the ⚡ RECALC nudge until they re-run it once.
+
 ---
 
 ### Not built yet (roadmap)

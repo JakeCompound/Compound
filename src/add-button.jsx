@@ -1,11 +1,13 @@
 import React from 'react';
 import { C } from './compound-ui.jsx';
+import { alcoholOn } from './alcohol.js';
 
-// add-button.jsx — Floating "+" on Home → Alcohol (nip) + Food (when diet tracking on).
+// add-button.jsx — Floating "+" on Home → Drink (alcoholic / non-alcoholic) + Food.
 
 function AddButton({ dietTracking, alcohol = true, onChanged, onGoNutrition }) {
   const [menu, setMenu] = React.useState(false);
-  const [sheet, setSheet] = React.useState(null); // 'nip' | 'food'
+  const [sheet, setSheet] = React.useState(null); // 'drink' | 'food'
+  if (!alcohol && !dietTracking) return null; // nothing to add
   return (
     <>
       <button
@@ -28,14 +30,14 @@ function AddButton({ dietTracking, alcohol = true, onChanged, onGoNutrition }) {
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 3, borderRadius: 2, background: 'rgba(255,255,255,.18)' }} /></div>
             <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.accent, letterSpacing: 2.4, marginBottom: 12 }}>ADD TO TODAY</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {alcohol && <AddRow label="Alcohol" sub="Log a nip / beer / wine" glyph="🍺" onClick={() => { setMenu(false); setSheet('nip'); }} />}
+              <AddRow label="Drink" sub={alcohol ? 'Coffee, juice, energy — or a beer' : 'Coffee, juice, energy, soft drink'} glyph={alcohol ? '🥤' : '☕'} onClick={() => { setMenu(false); setSheet('drink'); }} />
               {dietTracking && <AddRow label="Food" sub="Photo or describe — AI does the macros" glyph="🍽️" onClick={() => { setMenu(false); setSheet('food'); }} />}
             </div>
           </div>
         </div>
       )}
 
-      {sheet === 'nip' && <NipQuickAdd onClose={() => setSheet(null)} onChanged={onChanged} />}
+      {sheet === 'drink' && <DrinkChooser onClose={() => setSheet(null)} onChanged={onChanged} />}
       {sheet === 'food' && <FoodAdd onClose={() => setSheet(null)} onChanged={onChanged} onGoNutrition={onGoNutrition} />}
     </>
   );
@@ -134,9 +136,134 @@ function PourChip({ label, sub, onClick }) {
   );
 }
 
+// ── Drink chooser — alcoholic vs non-alcoholic ──────────────────────────────
+function DrinkChooser({ onClose, onChanged }) {
+  let onboard = {};
+  try { onboard = JSON.parse(localStorage.getItem('compound:onboarding') || '{}'); } catch (e) {}
+  const alcOn = alcoholOn(onboard);
+  // Only one side available → skip the extra tap.
+  const [pick, setPick] = React.useState(alcOn ? null : 'soft');
+  if (pick === 'alc') return <NipQuickAdd onClose={onClose} onChanged={onChanged} />;
+  if (pick === 'soft') return <SoftDrinkQuickAdd onClose={onClose} onChanged={onChanged} />;
+  return (
+    <div onClick={onClose} style={{ position: 'absolute', inset: 0, zIndex: 220, background: 'rgba(0,0,0,.72)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'flex-end' }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', background: C.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: '20px 22px 24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 3, borderRadius: 2, background: 'rgba(255,255,255,.18)' }} /></div>
+        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.accent, letterSpacing: 2.4, marginBottom: 12 }}>WHAT KIND OF DRINK?</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <AddRow label="Alcoholic" sub="Nip / beer / wine — counts to your nips" glyph="🍺" onClick={() => setPick('alc')} />
+          <AddRow label="Non-alcoholic" sub="Coffee, juice, energy, soft drink" glyph="☕" onClick={() => setPick('soft')} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Non-alcoholic quick-add — editable quick picks + describe-a-drink AI ────
+function SoftDrinkQuickAdd({ onClose, onChanged }) {
+  const [presets, setPresets] = React.useState(() => window.loadSoftPresets());
+  const [edit, setEdit] = React.useState(false);
+  const [desc, setDesc] = React.useState('');
+  const [pending, setPending] = React.useState(false);
+  const [note, setNote] = React.useState(null);
+  const [savePick, setSavePick] = React.useState(null); // last AI drink, offer to pin it
+  const recent = (window.recentEntries ? window.recentEntries({ kind: 'drink', limit: 8 }) : [])
+    .filter((d) => !presets.some((p) => p.name.toLowerCase() === d.name.toLowerCase()));
+  const log = (d) => {
+    const r = window.quickLogFood({ ...d, kind: 'drink' });
+    setNote(r.repeated ? `${r.name} → ×${r.servings}` + (window.isLogToday() ? ' today' : ' on ' + window.prettyDay()) + ` · ${r.kcal} kcal` : `Added ${r.name} · ${r.kcal} kcal`);
+    onChanged && onChanged();
+  };
+  const pin = (d) => { setPresets(window.pinSoftPreset(d)); setSavePick(null); };
+  const estimate = async () => {
+    if (!desc.trim() || pending) return;
+    setPending(true); setNote(null); setSavePick(null);
+    try {
+      const raw = await window.claude.complete(`Estimate this NON-ALCOHOLIC drink's calories and macros (coffee, tea, juice, soft drink, energy drink, milk, smoothie, protein shake). Include milk, syrup and sugar if described. If it's a branded drink, you may search the web for its real nutrition label. Drink: "${desc.trim()}". Respond ONLY JSON: {"name":"short drink name","kcal":<int>,"p":<g>,"c":<g>,"f":<g>,"health":"unhealthy"|"neutral"|"healthy","info":"one warm, honest sentence","nips":<number — 0 unless the drink actually contains alcohol, then standard-nip equivalent>}`);
+      const m = (typeof raw === 'string' ? raw : '').match(/\{[\s\S]*\}/);
+      if (!m) throw new Error('no json');
+      const o = JSON.parse(m[0]);
+      const d = { name: (o.name || desc.trim()).slice(0, 40), kcal: Math.max(0, Math.round(+o.kcal || 0)),
+        p: Math.max(0, Math.round(+o.p || 0)), c: Math.max(0, Math.round(+o.c || 0)), f: Math.max(0, Math.round(+o.f || 0)),
+        health: o.health || 'neutral', info: o.info || '' };
+      log(d);
+      setSavePick(d);
+      // Safety net: if it turns out to contain alcohol, it still counts to nips.
+      const nips = Math.max(0, +o.nips || 0);
+      if (nips > 0 && window.setNipsToday) window.setNipsToday(+(window.loadNipsToday() + nips).toFixed(2));
+      setDesc('');
+    } catch (e) { setNote('Estimate failed — try again, or pick one above.'); }
+    finally { setPending(false); }
+  };
+  const rowStyle = { width: '100%', textAlign: 'left', padding: '12px 14px', background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12 };
+  return (
+    <div onClick={onClose} style={{ position: 'absolute', inset: 0, zIndex: 220, background: 'rgba(0,0,0,.72)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'flex-end' }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxHeight: '92%', overflowY: 'auto', background: C.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: '20px 22px 24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 3, borderRadius: 2, background: 'rgba(255,255,255,.18)' }} /></div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+          <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.accent, letterSpacing: 2.4 }}>NON-ALCOHOLIC DRINK</div>
+          <button onClick={() => setEdit(!edit)} style={{ background: 'transparent', border: 0, padding: 0, color: edit ? C.accent : C.textLow, fontFamily: 'JetBrains Mono, monospace', fontSize: 9.5, letterSpacing: 1.6, cursor: 'pointer' }}>{edit ? 'DONE' : 'EDIT PICKS'}</button>
+        </div>
+        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: C.textLow, letterSpacing: 1.6, marginBottom: 8 }}>{edit ? 'YOUR QUICK PICKS' : 'QUICK SELECT'}</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {presets.map((d) => (
+            <div key={d.name} style={{ ...rowStyle, cursor: 'default' }}>
+              <span style={{ fontSize: 21 }}>{d.glyph || '🥤'}</span>
+              <button onClick={edit ? undefined : () => log(d)} disabled={edit} style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'transparent', border: 0, padding: 0, cursor: edit ? 'default' : 'pointer' }}>
+                <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 16.5, letterSpacing: 0.7, color: C.text, textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.name}</div>
+                <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9.5, color: C.textLow, letterSpacing: 0.8, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.kcal} KCAL{d.sub ? ' · ' + d.sub : ''}</div>
+              </button>
+              {edit ? (
+                <button onClick={() => setPresets(window.unpinSoftPreset(d.name))} title="Remove quick pick" style={{ flexShrink: 0, width: 26, height: 26, borderRadius: 13, background: 'rgba(229,86,75,.14)', border: '1px solid rgba(229,86,75,.5)', color: C.danger, cursor: 'pointer', fontFamily: 'JetBrains Mono, monospace', fontSize: 12, lineHeight: 1 }}>✕</button>
+              ) : (
+                <button onClick={() => log(d)} title="Log it" style={{ flexShrink: 0, width: 26, height: 26, borderRadius: 13, background: C.accent + '1f', border: `1px solid ${C.accent}66`, color: C.accent, cursor: 'pointer', fontFamily: 'JetBrains Mono, monospace', fontSize: 15, lineHeight: 1 }}>+</button>
+              )}
+            </div>
+          ))}
+          {presets.length === 0 && (
+            <div style={{ background: C.surf1, border: `1px dashed ${C.line}`, borderRadius: 12, padding: '14px 16px', textAlign: 'center', fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: C.textMid }}>No quick picks. Describe a drink below and save it as one.</div>
+          )}
+        </div>
+
+        {/* Pin something already logged often */}
+        {edit && recent.length > 0 && (
+          <div style={{ marginTop: 14 }}>
+            <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: C.textLow, letterSpacing: 1.6, marginBottom: 8 }}>PIN ONE YOU LOG OFTEN</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {recent.map((d) => (
+                <button key={d.name} onClick={() => pin(d)} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'transparent', border: `1px dashed ${C.lineStrong}`, borderRadius: 999, padding: '7px 11px', color: C.text, fontFamily: 'Outfit, sans-serif', fontSize: 12, cursor: 'pointer' }}>
+                  <span style={{ color: C.accent, fontFamily: 'JetBrains Mono, monospace', fontSize: 12 }}>+</span>{d.name}
+                  <span style={{ color: C.textLow, fontFamily: 'JetBrains Mono, monospace', fontSize: 9 }}>×{d.count}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div style={{ marginTop: 16, paddingTop: 16, borderTop: `1px solid ${C.line}` }}>
+          <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: C.textLow, letterSpacing: 1.6, marginBottom: 8 }}>OR DESCRIBE A DRINK</div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input value={desc} onChange={(e) => setDesc(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') estimate(); }} placeholder="e.g. large flat white, Coke Zero, iced latte" style={{ flex: 1, minWidth: 0, background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 10, color: C.text, fontFamily: 'Outfit, sans-serif', fontSize: 14, padding: '12px 14px', outline: 'none' }} />
+            <button onClick={estimate} disabled={pending || !desc.trim()} style={{ width: 52, flexShrink: 0, background: (pending || !desc.trim()) ? C.surf2 : C.accent, color: (pending || !desc.trim()) ? C.textLow : '#0A0A0C', border: 0, borderRadius: 10, fontSize: 18, cursor: (pending || !desc.trim()) ? 'default' : 'pointer' }}>{pending ? '…' : '→'}</button>
+          </div>
+          {note && <div style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: C.accent, marginTop: 8, lineHeight: 1.4 }}>{note}</div>}
+          {savePick && (
+            <button onClick={() => pin(savePick)} style={{ marginTop: 8, background: 'transparent', border: `1px dashed ${C.accent}88`, borderRadius: 999, padding: '7px 12px', color: C.accent, fontFamily: 'JetBrains Mono, monospace', fontSize: 9.5, letterSpacing: 1.4, cursor: 'pointer' }}>+ SAVE "{savePick.name.toUpperCase()}" AS A QUICK PICK</button>
+          )}
+        </div>
+        <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12, color: C.textMid, lineHeight: 1.5, margin: '14px 0 0' }}>
+          Drinks land in the food log — tap the <span style={{ color: C.accent }}>+</span> on a row for another one.
+        </p>
+        <button onClick={onClose} style={{ width: '100%', height: 50, marginTop: 14, background: C.accent, border: 0, borderRadius: 12, color: '#0A0A0C', fontFamily: 'Barlow Condensed, sans-serif', fontSize: 15, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', cursor: 'pointer' }}>Done</button>
+      </div>
+    </div>
+  );
+}
+
 // ── Food add (photo + text → AI estimate) ───────────────────────────────────
 function FoodAdd({ onClose, onChanged, onGoNutrition }) {
   const [desc, setDesc] = React.useState('');
+  const [again, setAgain] = React.useState(null); // note after repeating a past meal
   const [photo, setPhoto] = React.useState(null); // dataURL
   const [pending, setPending] = React.useState(false);
   const [err, setErr] = React.useState(null);
@@ -184,6 +311,7 @@ Rules: protein/carbs/fat in grams. BRANDED / PACKAGED PRODUCTS — if the meal n
         info: obj.info || '',
         questions: Array.isArray(obj.questions) ? obj.questions.slice(0, 2).map((q) => ({ q: q.q, options: q.options || [], answer: null })) : [],
         nips: Math.max(0, +obj.nips || 0),
+        kind: 'food', servings: 1,
         ts: Date.now(),
       };
       window.addFood(entry);
@@ -209,6 +337,38 @@ Rules: protein/carbs/fat in grams. BRANDED / PACKAGED PRODUCTS — if the meal n
         <h3 style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 26, lineHeight: 1, letterSpacing: 0.5, color: C.text, margin: '0 0 14px', textTransform: 'uppercase' }}>
           WHAT DID YOU<br /><span style={{ color: C.accent }}>EAT?</span>
         </h3>
+
+        {/* Repeat something already logged — no re-describing it. Hides as soon
+            as the user starts the normal flow (photo or description). */}
+        {(() => {
+          const recent = (window.recentEntries ? window.recentEntries({ limit: 12 }) : []).filter((r) => r.kind !== 'drink').slice(0, 4);
+          if (!recent.length || photo || desc.trim()) return null;
+          const repeat = (r) => {
+            const res = window.quickLogFood(r);
+            setAgain(res.repeated ? `${res.name} → ×${res.servings} · ${res.kcal} kcal` : `Added ${res.name} · ${res.kcal} kcal`);
+            onChanged && onChanged();
+          };
+          return (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: C.textLow, letterSpacing: 1.6, marginBottom: 8 }}>LOG IT AGAIN</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {recent.map((r) => (
+                  <div key={r.name} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 11px', background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 11 }}>
+                    {r.photo
+                      ? <img src={r.photo} alt="" style={{ width: 32, height: 32, borderRadius: 7, objectFit: 'cover', flexShrink: 0 }} />
+                      : <div style={{ width: 32, height: 32, borderRadius: 7, background: C.surf2, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 15 }}>🍽️</div>}
+                    <button onClick={() => repeat(r)} style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'transparent', border: 0, padding: 0, cursor: 'pointer' }}>
+                      <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 15, letterSpacing: 0.6, color: C.text, textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.name}</div>
+                      <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: C.textLow, letterSpacing: 0.8, marginTop: 1 }}>{r.kcal} KCAL · {window.prettyDay(r.day)}</div>
+                    </button>
+                    <button onClick={() => repeat(r)} title="Log it again" style={{ flexShrink: 0, width: 26, height: 26, borderRadius: 13, background: C.accent + '1f', border: `1px solid ${C.accent}66`, color: C.accent, cursor: 'pointer', fontFamily: 'JetBrains Mono, monospace', fontSize: 15, lineHeight: 1 }}>+</button>
+                  </div>
+                ))}
+              </div>
+              {again && <div style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: C.accent, marginTop: 8, lineHeight: 1.4 }}>{again}</div>}
+            </div>
+          );
+        })()}
 
         {/* Photo */}
         <input ref={fileRef} type="file" accept="image/*" onChange={pickPhoto} style={{ display: 'none' }} />
@@ -239,6 +399,6 @@ Rules: protein/carbs/fat in grams. BRANDED / PACKAGED PRODUCTS — if the meal n
   );
 }
 
-Object.assign(window, { AddButton, NipQuickAdd });
+Object.assign(window, { AddButton, NipQuickAdd, DrinkChooser, SoftDrinkQuickAdd });
 
-export { AddButton, AddRow, FoodAdd, NipQuickAdd, PourChip, stepBtn };
+export { AddButton, AddRow, DrinkChooser, FoodAdd, NipQuickAdd, PourChip, SoftDrinkQuickAdd, stepBtn };

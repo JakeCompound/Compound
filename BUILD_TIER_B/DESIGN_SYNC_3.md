@@ -45,7 +45,7 @@
   **Drink** option, the check-in **AFD + nips** questions, and the Reports
   **Alcohol-Free streak** + **AFD/nips chart**.
 
-## F. Life Balance radar on Home (`home-screen.jsx`)
+## F. Life Balance radar on Home (`home-screen.jsx`) — SUPERSEDED (removed in Round 4, A6)
 - A compact **`LifeBalanceRadar` (size 160)** in a warm-gradient card under the
   three rings, with a "LIFE BALANCE" label and a "**FULL REPORT →**" cue. The whole
   card is tappable → the Reports tab. Reports radar stays the full size 250.

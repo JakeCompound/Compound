@@ -163,46 +163,150 @@ const FOOD_KEY = 'compound:food'; // { [date]: [ {id, name, photo, kcal, p, c, f
 function loadFood() { try { return JSON.parse(localStorage.getItem(FOOD_KEY) || '{}'); } catch (e) { return {}; } }
 function saveFood(all) { try { localStorage.setItem(FOOD_KEY, JSON.stringify(all)); } catch (e) {} }
 function todayKey() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
-function foodForDay(date) { const all = loadFood(); return all[date || todayKey()] || []; }
+
+// ── Active log date — lets the user step back and fix a day they missed ────
+// null = today. Deliberately in-memory only (never persists across launches);
+// the Nutrition tab resets it on unmount so other screens always read today.
+let ACTIVE_DATE = null;
+function logDate() { return ACTIVE_DATE || todayKey(); }
+function setLogDate(d) { ACTIVE_DATE = (!d || d === todayKey()) ? null : d; return logDate(); }
+function isLogToday() { return logDate() === todayKey(); }
+function shiftDay(key, n) {
+  const p = String(key).split('-').map(Number);
+  const d = new Date(p[0], p[1] - 1, p[2] + n);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+const DOW_ABBR = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+const MON_ABBR = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+function prettyDay(key) {
+  const k = key || logDate();
+  if (k === todayKey()) return 'TODAY';
+  if (k === shiftDay(todayKey(), -1)) return 'YESTERDAY';
+  const p = k.split('-').map(Number);
+  const d = new Date(p[0], p[1] - 1, p[2]);
+  return `${DOW_ABBR[d.getDay()]} ${p[2]} ${MON_ABBR[p[1] - 1]}`;
+}
+
+function foodForDay(date) { const all = loadFood(); return all[date || logDate()] || []; }
 function addFood(entry) {
   const all = loadFood();
-  const k = todayKey();
+  const k = logDate();
   all[k] = [...(all[k] || []), entry];
   saveFood(all);
   return all[k];
 }
 function updateFood(id, patch) {
   const all = loadFood();
-  const k = todayKey();
+  const k = logDate();
   all[k] = (all[k] || []).map((e) => (e.id === id ? { ...e, ...patch } : e));
   saveFood(all);
   return all[k];
 }
 function removeFood(id) {
   const all = loadFood();
-  const k = todayKey();
+  const k = logDate();
   all[k] = (all[k] || []).filter((e) => e.id !== id);
   saveFood(all);
   return all[k];
 }
 
+// ── Servings: kcal/p/c/f on an entry are PER SERVING; `servings` defaults 1 ──
+function servingsOf(e) { return Math.max(1, Math.round((e && e.servings) || 1)); }
+function setServings(id, n) { return updateFood(id, { servings: Math.max(1, Math.round(n)) }); }
+function addServing(id) {
+  const e = foodForDay().find((x) => x.id === id);
+  return setServings(id, servingsOf(e) + 1);
+}
+function removeServing(id) {
+  const e = foodForDay().find((x) => x.id === id);
+  const n = servingsOf(e);
+  return n <= 1 ? removeFood(id) : setServings(id, n - 1);
+}
+
+// ── Repeat a food/drink without re-logging it from scratch ────────────────
+// Same name already on the active day → bump its servings, not a duplicate row.
+function quickLogFood(d) {
+  const existing = foodForDay().find((e) => (e.name || '').toLowerCase() === (d.name || '').toLowerCase());
+  if (existing) {
+    const n = servingsOf(existing) + 1;
+    setServings(existing.id, n);
+    return { name: existing.name, servings: n, kcal: (existing.kcal || 0) * n, repeated: true };
+  }
+  addFood({
+    id: 'f-' + Date.now(), name: d.name, photo: d.photo || null,
+    kcal: Math.max(0, Math.round(d.kcal || 0)), p: Math.max(0, Math.round(d.p || 0)),
+    c: Math.max(0, Math.round(d.c || 0)), f: Math.max(0, Math.round(d.f || 0)),
+    confidence: d.confidence || 'high', health: d.health || 'neutral', info: d.info || '',
+    nips: 0, kind: d.kind || 'food', questions: [], servings: 1, ts: Date.now(),
+  });
+  return { name: d.name, servings: 1, kcal: Math.round(d.kcal || 0), repeated: false };
+}
+
+// Distinct things logged recently, newest first — powers the "log it again" lists.
+function recentEntries(opts) {
+  const o = opts || {};
+  const all = loadFood();
+  const days = Object.keys(all).sort().reverse().slice(0, o.days || 21);
+  const seen = {}, out = [];
+  days.forEach((day) => {
+    (all[day] || []).slice().sort((a, b) => (b.ts || 0) - (a.ts || 0)).forEach((e) => {
+      const key = (e.name || '').toLowerCase();
+      if (!key || (o.kind && (e.kind || 'food') !== o.kind)) return;
+      if (seen[key]) { seen[key].count += servingsOf(e); return; }
+      seen[key] = { name: e.name, photo: e.photo || null, kcal: e.kcal || 0, p: e.p || 0, c: e.c || 0, f: e.f || 0,
+        health: e.health || 'neutral', info: e.info || '', kind: e.kind || 'food', day, count: servingsOf(e) };
+      out.push(seen[key]);
+    });
+  });
+  return out.slice(0, o.limit || 8);
+}
+
+// ── Non-alcoholic quick picks — user-editable, capped at 8 ─────────────────
+const SOFT_KEY = 'compound:softPresets';
+const DEFAULT_SOFT_PRESETS = [
+  { name: 'Black Coffee', sub: 'Long black · no sugar', glyph: '☕', kcal: 2, p: 0, c: 0, f: 0, health: 'healthy', info: 'Basically free calories — a solid default.' },
+  { name: 'Orange Juice 250ml', sub: 'One glass', glyph: '🧃', kcal: 110, p: 2, c: 26, f: 0, health: 'neutral', info: 'Real vitamin C, but juice carries the sugar of a few oranges without the fibre.' },
+  { name: 'V Zero Sugar 500ml', sub: 'Sugar-free energy', glyph: '⚡', kcal: 10, p: 0, c: 2, f: 0, health: 'neutral', info: 'Near-zero calories — just keep an eye on the caffeine load late in the day.' },
+];
+function loadSoftPresets() {
+  try { const v = JSON.parse(localStorage.getItem(SOFT_KEY) || 'null'); return Array.isArray(v) ? v : DEFAULT_SOFT_PRESETS.slice(); }
+  catch (e) { return DEFAULT_SOFT_PRESETS.slice(); }
+}
+function saveSoftPresets(list) {
+  try { localStorage.setItem(SOFT_KEY, JSON.stringify(list.slice(0, 8))); } catch (e) {}
+  return list;
+}
+function pinSoftPreset(d) {
+  const list = loadSoftPresets();
+  if (list.some((x) => x.name.toLowerCase() === (d.name || '').toLowerCase())) return list;
+  return saveSoftPresets(list.concat([{ name: d.name, sub: d.sub || 'Saved quick pick', glyph: d.glyph || '🥤',
+    kcal: Math.round(d.kcal || 0), p: Math.round(d.p || 0), c: Math.round(d.c || 0), f: Math.round(d.f || 0),
+    health: d.health || 'neutral', info: d.info || '' }]));
+}
+function unpinSoftPreset(name) {
+  return saveSoftPresets(loadSoftPresets().filter((x) => x.name.toLowerCase() !== String(name).toLowerCase()));
+}
+
 function dayTotals(date) {
   const items = foodForDay(date);
-  const base = items.reduce((t, e) => ({
-    kcal: t.kcal + (e.kcal || 0),
-    p: t.p + (e.p || 0),
-    c: t.c + (e.c || 0),
-    f: t.f + (e.f || 0),
-  }), { kcal: 0, p: 0, c: 0, f: 0 });
+  const base = items.reduce((t, e) => {
+    const s = servingsOf(e); // macros are per serving
+    return {
+      kcal: t.kcal + (e.kcal || 0) * s,
+      p: t.p + (e.p || 0) * s,
+      c: t.c + (e.c || 0) * s,
+      f: t.f + (e.f || 0) * s,
+    };
+  }, { kcal: 0, p: 0, c: 0, f: 0 });
   base.kcal += loadAlcoholKcal(date); // drinks logged via the + Alcohol path count too
   return base;
 }
 
 // ── Alcohol calories (per day) — drinks count toward the calorie total ─────
 const ALC_KCAL_KEY = 'compound:alcoholKcal'; // { [date]: kcal }
-function loadAlcoholKcal(date) { try { const all = JSON.parse(localStorage.getItem(ALC_KCAL_KEY) || '{}'); return all[date || todayKey()] || 0; } catch (e) { return 0; } }
+function loadAlcoholKcal(date) { try { const all = JSON.parse(localStorage.getItem(ALC_KCAL_KEY) || '{}'); return all[date || logDate()] || 0; } catch (e) { return 0; } }
 function setAlcoholKcal(kcal, date) {
-  try { const all = JSON.parse(localStorage.getItem(ALC_KCAL_KEY) || '{}'); all[date || todayKey()] = Math.max(0, Math.round(kcal)); localStorage.setItem(ALC_KCAL_KEY, JSON.stringify(all)); } catch (e) {}
+  try { const all = JSON.parse(localStorage.getItem(ALC_KCAL_KEY) || '{}'); all[date || logDate()] = Math.max(0, Math.round(kcal)); localStorage.setItem(ALC_KCAL_KEY, JSON.stringify(all)); } catch (e) {}
   return Math.max(0, Math.round(kcal));
 }
 function addAlcoholKcal(delta, date) { return setAlcoholKcal(loadAlcoholKcal(date) + delta, date); }
@@ -287,11 +391,11 @@ function openMealQuestions(date) {
 
 // ── Nip tally (real-time, per day) — separate from check-in until check-in writes ──
 const NIPS_KEY = 'compound:nipsToday'; // { [date]: number }
-function loadNipsToday(date) { try { const all = JSON.parse(localStorage.getItem(NIPS_KEY) || '{}'); return all[date || todayKey()] || 0; } catch (e) { return 0; } }
+function loadNipsToday(date) { try { const all = JSON.parse(localStorage.getItem(NIPS_KEY) || '{}'); return all[date || logDate()] || 0; } catch (e) { return 0; } }
 function setNipsToday(n, date) {
   try {
     const all = JSON.parse(localStorage.getItem(NIPS_KEY) || '{}');
-    all[date || todayKey()] = Math.max(0, n);
+    all[date || logDate()] = Math.max(0, n);
     localStorage.setItem(NIPS_KEY, JSON.stringify(all));
   } catch (e) {}
   return Math.max(0, n);
@@ -304,6 +408,10 @@ Object.assign(window, {
   loadNipsToday, setNipsToday,
   loadAlcoholKcal, setAlcoholKcal, addAlcoholKcal,
   loadStepLog, stepEntriesForDay, addStepEntry, removeStepEntry, dayStepTotal, dayEarnedKcal, estimateCardioKcal,
+  logDate, setLogDate, isLogToday, shiftDay, prettyDay,
+  servingsOf, setServings, addServing, removeServing,
+  quickLogFood, recentEntries,
+  loadSoftPresets, saveSoftPresets, pinSoftPreset, unpinSoftPreset, DEFAULT_SOFT_PRESETS,
 });
 
-export { ALC_KCAL_KEY, CUT_RATES, DEFAULT_MINUTES, DEFAULT_SESSIONS, DEFAULT_STEPS, FOOD_KEY, GAIN_RATES, GOALS, KCAL_PER_LB, LB_PER_KG, LIFESTYLES, LIFTING_MET, MAINTENANCE_MULT, NIPS_KEY, STEPLOG_KEY, STEPS_KCAL_FACTOR, TARGETS_KEY, addAlcoholKcal, addFood, addStepEntry, calcTargets, dayEarnedKcal, dayStepTotal, dayTotals, estimateCardioKcal, foodForDay, loadAlcoholKcal, loadFood, loadNipsToday, loadStepLog, loadTargets, openMealQuestions, removeFood, removeStepEntry, saveFood, saveTargets, setAlcoholKcal, setNipsToday, stepEntriesForDay, todayKey, updateFood };
+export { ALC_KCAL_KEY, CUT_RATES, DEFAULT_MINUTES, DEFAULT_SESSIONS, DEFAULT_SOFT_PRESETS, DEFAULT_STEPS, FOOD_KEY, GAIN_RATES, GOALS, KCAL_PER_LB, LB_PER_KG, LIFESTYLES, LIFTING_MET, MAINTENANCE_MULT, NIPS_KEY, SOFT_KEY, STEPLOG_KEY, STEPS_KCAL_FACTOR, TARGETS_KEY, addAlcoholKcal, addFood, addServing, addStepEntry, calcTargets, dayEarnedKcal, dayStepTotal, dayTotals, estimateCardioKcal, foodForDay, isLogToday, loadAlcoholKcal, loadFood, loadNipsToday, loadSoftPresets, loadStepLog, loadTargets, logDate, openMealQuestions, pinSoftPreset, prettyDay, quickLogFood, recentEntries, removeFood, removeServing, removeStepEntry, saveFood, saveSoftPresets, saveTargets, servingsOf, setAlcoholKcal, setLogDate, setNipsToday, setServings, shiftDay, stepEntriesForDay, todayKey, unpinSoftPreset, updateFood };

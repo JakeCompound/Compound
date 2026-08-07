@@ -2,7 +2,7 @@ import React from 'react';
 import { C } from './compound-ui.jsx';
 import { SectionLabel } from './home-components.jsx';
 import { NutritionChat } from './nutrition-screen.jsx';
-import { AddRow, FoodAdd, NipQuickAdd } from './add-button.jsx';
+import { AddRow, DrinkChooser, FoodAdd, NipQuickAdd, SoftDrinkQuickAdd } from './add-button.jsx';
 import { alcoholOn } from './alcohol.js';
 
 // nutrition-tab.jsx — Redesigned Nutrition: Today (food tracker) / Ask (AI chat).
@@ -68,10 +68,22 @@ function NutHeader({ view, onView, showToggle }) {
   );
 }
 
+const dayBtn = { width: 34, height: 34, borderRadius: 10, border: `1px solid ${C.line}`, background: C.surf1, color: C.text, fontFamily: 'Barlow Condensed, sans-serif', fontSize: 20, lineHeight: 1, cursor: 'pointer', flexShrink: 0 };
+
 function NutritionToday({ user, onChanged, onSetupTargets }) {
   const [, force] = React.useReducer((x) => x + 1, 0);
   const [qOpen, setQOpen] = React.useState(false);
-  const [sheet, setSheet] = React.useState(null); // 'food' | 'drink' — reuses Home's add sheets
+  const [sheet, setSheet] = React.useState(null); // 'menu' | 'food' | 'drink' | 'soft' | 'nip'
+  // Browsing a past day is temporary — always snap back to today on leaving,
+  // so other screens (check-in, Home rings) never read a browsed day.
+  React.useEffect(() => () => { window.setLogDate && window.setLogDate(null); }, []);
+  const day = window.logDate ? window.logDate() : null;
+  const onToday = window.isLogToday ? window.isLogToday() : true;
+  const stepDay = (n) => {
+    const next = window.shiftDay(day, n);
+    if (next > window.todayKey()) return; // no future days
+    window.setLogDate(next); force();
+  };
   const targets = window.loadTargets ? window.loadTargets() : null;
   const totals = window.dayTotals();
   const foods = window.foodForDay();
@@ -79,9 +91,9 @@ function NutritionToday({ user, onChanged, onSetupTargets }) {
 
   const refresh = () => { force(); onChanged && onChanged(); };
 
-  // Earned exercise kcal (v2 targets): today's steps above baseline + walks/
-  // runs + workouts, added straight onto today's allowance.
-  const earned = window.dayEarnedKcal ? window.dayEarnedKcal() : 0;
+  // Earned exercise kcal for the ACTIVE day (steps above baseline + walks/
+  // runs + workouts), added straight onto that day's allowance.
+  const earned = window.dayEarnedKcal ? window.dayEarnedKcal(day) : 0;
   const legacyTargets = !!(targets && targets.formula !== 'leangains'); // pre-v3 targets → nudge to recalc
   const kcalTarget = (targets ? targets.calories : 0) + earned;
   const kcalLeft = Math.max(0, kcalTarget - totals.kcal);
@@ -92,6 +104,15 @@ function NutritionToday({ user, onChanged, onSetupTargets }) {
 
   return (
     <div style={{ flex: 1, overflowY: 'auto', padding: '14px 22px 32px' }}>
+      {/* Day stepper — fix a day you missed without losing today's context */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+        <button onClick={() => stepDay(-1)} title="Previous day" style={dayBtn}>‹</button>
+        <div style={{ flex: 1, textAlign: 'center' }}>
+          <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 17, letterSpacing: 1.2, color: onToday ? C.text : C.accent, textTransform: 'uppercase', lineHeight: 1 }}>{window.prettyDay(day)}</div>
+          {!onToday && <button onClick={() => { window.setLogDate(null); force(); }} style={{ background: 'transparent', border: 0, padding: '3px 0 0', color: C.textLow, fontFamily: 'JetBrains Mono, monospace', fontSize: 9, letterSpacing: 1.4, cursor: 'pointer' }}>BACK TO TODAY</button>}
+        </div>
+        <button onClick={() => stepDay(1)} disabled={onToday} title="Next day" style={{ ...dayBtn, color: onToday ? C.textLow : C.text, cursor: onToday ? 'default' : 'pointer' }}>›</button>
+      </div>
       {/* Calories remaining ring + macros */}
       <div style={{ background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 16, padding: 18, display: 'flex', alignItems: 'center', gap: 18 }}>
         <CalRing consumed={totals.kcal} target={kcalTarget} />
@@ -147,10 +168,10 @@ function NutritionToday({ user, onChanged, onSetupTargets }) {
 
       {/* Food log */}
       <div style={{ marginTop: 18 }}>
-        <SectionLabel meta={`${foods.length} ${foods.length === 1 ? 'MEAL' : 'MEALS'} · ${totals.kcal} KCAL`}>TODAY'S LOG</SectionLabel>
+        <SectionLabel meta={`${foods.length} ${foods.length === 1 ? 'MEAL' : 'MEALS'} · ${totals.kcal} KCAL`}>{onToday ? "TODAY'S LOG" : `${window.prettyDay(day)} · LOG`}</SectionLabel>
         {foods.length === 0 && !(window.loadNipsToday && window.loadNipsToday() > 0) ? (
           <div style={{ background: C.surf1, border: `1px dashed ${C.line}`, borderRadius: 12, padding: '20px 16px', textAlign: 'center', fontFamily: 'Outfit, sans-serif', fontSize: 13, color: C.textMid, lineHeight: 1.5 }}>
-            Nothing logged yet. Tap <span style={{ color: C.accent }}>+ Add item</span> above to log a meal or a drink.
+            Nothing logged {onToday ? 'yet' : 'on this day'}. Tap <span style={{ color: C.accent }}>+ Add item</span> above to log a meal or a drink.
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -158,7 +179,7 @@ function NutritionToday({ user, onChanged, onSetupTargets }) {
               const nips = window.loadNipsToday ? window.loadNipsToday() : 0;
               const akcal = window.loadAlcoholKcal ? window.loadAlcoholKcal() : 0;
               if (!alcoholOn(user) || (nips <= 0 && akcal <= 0)) return null;
-              return <AlcoholRow nips={nips} kcal={akcal} onAdd={() => setSheet('drink')} />;
+              return <AlcoholRow nips={nips} kcal={akcal} onAdd={() => setSheet('nip')} />;
             })()}
             {foods.map((f) => <FoodRow key={f.id} food={f} onChanged={refresh} />)}
           </div>
@@ -170,16 +191,20 @@ function NutritionToday({ user, onChanged, onSetupTargets }) {
         <div onClick={() => setSheet(null)} style={{ position: 'absolute', inset: 0, zIndex: 210, background: 'rgba(0,0,0,.6)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'flex-end' }}>
           <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', background: C.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: '20px 22px 24px' }}>
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 3, borderRadius: 2, background: 'rgba(255,255,255,.18)' }} /></div>
-            <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.accent, letterSpacing: 2.4, marginBottom: 12 }}>ADD TO TODAY</div>
+            <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.accent, letterSpacing: 2.4, marginBottom: 12 }}>ADD TO {window.prettyDay(day)}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <AddRow label="Meal" sub="Photo or describe — AI does the macros" glyph="🍽️" onClick={() => setSheet('food')} />
-              {alcoholOn(user) && <AddRow label="Drink" sub="Log a nip / beer / wine" glyph="🍺" onClick={() => setSheet('drink')} />}
+              {alcoholOn(user)
+                ? <AddRow label="Drink" sub="Coffee, juice, energy — or a beer" glyph="🥤" onClick={() => setSheet('drink')} />
+                : <AddRow label="Drink" sub="Coffee, juice, energy, soft drink" glyph="☕" onClick={() => setSheet('soft')} />}
             </div>
           </div>
         </div>
       )}
       {sheet === 'food' && <FoodAdd onClose={() => setSheet(null)} onChanged={refresh} />}
-      {sheet === 'drink' && <NipQuickAdd onClose={() => setSheet(null)} onChanged={refresh} />}
+      {sheet === 'drink' && <DrinkChooser onClose={() => setSheet(null)} onChanged={refresh} />}
+      {sheet === 'soft' && <SoftDrinkQuickAdd onClose={() => setSheet(null)} onChanged={refresh} />}
+      {sheet === 'nip' && <NipQuickAdd onClose={() => setSheet(null)} onChanged={refresh} />}
     </div>
   );
 }
@@ -223,6 +248,15 @@ function FoodRow({ food, onChanged }) {
   const [popup, setPopup] = React.useState(null); // 'confidence' | 'health' | 'info'
   const [edit, setEdit] = React.useState(false);
   const nOpen = (food.questions || []).filter((q) => q.answer == null).length;
+  const servings = window.servingsOf ? window.servingsOf(food) : 1;
+  // A drink-entry serving carries its nips too — keep the nip tally in step.
+  const bumpNips = (dir) => {
+    if (food.nips > 0 && window.setNipsToday && window.loadNipsToday) {
+      window.setNipsToday(Math.max(0, +(window.loadNipsToday() + dir * food.nips).toFixed(2)));
+    }
+  };
+  const addOne = (e) => { e.stopPropagation(); window.addServing(food.id); bumpNips(1); onChanged && onChanged(); };
+  const subOne = (e) => { e.stopPropagation(); window.removeServing(food.id); bumpNips(-1); onChanged && onChanged(); };
   const CONF_TEXT = {
     low: 'Low confidence — the AI is unsure on this estimate. Answer its meal question to sharpen it.',
     medium: 'Medium confidence — a reasonable estimate. A quick meal question would tighten it.',
@@ -235,27 +269,36 @@ function FoodRow({ food, onChanged }) {
   };
   return (
     <div style={{ background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 12, overflow: 'hidden' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 12px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 12px' }}>
         {/* Tap the meal itself to edit or delete it */}
         <button
           onClick={() => setEdit(true)}
-          style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0, background: 'transparent', border: 0, padding: 0, cursor: 'pointer', textAlign: 'left' }}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0, background: 'transparent', border: 0, padding: 0, cursor: 'pointer', textAlign: 'left' }}
         >
           {food.photo
             ? <img src={food.photo} alt="" style={{ width: 46, height: 46, borderRadius: 9, objectFit: 'cover', flexShrink: 0 }} />
-            : <div style={{ width: 46, height: 46, borderRadius: 9, background: C.surf2, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 20 }}>🍽️</div>}
+            : <div style={{ width: 46, height: 46, borderRadius: 9, background: C.surf2, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 20 }}>{food.kind === 'drink' ? '🥤' : '🍽️'}</div>}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 16, letterSpacing: 0.5, color: C.text, textTransform: 'uppercase', lineHeight: 1.05, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{food.name}</div>
-            <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.textMid, letterSpacing: 0.5, marginTop: 2 }}>
-              {food.kcal} kcal · {food.p}p {food.c}c {food.f}f
+            <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.textMid, letterSpacing: 0.5, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {food.kcal * servings} kcal · {food.p * servings}p {food.c * servings}c {food.f * servings}f
             </div>
           </div>
         </button>
-        {/* 3 badges */}
-        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-          <Badge title="Estimate confidence" color={CONF_COLOR[food.confidence]} glyph="◎" alert={nOpen > 0} onClick={() => setPopup(popup === 'confidence' ? null : 'confidence')} />
-          <Badge title="Food quality" color={HEALTH_COLOR[food.health]} glyph="♥" onClick={() => setPopup(popup === 'health' ? null : 'health')} />
-          <Badge title="Info" color={C.textMid} glyph="i" onClick={() => setPopup(popup === 'info' ? null : 'info')} ring />
+        {/* Right column: badges above, serving stepper below — keeps the name wide */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
+          <div style={{ display: 'flex', gap: 5 }}>
+            <Badge title="Estimate confidence" color={CONF_COLOR[food.confidence]} glyph="◎" alert={nOpen > 0} onClick={() => setPopup(popup === 'confidence' ? null : 'confidence')} />
+            <Badge title="Food quality" color={HEALTH_COLOR[food.health]} glyph="♥" onClick={() => setPopup(popup === 'health' ? null : 'health')} />
+            <Badge title="Info" color={C.textMid} glyph="i" onClick={() => setPopup(popup === 'info' ? null : 'info')} ring />
+          </div>
+          {/* Servings — identical footprint at every count, so the row never shifts.
+              A single − never deletes; deleting lives in the edit sheet. */}
+          <div style={{ display: 'flex', alignItems: 'center', width: 70, height: 28, borderRadius: 14, border: `1px solid ${C.accent}55`, background: C.accent + '14', overflow: 'hidden' }}>
+            <button onClick={servings > 1 ? subOne : undefined} disabled={servings <= 1} title="One fewer serving" style={{ width: 25, height: 28, background: 'transparent', border: 0, borderRight: `1px solid ${C.accent}33`, color: servings > 1 ? C.accent : C.textLow, fontFamily: 'JetBrains Mono, monospace', fontSize: 14, lineHeight: 1, cursor: servings > 1 ? 'pointer' : 'default' }}>−</button>
+            <div style={{ width: 18, textAlign: 'center', fontFamily: 'JetBrains Mono, monospace', fontSize: 11, fontWeight: 600, color: C.accent, fontVariantNumeric: 'tabular-nums' }}>{servings}</div>
+            <button onClick={addOne} title="Another serving" style={{ width: 25, height: 28, background: 'transparent', border: 0, borderLeft: `1px solid ${C.accent}33`, color: C.accent, fontFamily: 'JetBrains Mono, monospace', fontSize: 15, lineHeight: 1, cursor: 'pointer' }}>+</button>
+          </div>
         </div>
       </div>
       {popup === 'info' && food.info && (
@@ -289,6 +332,7 @@ function FoodRow({ food, onChanged }) {
 function MealEditSheet({ food, onClose, onChanged }) {
   const [name, setName] = React.useState(food.name || '');
   const [vals, setVals] = React.useState({ kcal: food.kcal || 0, p: food.p || 0, c: food.c || 0, f: food.f || 0 });
+  const [servings, setServ] = React.useState(() => (window.servingsOf ? window.servingsOf(food) : 1));
   const [confirmDel, setConfirmDel] = React.useState(false);
   const setV = (k, v) => setVals((s) => ({ ...s, [k]: v }));
 
@@ -299,20 +343,22 @@ function MealEditSheet({ food, onClose, onChanged }) {
       p: Math.max(0, Math.round(+vals.p || 0)),
       c: Math.max(0, Math.round(+vals.c || 0)),
       f: Math.max(0, Math.round(+vals.f || 0)),
+      servings,
     });
     onChanged && onChanged();
     onClose();
   };
   const del = () => {
+    // Deleting a drink-meal un-counts its nips (× servings) from the tally.
     if (food.nips > 0 && window.setNipsToday && window.loadNipsToday) {
-      window.setNipsToday(Math.max(0, +(window.loadNipsToday() - food.nips).toFixed(2)));
+      window.setNipsToday(Math.max(0, +(window.loadNipsToday() - food.nips * (window.servingsOf ? window.servingsOf(food) : 1)).toFixed(2)));
     }
     window.removeFood(food.id);
     onChanged && onChanged();
     onClose();
   };
 
-  const FIELDS = [{ k: 'kcal', label: 'KCAL' }, { k: 'p', label: 'PROTEIN g' }, { k: 'c', label: 'CARBS g' }, { k: 'f', label: 'FAT g' }];
+  const FIELDS = [{ k: 'kcal', label: 'KCAL / SERVING' }, { k: 'p', label: 'PROTEIN g' }, { k: 'c', label: 'CARBS g' }, { k: 'f', label: 'FAT g' }];
   return (
     <div onClick={onClose} style={{ position: 'absolute', inset: 0, zIndex: 230, background: 'rgba(0,0,0,.72)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'flex-end' }}>
       <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', background: C.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: '20px 22px 24px' }}>
@@ -339,6 +385,19 @@ function MealEditSheet({ food, onClose, onChanged }) {
               />
             </div>
           ))}
+        </div>
+
+        {/* Servings — macros above are per serving; total updates live */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 8, padding: '10px 12px', background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 10 }}>
+          <div>
+            <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 8.5, color: C.textLow, letterSpacing: 1.4 }}>SERVINGS</div>
+            <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.textMid, marginTop: 3 }}>{Math.round((+vals.kcal || 0) * servings)} kcal total</div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <button onClick={() => setServ((n) => Math.max(1, n - 1))} style={{ width: 34, height: 34, borderRadius: 17, background: 'transparent', border: `1px solid ${C.lineStrong}`, color: C.text, fontFamily: 'JetBrains Mono, monospace', fontSize: 16, lineHeight: 1, cursor: 'pointer' }}>−</button>
+            <div style={{ minWidth: 22, textAlign: 'center', fontFamily: 'JetBrains Mono, monospace', fontSize: 20, fontWeight: 600, color: C.accent }}>{servings}</div>
+            <button onClick={() => setServ((n) => n + 1)} style={{ width: 34, height: 34, borderRadius: 17, background: C.accent + '1f', border: `1px solid ${C.accent}66`, color: C.accent, fontFamily: 'JetBrains Mono, monospace', fontSize: 17, lineHeight: 1, cursor: 'pointer' }}>+</button>
+          </div>
         </div>
 
         <button
@@ -414,9 +473,9 @@ function MealQuestionsFlow({ onClose, onChanged }) {
     setStatus('loading');
     setDelta(null);
 
-    // Record the answer on the food entry's question
+    // Record the answer on the food entry's question (on the active log day)
     const all = window.loadFood();
-    const k = window.todayKey();
+    const k = window.logDate ? window.logDate() : window.todayKey();
     const list = all[k] || [];
     const food = list.find((e) => e.id === item.foodId);
     if (food && food.questions[item.qIndex]) {

@@ -4,7 +4,7 @@ import { C, Stepper } from './compound-ui.jsx';
 // three-rings.jsx — Home hero: three north-star progress rings.
 // Weekly Nips (red over limit) · Workouts /target (green at target, red when unmakeable) · Life Score.
 
-function ProgressRing({ size = 100, stroke = 8, fraction, color, track = 'rgba(255,255,255,.08)', glow }) {
+function ProgressRing({ size = 100, stroke = 8, fraction, color, track = C.ink(.08), glow }) {
   const r = (size - stroke) / 2;
   const circ = 2 * Math.PI * r;
   const f = Math.max(0, Math.min(1, fraction));
@@ -210,7 +210,7 @@ function NipLimitSheet({ value, weekly, onSave, onClose }) {
         style={{ width: '100%', background: C.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: '20px 22px 24px' }}
       >
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
-          <div style={{ width: 36, height: 3, borderRadius: 2, background: 'rgba(255,255,255,.18)' }} />
+          <div style={{ width: 36, height: 3, borderRadius: 2, background: C.ink(.18) }} />
         </div>
         <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.accent, letterSpacing: 2.4, marginBottom: 8 }}>
           WEEKLY NIP LIMIT
@@ -227,7 +227,7 @@ function NipLimitSheet({ value, weekly, onSave, onClose }) {
         <button
           onClick={() => onSave(v)}
           style={{
-            width: '100%', height: 52, background: C.accent, border: 0, borderRadius: 12, color: '#0A0A0C',
+            width: '100%', height: 52, background: C.accent, border: 0, borderRadius: 12, color: C.onAccent,
             fontFamily: 'Barlow Condensed, sans-serif', fontSize: 16, fontWeight: 700, letterSpacing: 1.6,
             textTransform: 'uppercase', cursor: 'pointer',
           }}

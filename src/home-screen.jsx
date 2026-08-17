@@ -251,7 +251,7 @@ function QuickLink({ label, sub, onClick, accent }) {
         borderRadius: 12,
         padding: '14px 14px',
         cursor: 'pointer',
-        color: accent ? '#0A0A0C' : C.text,
+        color: accent ? C.onAccent : C.text,
         display: 'flex', flexDirection: 'column', gap: 4,
         position: 'relative',
       }}
@@ -322,7 +322,7 @@ function PlaceholderTab({ title, sub, accent = '#F2A30F' }) {
 }
 
 // ── Plateau nudge ───────────────────────────────────────────────────────
-const PLAT_BTN_PRIMARY = { background: C.accent, border: 0, color: '#0A0A0C', padding: '8px 14px', borderRadius: 8, fontFamily: 'JetBrains Mono, monospace', fontSize: 10, fontWeight: 600, letterSpacing: 1.2, cursor: 'pointer' };
+const PLAT_BTN_PRIMARY = { background: C.accent, border: 0, color: C.onAccent, padding: '8px 14px', borderRadius: 8, fontFamily: 'JetBrains Mono, monospace', fontSize: 10, fontWeight: 600, letterSpacing: 1.2, cursor: 'pointer' };
 const PLAT_BTN_SECONDARY = { background: C.surf2, border: `1px solid ${C.accentDim}`, color: C.accent, padding: '8px 14px', borderRadius: 8, fontFamily: 'JetBrains Mono, monospace', fontSize: 10, fontWeight: 600, letterSpacing: 1.2, cursor: 'pointer' };
 const PLAT_BTN_GHOST = { background: 'transparent', border: `1px solid ${C.line}`, color: C.textMid, padding: '8px 12px', borderRadius: 8, fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 1.2, cursor: 'pointer' };
 

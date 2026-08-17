@@ -317,7 +317,7 @@ function SavedWorkoutRow({ routine, onStart, onDelete }) {
       <button onClick={onDelete} style={{ background: 'transparent', border: 0, color: C.textLow, cursor: 'pointer', padding: 6, flexShrink: 0 }}>
         <svg width="15" height="15" viewBox="0 0 15 15"><path d="M3 4 H12 M6 4 V2.5 H9 V4 M4.5 4 L5 12.5 H10 L10.5 4" stroke="currentColor" strokeWidth="1.2" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>
       </button>
-      <button onClick={onStart} style={{ background: C.accent, border: 0, color: '#0A0A0C', padding: '9px 14px', borderRadius: 9, fontFamily: 'JetBrains Mono, monospace', fontSize: 11, fontWeight: 600, letterSpacing: 1.2, cursor: 'pointer', flexShrink: 0 }}>START</button>
+      <button onClick={onStart} style={{ background: C.accent, border: 0, color: C.onAccent, padding: '9px 14px', borderRadius: 9, fontFamily: 'JetBrains Mono, monospace', fontSize: 11, fontWeight: 600, letterSpacing: 1.2, cursor: 'pointer', flexShrink: 0 }}>START</button>
     </div>
   );
 }
@@ -401,7 +401,7 @@ function SaveAsRoutineCard({ session, config, onSaved }) {
         <button
           onClick={handleSave}
           style={{
-            background: C.accent, border: 0, color: '#0A0A0C',
+            background: C.accent, border: 0, color: C.onAccent,
             padding: '10px 14px', borderRadius: 8,
             fontFamily: 'JetBrains Mono, monospace', fontSize: 11, fontWeight: 600,
             letterSpacing: 1.5, cursor: 'pointer',

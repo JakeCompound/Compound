@@ -26,7 +26,7 @@ function NutritionTab({ user, dietTracking, onToggleTracking, onChanged, onSetup
               <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 15, letterSpacing: 0.8, color: C.text, textTransform: 'uppercase' }}>Turn on food tracking</div>
               <div style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: C.textMid, marginTop: 2 }}>Log meals by photo or text, AI does the macros.</div>
             </div>
-            <button onClick={onSetupTargets} style={{ background: C.accent, border: 0, color: '#0A0A0C', padding: '9px 14px', borderRadius: 9, fontFamily: 'JetBrains Mono, monospace', fontSize: 10, fontWeight: 600, letterSpacing: 1.4, cursor: 'pointer' }}>SET UP</button>
+            <button onClick={onSetupTargets} style={{ background: C.accent, border: 0, color: C.onAccent, padding: '9px 14px', borderRadius: 9, fontFamily: 'JetBrains Mono, monospace', fontSize: 10, fontWeight: 600, letterSpacing: 1.4, cursor: 'pointer' }}>SET UP</button>
           </div>
         </div>
         <div style={{ flex: 1, minHeight: 0 }}><NutritionChat user={user} /></div>
@@ -59,7 +59,7 @@ function NutHeader({ view, onView, showToggle }) {
         {showToggle && (
           <div style={{ display: 'flex', gap: 4, padding: 3, background: C.surf1, borderRadius: 9, border: `1px solid ${C.line}` }}>
             {[{ k: 'today', l: 'TODAY' }, { k: 'week', l: 'WEEK' }, { k: 'ask', l: 'ASK' }].map((t) => (
-              <button key={t.k} onClick={() => onView(t.k)} style={{ padding: '6px 11px', borderRadius: 7, border: 0, cursor: 'pointer', background: view === t.k ? C.accent : 'transparent', color: view === t.k ? '#0A0A0C' : C.textMid, fontFamily: 'JetBrains Mono, monospace', fontSize: 10, fontWeight: 600, letterSpacing: 1.2 }}>{t.l}</button>
+              <button key={t.k} onClick={() => onView(t.k)} style={{ padding: '6px 11px', borderRadius: 7, border: 0, cursor: 'pointer', background: view === t.k ? C.accent : 'transparent', color: view === t.k ? C.onAccent : C.textMid, fontFamily: 'JetBrains Mono, monospace', fontSize: 10, fontWeight: 600, letterSpacing: 1.2 }}>{t.l}</button>
             ))}
           </div>
         )}
@@ -190,7 +190,7 @@ function NutritionToday({ user, onChanged, onSetupTargets }) {
       {sheet === 'menu' && (
         <div onClick={() => setSheet(null)} style={{ position: 'absolute', inset: 0, zIndex: 210, background: 'rgba(0,0,0,.6)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'flex-end' }}>
           <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', background: C.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: '20px 22px 24px' }}>
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 3, borderRadius: 2, background: 'rgba(255,255,255,.18)' }} /></div>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 3, borderRadius: 2, background: C.ink(.18) }} /></div>
             <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.accent, letterSpacing: 2.4, marginBottom: 12 }}>ADD TO {window.prettyDay(day)}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <AddRow label="Meal" sub="Photo or describe — AI does the macros" glyph="🍽️" onClick={() => setSheet('food')} />
@@ -218,7 +218,7 @@ function CalRing({ consumed, target }) {
   return (
     <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
       <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,.08)" strokeWidth={stroke} />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={C.ink(.08)} strokeWidth={stroke} />
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="round" strokeDasharray={`${circ * frac} ${circ}`} />
       </svg>
       <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
@@ -362,7 +362,7 @@ function MealEditSheet({ food, onClose, onChanged }) {
   return (
     <div onClick={onClose} style={{ position: 'absolute', inset: 0, zIndex: 230, background: 'rgba(0,0,0,.72)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'flex-end' }}>
       <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', background: C.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: '20px 22px 24px' }}>
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 3, borderRadius: 2, background: 'rgba(255,255,255,.18)' }} /></div>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 3, borderRadius: 2, background: C.ink(.18) }} /></div>
         <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.accent, letterSpacing: 2.4, marginBottom: 10 }}>EDIT MEAL</div>
 
         <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: C.textLow, letterSpacing: 1.6, marginBottom: 6 }}>NAME</div>
@@ -402,7 +402,7 @@ function MealEditSheet({ food, onClose, onChanged }) {
 
         <button
           onClick={save}
-          style={{ width: '100%', height: 50, marginTop: 14, background: C.accent, border: 0, borderRadius: 12, color: '#0A0A0C', fontFamily: 'Barlow Condensed, sans-serif', fontSize: 15, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', cursor: 'pointer' }}
+          style={{ width: '100%', height: 50, marginTop: 14, background: C.accent, border: 0, borderRadius: 12, color: C.onAccent, fontFamily: 'Barlow Condensed, sans-serif', fontSize: 15, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', cursor: 'pointer' }}
         >
           Save changes
         </button>
@@ -574,7 +574,7 @@ function MealQuestionsFlow({ onClose, onChanged }) {
                   Couldn't refresh the estimate just now — your answer is saved. Try again?
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <button onClick={() => answer(chosen)} style={{ flex: 1, padding: '11px 0', background: C.accent, border: 0, borderRadius: 10, color: '#0A0A0C', fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 14, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer' }}>
+                  <button onClick={() => answer(chosen)} style={{ flex: 1, padding: '11px 0', background: C.accent, border: 0, borderRadius: 10, color: C.onAccent, fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 14, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer' }}>
                     Try again
                   </button>
                   <button onClick={skipCurrent} style={{ flex: 1, padding: '11px 0', background: 'transparent', border: `1px solid ${C.line}`, borderRadius: 10, color: C.textMid, fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 14, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer' }}>
@@ -588,7 +588,7 @@ function MealQuestionsFlow({ onClose, onChanged }) {
                   <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: C.textLow, letterSpacing: 1.6, marginBottom: 6 }}>OR WRITE YOUR OWN</div>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <input value={custom} onChange={(e) => setCustom(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && custom.trim()) answer(custom.trim()); }} placeholder="Type an answer…" style={{ flex: 1, background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 10, color: C.text, fontFamily: 'Outfit, sans-serif', fontSize: 14, padding: '12px 14px', outline: 'none' }} />
-                    <button onClick={() => custom.trim() && answer(custom.trim())} disabled={!custom.trim()} style={{ width: 46, background: custom.trim() ? C.accent : C.surf2, color: custom.trim() ? '#0A0A0C' : C.textLow, border: 0, borderRadius: 10, fontSize: 20, cursor: custom.trim() ? 'pointer' : 'default' }}>→</button>
+                    <button onClick={() => custom.trim() && answer(custom.trim())} disabled={!custom.trim()} style={{ width: 46, background: custom.trim() ? C.accent : C.surf2, color: custom.trim() ? C.onAccent : C.textLow, border: 0, borderRadius: 10, fontSize: 20, cursor: custom.trim() ? 'pointer' : 'default' }}>→</button>
                   </div>
                 </div>
                 <button onClick={() => answer('Not sure')} style={{ width: '100%', marginTop: 12, background: 'transparent', border: 0, color: C.textLow, fontFamily: 'JetBrains Mono, monospace', fontSize: 11, letterSpacing: 1.5, cursor: 'pointer', padding: 8 }}>

@@ -57,7 +57,7 @@ function LifeScoreArc({ value, label = 'LIFE SCORE', size = 220 }) {
           cy={size / 2}
           r={r}
           fill="none"
-          stroke="rgba(255,255,255,.06)"
+          stroke={C.ink(.06)}
           strokeWidth="6"
           strokeDasharray={`${fullDash} ${circ}`}
           strokeDashoffset={trackOffset}
@@ -88,7 +88,7 @@ function LifeScoreArc({ value, label = 'LIFE SCORE', size = 220 }) {
             <line
               key={i}
               x1={ix} y1={iy} x2={cx} y2={cy}
-              stroke={value/100 >= frac ? '#F2A30F' : 'rgba(255,255,255,.18)'}
+              stroke={value/100 >= frac ? '#F2A30F' : C.ink(.18)}
               strokeWidth="1"
               strokeLinecap="round"
             />
@@ -231,14 +231,14 @@ function LifeBalanceRadar({ values, size = 240 }) {
             key={ring}
             points={axes.map((a, i) => point(i, ring).join(',')).join(' ')}
             fill="none"
-            stroke="rgba(255,255,255,.07)"
+            stroke={C.ink(.07)}
             strokeWidth="1"
           />
         ))}
         {/* spokes */}
         {axes.map((a, i) => {
           const [x, y] = point(i, 1);
-          return <line key={a} x1={cx} y1={cy} x2={x} y2={y} stroke="rgba(255,255,255,.07)" strokeWidth="1" />;
+          return <line key={a} x1={cx} y1={cy} x2={x} y2={y} stroke={C.ink(.07)} strokeWidth="1" />;
         })}
         {/* filled polygon */}
         <polygon points={animatedPoly} fill="rgba(242,163,15,.18)" stroke="#F2A30F" strokeWidth="1.5" strokeLinejoin="round" />
@@ -328,7 +328,7 @@ function WeekStrip({ days }) {
 }
 
 function DayDot({ kind, on, future }) {
-  const color = on ? C.accent : (future ? 'rgba(255,255,255,.10)' : 'rgba(255,255,255,.15)');
+  const color = on ? C.accent : (future ? C.ink(.10) : C.ink(.15));
   // tiny glyphs
   const size = 12;
   if (kind === 'checkin') return <svg width={size} height={size} viewBox="0 0 12 12"><circle cx="6" cy="6" r="3" fill={color} /></svg>;
@@ -384,7 +384,7 @@ function CheckinCard({ time, done, onOpen }) {
         style={{
           width: 46, height: 46, borderRadius: 12,
           background: done ? C.surf3 : C.accent,
-          color: done ? C.text : '#0A0A0C',
+          color: done ? C.text : C.onAccent,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           flexShrink: 0,
         }}

@@ -77,7 +77,7 @@ function ReportsScreen({ user = {} }) {
               flex: 1, padding: '8px 0',
               background: tf === t.key ? C.accent : 'transparent',
               border: 0, borderRadius: 8,
-              color: tf === t.key ? '#0A0A0C' : C.textMid,
+              color: tf === t.key ? C.onAccent : C.textMid,
               fontFamily: 'JetBrains Mono, monospace', fontSize: 11, fontWeight: 600,
               letterSpacing: 1.5, cursor: 'pointer',
               transition: 'background .15s',
@@ -293,7 +293,7 @@ function HabitGrid({ points }) {
           key={i}
           style={{
             aspectRatio: '1',
-            background: p.value ? C.accent : 'rgba(255,255,255,.06)',
+            background: p.value ? C.accent : C.ink(.06),
             borderRadius: 3,
             opacity: p.value ? 1 : 0.6,
           }}
@@ -396,7 +396,7 @@ function WeightChart({ data }) {
         </defs>
         {/* Subtle gridlines */}
         {[0.25, 0.5, 0.75].map((g) => (
-          <line key={g} x1="0" y1={h * g} x2={w} y2={h * g} stroke="rgba(255,255,255,.05)" strokeDasharray="2 4" />
+          <line key={g} x1="0" y1={h * g} x2={w} y2={h * g} stroke={C.ink(.05)} strokeDasharray="2 4" />
         ))}
         <path d={areaPath} fill="url(#weightArea)" />
         <path d={path} fill="none" stroke="#F2A30F" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
@@ -451,7 +451,7 @@ function MonthlyCard({ card }) {
         <div
           style={{
             width: 60, height: 60, borderRadius: 14,
-            background: C.accent, color: '#0A0A0C',
+            background: C.accent, color: C.onAccent,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontFamily: 'Barlow Condensed, sans-serif', fontSize: 36, fontWeight: 700,
             boxShadow: '0 8px 24px rgba(242,163,15,.3)',

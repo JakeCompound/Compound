@@ -12,6 +12,24 @@
   <meta name="apple-mobile-web-app-title" content="COMPOUND" />
   <meta name="theme-color" content="#070709" />
 
+  <!-- Theme boot: paint the right background before React loads (default is the
+       light "stone" theme; "dark" is a Settings option stored in compound:theme). -->
+  <script>
+    (function () {
+      var dark = false;
+      try { dark = localStorage.getItem('compound:theme') === 'dark'; } catch (e) {}
+      var s = document.documentElement.style;
+      if (!dark) {
+        s.setProperty('--boot-bg', '#E8E6E1');
+        s.setProperty('--boot-fg', '#1C1B17');
+        s.setProperty('--boot-scroll', 'rgba(28,27,23,.18)');
+        s.setProperty('--boot-placeholder', 'rgba(28,27,23,.35)');
+        var m = document.querySelector('meta[name="theme-color"]');
+        if (m) m.setAttribute('content', '#E8E6E1');
+      }
+    })();
+  </script>
+
   <!-- Manifest + icons MUST live in <head>: Chrome's manifest discovery is
        head-only, and an undiscovered manifest silently downgrades "Install app"
        to a Chrome-hosted shortcut instead of a real WebAPK. -->
@@ -25,13 +43,13 @@
 
   <style>
     *, *::before, *::after { box-sizing: border-box; }
-    html, body { margin: 0; padding: 0; background: #050507; color: #F2F1EC; font-family: 'Outfit', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+    html, body { margin: 0; padding: 0; background: var(--boot-bg, #050507); color: var(--boot-fg, #F2F1EC); font-family: 'Outfit', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
     #root { min-height: 100vh; }
 
     /* hide scrollbar on inner content while keeping scroll */
     ::-webkit-scrollbar { width: 4px; height: 4px; }
     ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.08); border-radius: 2px; }
+    ::-webkit-scrollbar-thumb { background: var(--boot-scroll, rgba(255,255,255,.08)); border-radius: 2px; }
 
     /* avoid blue tap highlight on Android */
     button { -webkit-tap-highlight-color: transparent; }
@@ -47,7 +65,7 @@
     }
 
     /* placeholder color */
-    input::placeholder { color: rgba(242,241,236,.28); }
+    input::placeholder { color: var(--boot-placeholder, rgba(242,241,236,.28)); }
   </style>
 </head>
 <body>

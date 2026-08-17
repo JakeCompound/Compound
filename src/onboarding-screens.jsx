@@ -90,7 +90,7 @@ function ScreenWelcome({ onNext }) {
             cy={arcSize / 2}
             r={r}
             fill="none"
-            stroke="rgba(255,255,255,.06)"
+            stroke={C.ink(.06)}
             strokeWidth="2"
             strokeDasharray={`${dash} ${circ}`}
             strokeLinecap="round"
@@ -463,7 +463,7 @@ function ScreenTrainingDays({ data, set, ctx, onNext, onBack }) {
               style={{
                 aspectRatio: '1 / 1.4',
                 background: active ? C.accent : C.surf1,
-                color: active ? '#0A0A0C' : C.text,
+                color: active ? C.onAccent : C.text,
                 border: active ? `1px solid ${C.accent}` : `1px solid ${C.line}`,
                 borderRadius: 10,
                 fontFamily: 'Barlow Condensed, sans-serif',
@@ -818,7 +818,7 @@ function ScreenGratitudeBuilder({ data, set, ctx, onNext, onBack }) {
                   title={c.label}
                   style={{
                     flex: 1, height: 6, borderRadius: 3, border: 0, padding: 0, cursor: 'pointer',
-                    background: has ? C.accent : 'rgba(255,255,255,.10)',
+                    background: has ? C.accent : C.ink(.10),
                     transition: 'background .2s',
                   }}
                 />
@@ -871,7 +871,7 @@ function ScreenGratitudeBuilder({ data, set, ctx, onNext, onBack }) {
                   style={{
                     fontFamily: 'JetBrains Mono, monospace',
                     fontSize: 10,
-                    color: active ? '#0A0A0C' : C.textLow,
+                    color: active ? C.onAccent : C.textLow,
                     background: active ? C.accent : 'transparent',
                     borderRadius: 4,
                     padding: '1px 5px',
@@ -916,7 +916,7 @@ function ScreenGratitudeBuilder({ data, set, ctx, onNext, onBack }) {
           style={{
             width: 46,
             background: input.trim() ? C.accent : C.surf2,
-            color: input.trim() ? '#0A0A0C' : C.textLow,
+            color: input.trim() ? C.onAccent : C.textLow,
             border: 0,
             borderRadius: 10,
             fontSize: 22,

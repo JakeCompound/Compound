@@ -158,7 +158,7 @@ function ComebackCard({ daysMissed, onStart }) {
       <div
         style={{
           width: 48, height: 48, borderRadius: 12,
-          background: C.accent, color: '#0A0A0C',
+          background: C.accent, color: C.onAccent,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           flexShrink: 0, position: 'relative',
         }}
@@ -238,7 +238,7 @@ function BirthdayCard({ name, onClose }) {
             onClick={onClose}
             style={{
               flex: 1,
-              background: C.accent, border: 0, color: '#0A0A0C',
+              background: C.accent, border: 0, color: C.onAccent,
               padding: '12px 0', borderRadius: 10,
               fontFamily: 'Barlow Condensed, sans-serif', fontSize: 14, fontWeight: 700,
               letterSpacing: 1.4, textTransform: 'uppercase', cursor: 'pointer',
@@ -334,7 +334,7 @@ function WeighInModal({ start, goal, onSave, onClose }) {
         style={{ width: '100%', background: C.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: '20px 22px 24px' }}
       >
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
-          <div style={{ width: 36, height: 3, borderRadius: 2, background: 'rgba(255,255,255,.18)' }} />
+          <div style={{ width: 36, height: 3, borderRadius: 2, background: C.ink(.18) }} />
         </div>
         <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.accent, letterSpacing: 2.4, marginBottom: 8 }}>
           FRIDAY WEIGH-IN
@@ -353,7 +353,7 @@ function WeighInModal({ start, goal, onSave, onClose }) {
         <button
           onClick={() => onSave(+(+val).toFixed(1))}
           style={{
-            width: '100%', height: 52, background: C.accent, border: 0, borderRadius: 12, color: '#0A0A0C',
+            width: '100%', height: 52, background: C.accent, border: 0, borderRadius: 12, color: C.onAccent,
             fontFamily: 'Barlow Condensed, sans-serif', fontSize: 16, fontWeight: 700, letterSpacing: 1.6,
             textTransform: 'uppercase', cursor: 'pointer',
           }}

@@ -149,7 +149,7 @@ function HeroCta({ onClick }) {
         cursor: 'pointer',
         position: 'relative',
         overflow: 'hidden',
-        color: '#0A0A0C',
+        color: C.onAccent,
         transform: pressed ? 'scale(0.985)' : 'scale(1)',
         transition: 'transform .1s',
         boxShadow: '0 12px 36px rgba(242,163,15,.28)',
@@ -178,7 +178,7 @@ function HeroCta({ onClick }) {
         <div
           style={{
             width: 56, height: 56, borderRadius: '50%',
-            background: '#0A0A0C', color: C.accent,
+            background: C.onAccent, color: C.accent,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             flexShrink: 0, marginLeft: 8,
           }}
@@ -280,7 +280,7 @@ function BigCount({ value, target }) {
   return (
     <div style={{ position: 'relative', width: 60, height: 60, flexShrink: 0 }}>
       <svg width="60" height="60" style={{ transform: 'rotate(-90deg)' }}>
-        <circle cx="30" cy="30" r={r} fill="none" stroke="rgba(255,255,255,.08)" strokeWidth="3" />
+        <circle cx="30" cy="30" r={r} fill="none" stroke={C.ink(.08)} strokeWidth="3" />
         <circle cx="30" cy="30" r={r} fill="none" stroke={C.accent} strokeWidth="3" strokeDasharray={`${c * pct} ${c}`} strokeLinecap="round" />
       </svg>
       <div
@@ -623,7 +623,7 @@ function SwapExerciseSheet({ current, location, onPick, onClose }) {
   return (
     <div onClick={onClose} style={{ position: 'absolute', inset: 0, zIndex: 220, background: 'rgba(0,0,0,.72)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'flex-end' }}>
       <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxHeight: '80%', overflowY: 'auto', background: C.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: '20px 22px 24px' }}>
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 3, borderRadius: 2, background: 'rgba(255,255,255,.18)' }} /></div>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 3, borderRadius: 2, background: C.ink(.18) }} /></div>
         <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.accent, letterSpacing: 2.4, marginBottom: 8 }}>SWAP EXERCISE</div>
         <h3 style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 24, lineHeight: 1, letterSpacing: 0.5, color: C.text, margin: '0 0 4px', textTransform: 'uppercase' }}>
           REPLACE <span style={{ color: C.accent }}>{current.name}</span>
@@ -746,7 +746,7 @@ function MovementToday({ user, onChanged }) {
           <button onClick={() => setSheet('steps')} style={{ flex: 1, padding: '11px 0', background: C.surf2, border: `1px solid ${C.line}`, borderRadius: 10, color: C.text, fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 14, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer' }}>
             + Log steps
           </button>
-          <button onClick={() => setSheet('cardio')} style={{ flex: 1, padding: '11px 0', background: C.accent, border: 0, borderRadius: 10, color: '#0A0A0C', fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 14, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer' }}>
+          <button onClick={() => setSheet('cardio')} style={{ flex: 1, padding: '11px 0', background: C.accent, border: 0, borderRadius: 10, color: C.onAccent, fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 14, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer' }}>
             + Walk / Run
           </button>
         </div>
@@ -770,7 +770,7 @@ function StepLogSheet({ onClose, onChanged }) {
   return (
     <div onClick={onClose} style={{ position: 'absolute', inset: 0, zIndex: 220, background: 'rgba(0,0,0,.72)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'flex-end' }}>
       <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', background: C.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: '20px 22px 24px' }}>
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 3, borderRadius: 2, background: 'rgba(255,255,255,.18)' }} /></div>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 3, borderRadius: 2, background: C.ink(.18) }} /></div>
         <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.accent, letterSpacing: 2.4, marginBottom: 10 }}>LOG STEPS</div>
         <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: C.textMid, lineHeight: 1.5, margin: '0 0 12px' }}>
           Add what your watch shows since your last log — every entry stacks into today's total.
@@ -789,7 +789,7 @@ function StepLogSheet({ onClose, onChanged }) {
             onKeyDown={(e) => { if (e.key === 'Enter') add(val); }}
             style={{ flex: 1, background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 10, color: C.text, fontFamily: 'JetBrains Mono, monospace', fontSize: 15, padding: '12px 14px', outline: 'none' }}
           />
-          <button onClick={() => add(val)} disabled={!(+val > 0)} style={{ width: 56, background: +val > 0 ? C.accent : C.surf2, color: +val > 0 ? '#0A0A0C' : C.textLow, border: 0, borderRadius: 10, fontSize: 18, cursor: +val > 0 ? 'pointer' : 'default' }}>→</button>
+          <button onClick={() => add(val)} disabled={!(+val > 0)} style={{ width: 56, background: +val > 0 ? C.accent : C.surf2, color: +val > 0 ? C.onAccent : C.textLow, border: 0, borderRadius: 10, fontSize: 18, cursor: +val > 0 ? 'pointer' : 'default' }}>→</button>
         </div>
       </div>
     </div>
@@ -829,7 +829,7 @@ function CardioSheet({ user, onClose, onChanged }) {
   return (
     <div onClick={onClose} style={{ position: 'absolute', inset: 0, zIndex: 220, background: 'rgba(0,0,0,.72)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'flex-end' }}>
       <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxHeight: '92%', overflowY: 'auto', background: C.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: '20px 22px 24px' }}>
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 3, borderRadius: 2, background: 'rgba(255,255,255,.18)' }} /></div>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 3, borderRadius: 2, background: C.ink(.18) }} /></div>
         <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.accent, letterSpacing: 2.4, marginBottom: 10 }}>ADD A WALK / RUN</div>
 
         <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
@@ -893,7 +893,7 @@ function CardioSheet({ user, onClose, onChanged }) {
           <button
             onClick={save}
             disabled={path === 'watch' ? !canSaveWatch : !canSaveEst}
-            style={{ width: '100%', height: 50, marginTop: 14, background: (path === 'watch' ? canSaveWatch : canSaveEst) ? C.accent : C.surf2, border: 0, borderRadius: 12, color: (path === 'watch' ? canSaveWatch : canSaveEst) ? '#0A0A0C' : C.textLow, fontFamily: 'Barlow Condensed, sans-serif', fontSize: 15, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', cursor: 'pointer' }}
+            style={{ width: '100%', height: 50, marginTop: 14, background: (path === 'watch' ? canSaveWatch : canSaveEst) ? C.accent : C.surf2, border: 0, borderRadius: 12, color: (path === 'watch' ? canSaveWatch : canSaveEst) ? C.onAccent : C.textLow, fontFamily: 'Barlow Condensed, sans-serif', fontSize: 15, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', cursor: 'pointer' }}
           >
             Log {kind}
           </button>

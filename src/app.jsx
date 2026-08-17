@@ -521,7 +521,7 @@ function App() {
             </p>
             <button
               onClick={() => { setRecalcPrompt(false); setShowCalc(true); }}
-              style={{ width: '100%', height: 50, background: C.accent, border: 0, borderRadius: 12, color: '#0A0A0C', fontFamily: 'Barlow Condensed, sans-serif', fontSize: 15, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', cursor: 'pointer' }}
+              style={{ width: '100%', height: 50, background: C.accent, border: 0, borderRadius: 12, color: C.onAccent, fontFamily: 'Barlow Condensed, sans-serif', fontSize: 15, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', cursor: 'pointer' }}
             >
               Update my targets
             </button>
@@ -657,7 +657,7 @@ function SideMeta({ data, step, view, tab }) {
         top: '50%',
         transform: 'translateY(-50%)',
         fontFamily: 'JetBrains Mono, monospace',
-        color: 'rgba(242,241,236,.42)',
+        color: C.textLow,
         fontSize: 10,
         letterSpacing: 2,
         lineHeight: 1.8,

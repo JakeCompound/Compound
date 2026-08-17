@@ -266,7 +266,7 @@ function VolumeChart({ sessions }) {
 // ── Body heatmap ─────────────────────────────────────────────────────────
 function BodyHeatmap({ recovery }) {
   // Simple stylised front-body silhouette with regions
-  const region = (key, defaultColor = 'rgba(255,255,255,.12)') => {
+  const region = (key, defaultColor = C.ink(.12)) => {
     const status = recovery[key];
     return status ? statusColor(status) : defaultColor;
   };
@@ -274,9 +274,9 @@ function BodyHeatmap({ recovery }) {
     <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
       <svg width="120" height="180" viewBox="0 0 120 180" style={{ flexShrink: 0 }}>
         {/* head */}
-        <circle cx="60" cy="18" r="14" fill="rgba(255,255,255,.07)" stroke="rgba(255,255,255,.12)" />
+        <circle cx="60" cy="18" r="14" fill={C.ink(.07)} stroke={C.ink(.12)} />
         {/* neck */}
-        <rect x="55" y="30" width="10" height="8" fill="rgba(255,255,255,.07)" />
+        <rect x="55" y="30" width="10" height="8" fill={C.ink(.07)} />
         {/* chest */}
         <rect x="36" y="40" width="48" height="22" rx="6" fill={region('Chest')} stroke="rgba(0,0,0,.4)" />
         {/* shoulders */}
@@ -291,7 +291,7 @@ function BodyHeatmap({ recovery }) {
         {/* core */}
         <rect x="42" y="64" width="36" height="28" rx="4" fill={region('Core')} stroke="rgba(0,0,0,.4)" />
         {/* hips */}
-        <rect x="40" y="94" width="40" height="14" rx="4" fill="rgba(255,255,255,.07)" stroke="rgba(255,255,255,.12)" />
+        <rect x="40" y="94" width="40" height="14" rx="4" fill={C.ink(.07)} stroke={C.ink(.12)} />
         {/* legs */}
         <rect x="42" y="110" width="14" height="58" rx="4" fill={region('Legs')} stroke="rgba(0,0,0,.4)" />
         <rect x="64" y="110" width="14" height="58" rx="4" fill={region('Legs')} stroke="rgba(0,0,0,.4)" />

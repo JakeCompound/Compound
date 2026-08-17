@@ -128,7 +128,7 @@ Respond ONLY with valid JSON, no other text. Use null for unknown values. Exampl
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
-          <div style={{ width: 36, height: 3, borderRadius: 2, background: 'rgba(255,255,255,.18)' }} />
+          <div style={{ width: 36, height: 3, borderRadius: 2, background: C.ink(.18) }} />
         </div>
 
         <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.accent, letterSpacing: 2.4, marginBottom: 8 }}>
@@ -240,7 +240,7 @@ Respond ONLY with valid JSON, no other text. Use null for unknown values. Exampl
                 flex: 2, height: 48,
                 background: !text.trim() || pending ? C.surf3 : C.accent,
                 border: 0, borderRadius: 12,
-                color: !text.trim() || pending ? C.textLow : '#0A0A0C',
+                color: !text.trim() || pending ? C.textLow : C.onAccent,
                 fontFamily: 'Barlow Condensed, sans-serif', fontSize: 14, fontWeight: 700,
                 letterSpacing: 1.4, textTransform: 'uppercase',
                 cursor: !text.trim() || pending ? 'default' : 'pointer',
@@ -254,7 +254,7 @@ Respond ONLY with valid JSON, no other text. Use null for unknown values. Exampl
               onClick={commit}
               style={{
                 flex: 2, height: 48,
-                background: C.accent, border: 0, borderRadius: 12, color: '#0A0A0C',
+                background: C.accent, border: 0, borderRadius: 12, color: C.onAccent,
                 fontFamily: 'Barlow Condensed, sans-serif', fontSize: 14, fontWeight: 700,
                 letterSpacing: 1.4, textTransform: 'uppercase', cursor: 'pointer',
               }}
@@ -294,7 +294,7 @@ function PulseDots() {
           key={i}
           style={{
             width: 6, height: 6, borderRadius: 3,
-            background: i <= n ? '#0A0A0C' : 'rgba(0,0,0,.3)',
+            background: i <= n ? C.onAccent : 'rgba(0,0,0,.3)',
             transition: 'background .15s',
           }}
         />

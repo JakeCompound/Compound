@@ -471,7 +471,7 @@ function CheckinModal({ open, onClose, onComplete, gratitudeLibrary = [], user =
       >
         {/* Handle bar */}
         <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 4px', flexShrink: 0 }}>
-          <div style={{ width: 40, height: 4, borderRadius: 2, background: 'rgba(255,255,255,.18)' }} />
+          <div style={{ width: 40, height: 4, borderRadius: 2, background: C.ink(.18) }} />
         </div>
 
         {/* Progress + close */}
@@ -683,7 +683,7 @@ function WeekDayPicker({ value, onChange }) {
               style={{
                 aspectRatio: '1 / 1.3',
                 background: active ? C.accent : C.surf1,
-                color: active ? '#0A0A0C' : C.text,
+                color: active ? C.onAccent : C.text,
                 border: active ? `1px solid ${C.accent}` : `1px solid ${C.line}`,
                 borderRadius: 10,
                 fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 12,

@@ -357,7 +357,7 @@ function TodoRow({ todo, now, dateKey }) {
           style={{
             width: 40, height: 40, borderRadius: 10, flexShrink: 0,
             background: todo.done ? C.success : (overdue ? 'rgba(229,86,75,.14)' : C.surf3),
-            color: todo.done ? '#0A0A0C' : (overdue ? C.danger : C.accent),
+            color: todo.done ? C.onAccent : (overdue ? C.danger : C.accent),
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}
         >
@@ -400,7 +400,7 @@ function TodoRow({ todo, now, dateKey }) {
         <div style={{ display: 'flex', gap: 8, padding: '0 14px 14px' }}>
           <button
             onClick={todo.onDo}
-            style={{ flex: 1, padding: '10px 0', background: C.accent, border: 0, borderRadius: 10, color: '#0A0A0C', fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 14, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer' }}
+            style={{ flex: 1, padding: '10px 0', background: C.accent, border: 0, borderRadius: 10, color: C.onAccent, fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 14, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer' }}
           >
             Complete
           </button>
@@ -472,7 +472,7 @@ function AddWorkoutSheet({ futureDays, onSwap, onExtra, onClose }) {
         style={{ width: '100%', background: C.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: '20px 22px 24px' }}
       >
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
-          <div style={{ width: 36, height: 3, borderRadius: 2, background: 'rgba(255,255,255,.18)' }} />
+          <div style={{ width: 36, height: 3, borderRadius: 2, background: C.ink(.18) }} />
         </div>
         <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.accent, letterSpacing: 2.4, marginBottom: 8 }}>
           UNSCHEDULED WORKOUT
@@ -512,7 +512,7 @@ function AddWorkoutSheet({ futureDays, onSwap, onExtra, onClose }) {
           onClick={onExtra}
           style={{
             width: '100%', height: 50, marginTop: 4,
-            background: C.accent, border: 0, borderRadius: 12, color: '#0A0A0C',
+            background: C.accent, border: 0, borderRadius: 12, color: C.onAccent,
             fontFamily: 'Barlow Condensed, sans-serif', fontSize: 15, fontWeight: 700,
             letterSpacing: 1.4, textTransform: 'uppercase', cursor: 'pointer',
           }}
@@ -532,7 +532,7 @@ function PostponeSheet({ targets, fromDow, onConfirm, onClose }) {
   return (
     <div onClick={onClose} style={{ position: 'absolute', inset: 0, zIndex: 220, background: 'rgba(0,0,0,.72)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'flex-end' }}>
       <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', background: C.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: '20px 22px 24px' }}>
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 3, borderRadius: 2, background: 'rgba(255,255,255,.18)' }} /></div>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 3, borderRadius: 2, background: C.ink(.18) }} /></div>
         <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.accent, letterSpacing: 2.4, marginBottom: 8 }}>POSTPONE {DAY_LABELS[fromDow]}'S WORKOUT</div>
         <h3 style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 26, lineHeight: 1, letterSpacing: 0.5, color: C.text, margin: '0 0 10px', textTransform: 'uppercase' }}>
           MOVE IT TO<br /><span style={{ color: C.accent }}>ANOTHER DAY</span>
@@ -558,7 +558,7 @@ function PostponeSheet({ targets, fromDow, onConfirm, onClose }) {
                 <button key={r} onClick={() => setReason(r)} style={{ padding: '7px 12px', borderRadius: 999, background: reason === r ? C.accentDim : C.surf1, border: reason === r ? `1px solid ${C.accent}` : `1px solid ${C.line}`, color: reason === r ? C.accent : C.text, fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 600, fontSize: 13, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer' }}>{r}</button>
               ))}
             </div>
-            <button onClick={() => canConfirm && onConfirm(day, reason)} disabled={!canConfirm} style={{ width: '100%', height: 50, background: canConfirm ? C.accent : C.surf2, border: 0, borderRadius: 12, color: canConfirm ? '#0A0A0C' : C.textLow, fontFamily: 'Barlow Condensed, sans-serif', fontSize: 15, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', cursor: canConfirm ? 'pointer' : 'default' }}>
+            <button onClick={() => canConfirm && onConfirm(day, reason)} disabled={!canConfirm} style={{ width: '100%', height: 50, background: canConfirm ? C.accent : C.surf2, border: 0, borderRadius: 12, color: canConfirm ? C.onAccent : C.textLow, fontFamily: 'Barlow Condensed, sans-serif', fontSize: 15, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', cursor: canConfirm ? 'pointer' : 'default' }}>
               {day != null ? `Move to ${DAY_LABELS[day]}` : 'Pick a day'}
             </button>
           </>
@@ -573,7 +573,7 @@ function SwapDefaultSheet({ toDow, fromDow, onAccept, onDecline }) {
   return (
     <div onClick={onDecline} style={{ position: 'absolute', inset: 0, zIndex: 221, background: 'rgba(0,0,0,.72)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'flex-end' }}>
       <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', background: C.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: '20px 22px 24px' }}>
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 3, borderRadius: 2, background: 'rgba(255,255,255,.18)' }} /></div>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 3, borderRadius: 2, background: C.ink(.18) }} /></div>
         <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.accent, letterSpacing: 2.4, marginBottom: 8 }}>THIS KEEPS MOVING</div>
         <h3 style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 26, lineHeight: 1, letterSpacing: 0.5, color: C.text, margin: '0 0 10px', textTransform: 'uppercase' }}>
           MAKE {DAY_LABELS[toDow]} YOUR<br /><span style={{ color: C.accent }}>REGULAR DAY?</span>
@@ -581,7 +581,7 @@ function SwapDefaultSheet({ toDow, fromDow, onAccept, onDecline }) {
         <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 13, color: C.textMid, lineHeight: 1.5, margin: '0 0 16px' }}>
           You've moved {DAY_LABELS[fromDow]}'s session a few times. Want to make {DAY_LABELS[toDow]} your usual workout day instead — so it sticks?
         </p>
-        <button onClick={onAccept} style={{ width: '100%', height: 50, background: C.accent, border: 0, borderRadius: 12, color: '#0A0A0C', fontFamily: 'Barlow Condensed, sans-serif', fontSize: 15, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', cursor: 'pointer' }}>
+        <button onClick={onAccept} style={{ width: '100%', height: 50, background: C.accent, border: 0, borderRadius: 12, color: C.onAccent, fontFamily: 'Barlow Condensed, sans-serif', fontSize: 15, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', cursor: 'pointer' }}>
           Yes — make {DAY_LABELS[toDow]} my day
         </button>
         <button onClick={onDecline} style={{ width: '100%', height: 46, marginTop: 8, background: 'transparent', border: `1px solid ${C.line}`, borderRadius: 12, color: C.textMid, fontFamily: 'Barlow Condensed, sans-serif', fontSize: 14, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', cursor: 'pointer' }}>

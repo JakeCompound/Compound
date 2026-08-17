@@ -241,7 +241,7 @@ function LogMeasurementsModal({ onClose, onSave, entries, height }) {
         style={{ width: '100%', maxHeight: '92%', overflowY: 'auto', background: C.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: '20px 22px 22px' }}
       >
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
-          <div style={{ width: 36, height: 3, borderRadius: 2, background: 'rgba(255,255,255,.18)' }} />
+          <div style={{ width: 36, height: 3, borderRadius: 2, background: C.ink(.18) }} />
         </div>
 
         {phase === 'confirm' ? (
@@ -266,7 +266,7 @@ function LogMeasurementsModal({ onClose, onSave, entries, height }) {
                       {f.reason}{suggDisp != null ? ` — did you mean ${suggDisp}${unitLabel(f.key, unit)}?` : ''}
                     </div>
                     {suggDisp != null && (
-                      <button onClick={() => useSuggestion(f)} style={{ marginTop: 8, padding: '7px 12px', background: C.accent, border: 0, borderRadius: 8, color: '#0A0A0C', fontFamily: 'JetBrains Mono, monospace', fontSize: 10, fontWeight: 600, letterSpacing: 1, cursor: 'pointer' }}>
+                      <button onClick={() => useSuggestion(f)} style={{ marginTop: 8, padding: '7px 12px', background: C.accent, border: 0, borderRadius: 8, color: C.onAccent, fontFamily: 'JetBrains Mono, monospace', fontSize: 10, fontWeight: 600, letterSpacing: 1, cursor: 'pointer' }}>
                         USE {suggDisp}{unitLabel(f.key, unit)}
                       </button>
                     )}
@@ -278,7 +278,7 @@ function LogMeasurementsModal({ onClose, onSave, entries, height }) {
               <button onClick={() => { setPhase('input'); setFlags([]); }} style={{ flex: 1, height: 48, background: C.surf2, border: `1px solid ${C.line}`, borderRadius: 12, color: C.text, fontFamily: 'Barlow Condensed, sans-serif', fontSize: 14, fontWeight: 600, letterSpacing: 1.4, textTransform: 'uppercase', cursor: 'pointer' }}>
                 Back to edit
               </button>
-              <button onClick={() => onSave(pendingCm)} style={{ flex: 2, height: 48, background: C.accent, border: 0, borderRadius: 12, color: '#0A0A0C', fontFamily: 'Barlow Condensed, sans-serif', fontSize: 14, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', cursor: 'pointer' }}>
+              <button onClick={() => onSave(pendingCm)} style={{ flex: 2, height: 48, background: C.accent, border: 0, borderRadius: 12, color: C.onAccent, fontFamily: 'Barlow Condensed, sans-serif', fontSize: 14, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', cursor: 'pointer' }}>
                 Save anyway
               </button>
             </div>
@@ -295,7 +295,7 @@ function LogMeasurementsModal({ onClose, onSave, entries, height }) {
               {/* cm / in unit toggle */}
               <div style={{ display: 'flex', background: C.surf2, border: `1px solid ${C.line}`, borderRadius: 8, overflow: 'hidden', flexShrink: 0 }}>
                 {['cm', 'in'].map((u) => (
-                  <button key={u} onClick={() => changeUnit(u)} style={{ padding: '6px 12px', background: unit === u ? C.accent : 'transparent', border: 0, color: unit === u ? '#0A0A0C' : C.textMid, fontFamily: 'JetBrains Mono, monospace', fontSize: 11, fontWeight: 600, letterSpacing: 1, cursor: 'pointer', textTransform: 'uppercase' }}>
+                  <button key={u} onClick={() => changeUnit(u)} style={{ padding: '6px 12px', background: unit === u ? C.accent : 'transparent', border: 0, color: unit === u ? C.onAccent : C.textMid, fontFamily: 'JetBrains Mono, monospace', fontSize: 11, fontWeight: 600, letterSpacing: 1, cursor: 'pointer', textTransform: 'uppercase' }}>
                     {u}
                   </button>
                 ))}
@@ -327,7 +327,7 @@ function LogMeasurementsModal({ onClose, onSave, entries, height }) {
               <button onClick={onClose} disabled={phase === 'checking'} style={{ flex: 1, height: 48, background: C.surf2, border: `1px solid ${C.line}`, borderRadius: 12, color: C.text, fontFamily: 'Barlow Condensed, sans-serif', fontSize: 14, fontWeight: 600, letterSpacing: 1.4, textTransform: 'uppercase', cursor: phase === 'checking' ? 'default' : 'pointer', opacity: phase === 'checking' ? 0.6 : 1 }}>
                 Cancel
               </button>
-              <button onClick={attemptSave} disabled={phase === 'checking'} style={{ flex: 2, height: 48, background: C.accent, border: 0, borderRadius: 12, color: '#0A0A0C', fontFamily: 'Barlow Condensed, sans-serif', fontSize: 14, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', cursor: phase === 'checking' ? 'default' : 'pointer', opacity: phase === 'checking' ? 0.7 : 1 }}>
+              <button onClick={attemptSave} disabled={phase === 'checking'} style={{ flex: 2, height: 48, background: C.accent, border: 0, borderRadius: 12, color: C.onAccent, fontFamily: 'Barlow Condensed, sans-serif', fontSize: 14, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', cursor: phase === 'checking' ? 'default' : 'pointer', opacity: phase === 'checking' ? 0.7 : 1 }}>
                 {phase === 'checking' ? 'Checking…' : 'Save'}
               </button>
             </div>
@@ -473,7 +473,7 @@ function PhotoChooser({ label, hasPhoto, onCamera, onLibrary, onRemove, onClose 
   return (
     <div onClick={onClose} style={{ position: 'absolute', inset: 0, zIndex: 220, background: 'rgba(0,0,0,.72)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'flex-end' }}>
       <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', background: C.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: '20px 22px 24px' }}>
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 3, borderRadius: 2, background: 'rgba(255,255,255,.18)' }} /></div>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 3, borderRadius: 2, background: C.ink(.18) }} /></div>
         <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.accent, letterSpacing: 2.4, marginBottom: 12 }}>PROGRESS PHOTO · {label}</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {row('📸  Take a photo', onCamera)}

@@ -281,7 +281,7 @@ function SetRow({ n, exId, setIdx, set, isHold, isWeighted, onChange, onComplete
           width: 28, height: 28, borderRadius: '50%',
           background: set.complete ? C.accent : 'transparent',
           border: set.complete ? `1px solid ${C.accent}` : `1.5px solid ${C.lineStrong}`,
-          color: set.complete ? '#0A0A0C' : C.textMid,
+          color: set.complete ? C.onAccent : C.textMid,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           flexShrink: 0,
           fontFamily: 'JetBrains Mono, monospace', fontSize: 11, fontWeight: 600,
@@ -353,7 +353,7 @@ function SetRow({ n, exId, setIdx, set, isHold, isWeighted, onChange, onComplete
           minWidth: 38, height: 36,
           background: set.complete ? 'transparent' : (((!isHold && set.reps !== null) || isHold) ? C.accent : C.surf3),
           border: 0, borderRadius: 8,
-          color: set.complete ? C.textLow : '#0A0A0C',
+          color: set.complete ? C.textLow : C.onAccent,
           fontFamily: 'JetBrains Mono, monospace', fontSize: 11, letterSpacing: 1.4, fontWeight: 600,
           cursor: set.complete ? 'default' : 'pointer',
           opacity: (!set.complete && !isHold && set.reps === null) ? 0.4 : 1,
@@ -494,7 +494,7 @@ function RIRModal({ exercise, set, onSubmit, onCancel }) {
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
-          <div style={{ width: 36, height: 3, borderRadius: 2, background: 'rgba(255,255,255,.18)' }} />
+          <div style={{ width: 36, height: 3, borderRadius: 2, background: C.ink(.18) }} />
         </div>
         <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.accent, letterSpacing: 2.4, marginBottom: 10 }}>
           {set.isWarmup ? 'WARMUP' : `SET COMPLETE · ${set.weight}KG × ${set.reps}`}

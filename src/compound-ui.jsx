@@ -4,25 +4,71 @@ import React from 'react';
 // Buttons, inputs, headers, star ratings, segmented pills, steppers, chips,
 // progress dots — all dark-premium, amber-accented.
 
-const C = {
-  bg: '#070709',
-  surf1: '#0E0E11',
-  surf2: '#14141A',
-  surf3: '#1C1C22',
-  line: 'rgba(255,255,255,.07)',
-  lineStrong: 'rgba(255,255,255,.14)',
-  text: '#F2F1EC',
-  textMid: 'rgba(242,241,236,.62)',
-  textLow: 'rgba(242,241,236,.38)',
-  accent: '#F2A30F',
-  accentDim: 'rgba(242,163,15,.16)',
-  accentSoft: 'rgba(242,163,15,.08)',
-  success: '#5AC57E',
-  danger: '#E5564B',
+// ── Themes ──────────────────────────────────────────────────────────────────
+// Two full palettes sharing one token vocabulary. The choice is applied ONCE at
+// module load (before anything renders), so components can keep reading C as
+// plain values; switching themes saves the choice and reloads the app.
+//   onAccent — ink drawn ON an accent-filled surface (buttons, filled pips)
+//   ink(a)   — theme-aware neutral wash (white-on-dark / near-black-on-light)
+//   light    — true on light palettes (gates dark-only dressing like grain)
+const THEMES = {
+  stone: {
+    light: true,
+    bg: '#E8E6E1',
+    surf1: '#F6F5F1',
+    surf2: '#DEDBD4',
+    surf3: '#D2CEC5',
+    line: 'rgba(28,27,23,.09)',
+    lineStrong: 'rgba(28,27,23,.18)',
+    text: '#1C1B17',
+    textMid: 'rgba(28,27,23,.66)',
+    textLow: 'rgba(28,27,23,.42)',
+    accent: '#B87400',
+    accentDim: 'rgba(184,116,0,.16)',
+    accentSoft: 'rgba(184,116,0,.09)',
+    success: '#2E7D4F',
+    danger: '#C6483E',
+    onAccent: '#FFFFFF',
+    inkBase: '28,27,23',
+  },
+  dark: {
+    light: false,
+    bg: '#070709',
+    surf1: '#0E0E11',
+    surf2: '#14141A',
+    surf3: '#1C1C22',
+    line: 'rgba(255,255,255,.07)',
+    lineStrong: 'rgba(255,255,255,.14)',
+    text: '#F2F1EC',
+    textMid: 'rgba(242,241,236,.62)',
+    textLow: 'rgba(242,241,236,.38)',
+    accent: '#F2A30F',
+    accentDim: 'rgba(242,163,15,.16)',
+    accentSoft: 'rgba(242,163,15,.08)',
+    success: '#5AC57E',
+    danger: '#E5564B',
+    onAccent: '#0A0A0C',
+    inkBase: '255,255,255',
+  },
 };
 
-// Grain texture overlay — subtle film noise on dark surfaces
+const THEME_KEY = 'compound:theme';
+function currentThemeName() {
+  try { const t = localStorage.getItem(THEME_KEY); return THEMES[t] ? t : 'stone'; }
+  catch (e) { return 'stone'; }
+}
+// Save a theme choice. Takes effect on next load — callers reload after saving.
+function setThemeName(name) {
+  try { localStorage.setItem(THEME_KEY, THEMES[name] ? name : 'stone'); } catch (e) {}
+}
+
+const PALETTE = THEMES[currentThemeName()];
+const C = { ...PALETTE, ink: (a) => `rgba(${PALETTE.inkBase},${a})` };
+
+// Grain texture overlay — subtle film noise on dark surfaces (dark theme only;
+// the white-noise overlay blend just hazes a light background)
 function GrainOverlay({ opacity = 0.06 }) {
+  if (C.light) return null;
   return (
     <div
       aria-hidden
@@ -134,7 +180,7 @@ function StepBar({ current, total }) {
             flex: 1,
             height: 2,
             borderRadius: 1,
-            background: i < current ? C.accent : 'rgba(255,255,255,.10)',
+            background: i < current ? C.accent : C.ink(.10),
             transition: 'background .25s',
           }}
         />
@@ -159,7 +205,7 @@ function PrimaryButton({ children, onClick, disabled, icon }) {
         border: 0,
         borderRadius: 12,
         background: disabled ? 'rgba(242,163,15,.28)' : C.accent,
-        color: disabled ? 'rgba(0,0,0,.45)' : '#0A0A0C',
+        color: disabled ? 'rgba(0,0,0,.45)' : C.onAccent,
         fontFamily: 'Barlow Condensed, sans-serif',
         fontWeight: 700,
         fontSize: 18,
@@ -769,6 +815,8 @@ function SaveExitButton({ onClick }) {
 
 Object.assign(window, {
   C,
+  currentThemeName,
+  setThemeName,
   GrainOverlay,
   ScreenHead,
   StepBar,
@@ -789,4 +837,4 @@ Object.assign(window, {
   SaveExitButton,
 });
 
-export { C, DateWheel, FieldLabel, GhostButton, GrainOverlay, InfoDot, MONTHS_SHORT, MultiChip, PrimaryButton, SaveExitButton, ScreenHead, SelectCard, StarRating, StepBar, Stepper, StepperBtn, TextInput, TimeWheel, Wheel, computeAge, daysInMonth };
+export { C, DateWheel, FieldLabel, GhostButton, GrainOverlay, InfoDot, MONTHS_SHORT, MultiChip, PrimaryButton, SaveExitButton, ScreenHead, SelectCard, StarRating, StepBar, Stepper, StepperBtn, TextInput, TimeWheel, Wheel, computeAge, currentThemeName, daysInMonth, setThemeName };

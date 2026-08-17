@@ -1,5 +1,5 @@
 import React from 'react';
-import { C, DateWheel, FieldLabel, SelectCard, Stepper, TextInput, TimeWheel, computeAge } from './compound-ui.jsx';
+import { C, DateWheel, FieldLabel, SelectCard, Stepper, TextInput, TimeWheel, computeAge, currentThemeName, setThemeName } from './compound-ui.jsx';
 import { PerDayTimes, ScreenGratitudeBuilder } from './onboarding-screens.jsx';
 import { supabase, supabaseConfigured } from './supabase.js';
 import { pushSupported, notifPermission, isSubscribed, subscribePush, unsubscribePush } from './push.js';
@@ -99,7 +99,7 @@ function SettingsScreen({ user, set, onClose, onReset, onRecalc }) {
           <div
             style={{
               width: 54, height: 54, borderRadius: '50%',
-              background: C.accent, color: '#0A0A0C',
+              background: C.accent, color: C.onAccent,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 26,
               flexShrink: 0,
@@ -129,6 +129,13 @@ function SettingsScreen({ user, set, onClose, onReset, onRecalc }) {
             hint={measureUnit === 'in' ? 'Inches' : 'Centimetres'}
             value={measureUnit.toUpperCase()}
             onClick={() => { const next = measureUnit === 'cm' ? 'in' : 'cm'; try { localStorage.setItem('compound:measureUnit', next); } catch (e) {} setMeasureUnit(next); }}
+          />
+          <SettingsRow
+            icon={<IconSpark />}
+            label="Appearance"
+            hint={currentThemeName() === 'dark' ? 'Dark · the original look' : 'Light · stone'}
+            value={currentThemeName() === 'dark' ? 'DARK' : 'LIGHT'}
+            onClick={() => { setThemeName(currentThemeName() === 'dark' ? 'stone' : 'dark'); window.location.reload(); }}
           />
         </SettingsGroup>
 
@@ -352,7 +359,7 @@ function ClearDataModal({ onClose }) {
             style={{
               flex: 1.4, height: 52, borderRadius: 12, border: 0,
               background: canDelete ? C.danger : 'rgba(229,86,75,.28)',
-              color: canDelete ? '#fff' : 'rgba(255,255,255,.5)',
+              color: canDelete ? '#fff' : C.ink(.5),
               fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 15, letterSpacing: 0.6, textTransform: 'uppercase',
               cursor: canDelete ? 'pointer' : 'default',
             }}
@@ -618,7 +625,7 @@ function SettingsWorkoutSchedule({ user, set, onBack }) {
                   <button
                     key={d.i}
                     onClick={() => toggle(d.i)}
-                    style={{ aspectRatio: '1 / 1.4', background: active ? C.accent : C.surf1, color: active ? '#0A0A0C' : C.text, border: active ? `1px solid ${C.accent}` : `1px solid ${C.line}`, borderRadius: 10, fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 12, letterSpacing: 0.3, cursor: 'pointer' }}
+                    style={{ aspectRatio: '1 / 1.4', background: active ? C.accent : C.surf1, color: active ? C.onAccent : C.text, border: active ? `1px solid ${C.accent}` : `1px solid ${C.line}`, borderRadius: 10, fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 12, letterSpacing: 0.3, cursor: 'pointer' }}
                   >
                     {d.l}
                   </button>
@@ -725,7 +732,7 @@ function PushDeviceCard() {
         fontFamily: 'JetBrains Mono, monospace', fontSize: 11, letterSpacing: 1, textTransform: 'uppercase',
         padding: '9px 16px', borderRadius: 10,
         background: primary ? C.accent : 'transparent',
-        color: primary ? '#0A0A0C' : C.textMid,
+        color: primary ? C.onAccent : C.textMid,
         border: primary ? 0 : `1px solid ${C.line}`,
         opacity: busy ? 0.6 : 1,
       }}>{busy ? '…' : label}</button>
@@ -832,7 +839,7 @@ function NotifRow({ label, hint, on, onChange }) {
           style={{
             position: 'absolute', top: 3, left: on ? 22 : 3,
             width: 18, height: 18, borderRadius: 9,
-            background: '#0A0A0C', transition: 'left .15s',
+            background: C.onAccent, transition: 'left .15s',
           }}
         />
       </button>

@@ -122,7 +122,7 @@ function AuthScreen() {
           style={{
             width: '100%', height: 54, marginTop: 24,
             background: (!valid || pending) ? 'rgba(242,163,15,.28)' : C.accent,
-            color: (!valid || pending) ? 'rgba(0,0,0,.45)' : '#0A0A0C',
+            color: (!valid || pending) ? 'rgba(0,0,0,.45)' : C.onAccent,
             border: 0, borderRadius: 12,
             fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 17, letterSpacing: 2, textTransform: 'uppercase',
             cursor: (!valid || pending) ? 'default' : 'pointer',

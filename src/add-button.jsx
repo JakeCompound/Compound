@@ -16,7 +16,7 @@ function AddButton({ dietTracking, alcohol = true, onChanged, onGoNutrition }) {
         style={{
           position: 'absolute', right: 18, bottom: 18, zIndex: 60,
           width: 58, height: 58, borderRadius: 29,
-          background: C.accent, border: 0, color: '#0A0A0C',
+          background: C.accent, border: 0, color: C.onAccent,
           boxShadow: '0 10px 30px rgba(242,163,15,.4)', cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}
@@ -27,7 +27,7 @@ function AddButton({ dietTracking, alcohol = true, onChanged, onGoNutrition }) {
       {menu && (
         <div onClick={() => setMenu(false)} style={{ position: 'absolute', inset: 0, zIndex: 210, background: 'rgba(0,0,0,.6)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'flex-end' }}>
           <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', background: C.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: '20px 22px 24px' }}>
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 3, borderRadius: 2, background: 'rgba(255,255,255,.18)' }} /></div>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 3, borderRadius: 2, background: C.ink(.18) }} /></div>
             <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.accent, letterSpacing: 2.4, marginBottom: 12 }}>ADD TO TODAY</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <AddRow label="Drink" sub={alcohol ? 'Coffee, juice, energy — or a beer' : 'Coffee, juice, energy, soft drink'} glyph={alcohol ? '🥤' : '☕'} onClick={() => { setMenu(false); setSheet('drink'); }} />
@@ -92,7 +92,7 @@ function NipQuickAdd({ onClose, onChanged }) {
   return (
     <div onClick={onClose} style={{ position: 'absolute', inset: 0, zIndex: 220, background: 'rgba(0,0,0,.72)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'flex-end' }}>
       <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', background: C.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: '20px 22px 24px' }}>
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 3, borderRadius: 2, background: 'rgba(255,255,255,.18)' }} /></div>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 3, borderRadius: 2, background: C.ink(.18) }} /></div>
         <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.accent, letterSpacing: 2.4, marginBottom: 8 }}>TODAY'S DRINKS</div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '6px 0 16px' }}>
           <button onClick={() => bump(-1)} style={stepBtn}>−</button>
@@ -117,11 +117,11 @@ function NipQuickAdd({ onClose, onChanged }) {
           <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: C.textLow, letterSpacing: 1.6, marginBottom: 8 }}>OR DESCRIBE A DRINK</div>
           <div style={{ display: 'flex', gap: 8 }}>
             <input value={desc} onChange={(e) => setDesc(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') estimate(); }} placeholder="e.g. Long Island iced tea, cider, espresso martini" style={{ flex: 1, background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 10, color: C.text, fontFamily: 'Outfit, sans-serif', fontSize: 14, padding: '12px 14px', outline: 'none' }} />
-            <button onClick={estimate} disabled={pending || !desc.trim()} style={{ width: 52, background: (pending || !desc.trim()) ? C.surf2 : C.accent, color: (pending || !desc.trim()) ? C.textLow : '#0A0A0C', border: 0, borderRadius: 10, fontSize: 18, cursor: (pending || !desc.trim()) ? 'default' : 'pointer' }}>{pending ? '…' : '→'}</button>
+            <button onClick={estimate} disabled={pending || !desc.trim()} style={{ width: 52, background: (pending || !desc.trim()) ? C.surf2 : C.accent, color: (pending || !desc.trim()) ? C.textLow : C.onAccent, border: 0, borderRadius: 10, fontSize: 18, cursor: (pending || !desc.trim()) ? 'default' : 'pointer' }}>{pending ? '…' : '→'}</button>
           </div>
           {note && <div style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: C.accent, marginTop: 8, lineHeight: 1.4 }}>{note}</div>}
         </div>
-        <button onClick={onClose} style={{ width: '100%', height: 50, marginTop: 16, background: C.accent, border: 0, borderRadius: 12, color: '#0A0A0C', fontFamily: 'Barlow Condensed, sans-serif', fontSize: 15, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', cursor: 'pointer' }}>Done</button>
+        <button onClick={onClose} style={{ width: '100%', height: 50, marginTop: 16, background: C.accent, border: 0, borderRadius: 12, color: C.onAccent, fontFamily: 'Barlow Condensed, sans-serif', fontSize: 15, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', cursor: 'pointer' }}>Done</button>
       </div>
     </div>
   );
@@ -148,7 +148,7 @@ function DrinkChooser({ onClose, onChanged }) {
   return (
     <div onClick={onClose} style={{ position: 'absolute', inset: 0, zIndex: 220, background: 'rgba(0,0,0,.72)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'flex-end' }}>
       <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', background: C.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: '20px 22px 24px' }}>
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 3, borderRadius: 2, background: 'rgba(255,255,255,.18)' }} /></div>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 3, borderRadius: 2, background: C.ink(.18) }} /></div>
         <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.accent, letterSpacing: 2.4, marginBottom: 12 }}>WHAT KIND OF DRINK?</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <AddRow label="Alcoholic" sub="Nip / beer / wine — counts to your nips" glyph="🍺" onClick={() => setPick('alc')} />
@@ -199,7 +199,7 @@ function SoftDrinkQuickAdd({ onClose, onChanged }) {
   return (
     <div onClick={onClose} style={{ position: 'absolute', inset: 0, zIndex: 220, background: 'rgba(0,0,0,.72)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'flex-end' }}>
       <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxHeight: '92%', overflowY: 'auto', background: C.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: '20px 22px 24px' }}>
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 3, borderRadius: 2, background: 'rgba(255,255,255,.18)' }} /></div>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 3, borderRadius: 2, background: C.ink(.18) }} /></div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
           <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.accent, letterSpacing: 2.4 }}>NON-ALCOHOLIC DRINK</div>
           <button onClick={() => setEdit(!edit)} style={{ background: 'transparent', border: 0, padding: 0, color: edit ? C.accent : C.textLow, fontFamily: 'JetBrains Mono, monospace', fontSize: 9.5, letterSpacing: 1.6, cursor: 'pointer' }}>{edit ? 'DONE' : 'EDIT PICKS'}</button>
@@ -244,7 +244,7 @@ function SoftDrinkQuickAdd({ onClose, onChanged }) {
           <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: C.textLow, letterSpacing: 1.6, marginBottom: 8 }}>OR DESCRIBE A DRINK</div>
           <div style={{ display: 'flex', gap: 8 }}>
             <input value={desc} onChange={(e) => setDesc(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') estimate(); }} placeholder="e.g. large flat white, Coke Zero, iced latte" style={{ flex: 1, minWidth: 0, background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 10, color: C.text, fontFamily: 'Outfit, sans-serif', fontSize: 14, padding: '12px 14px', outline: 'none' }} />
-            <button onClick={estimate} disabled={pending || !desc.trim()} style={{ width: 52, flexShrink: 0, background: (pending || !desc.trim()) ? C.surf2 : C.accent, color: (pending || !desc.trim()) ? C.textLow : '#0A0A0C', border: 0, borderRadius: 10, fontSize: 18, cursor: (pending || !desc.trim()) ? 'default' : 'pointer' }}>{pending ? '…' : '→'}</button>
+            <button onClick={estimate} disabled={pending || !desc.trim()} style={{ width: 52, flexShrink: 0, background: (pending || !desc.trim()) ? C.surf2 : C.accent, color: (pending || !desc.trim()) ? C.textLow : C.onAccent, border: 0, borderRadius: 10, fontSize: 18, cursor: (pending || !desc.trim()) ? 'default' : 'pointer' }}>{pending ? '…' : '→'}</button>
           </div>
           {note && <div style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: C.accent, marginTop: 8, lineHeight: 1.4 }}>{note}</div>}
           {savePick && (
@@ -254,7 +254,7 @@ function SoftDrinkQuickAdd({ onClose, onChanged }) {
         <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12, color: C.textMid, lineHeight: 1.5, margin: '14px 0 0' }}>
           Drinks land in the food log — tap the <span style={{ color: C.accent }}>+</span> on a row for another one.
         </p>
-        <button onClick={onClose} style={{ width: '100%', height: 50, marginTop: 14, background: C.accent, border: 0, borderRadius: 12, color: '#0A0A0C', fontFamily: 'Barlow Condensed, sans-serif', fontSize: 15, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', cursor: 'pointer' }}>Done</button>
+        <button onClick={onClose} style={{ width: '100%', height: 50, marginTop: 14, background: C.accent, border: 0, borderRadius: 12, color: C.onAccent, fontFamily: 'Barlow Condensed, sans-serif', fontSize: 15, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', cursor: 'pointer' }}>Done</button>
       </div>
     </div>
   );
@@ -332,7 +332,7 @@ Rules: protein/carbs/fat in grams. BRANDED / PACKAGED PRODUCTS — if the meal n
   return (
     <div onClick={onClose} style={{ position: 'absolute', inset: 0, zIndex: 220, background: 'rgba(0,0,0,.72)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'flex-end' }}>
       <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxHeight: '92%', overflowY: 'auto', background: C.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: '20px 22px 24px' }}>
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 3, borderRadius: 2, background: 'rgba(255,255,255,.18)' }} /></div>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 3, borderRadius: 2, background: C.ink(.18) }} /></div>
         <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.accent, letterSpacing: 2.4, marginBottom: 8 }}>ADD A MEAL</div>
         <h3 style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 26, lineHeight: 1, letterSpacing: 0.5, color: C.text, margin: '0 0 14px', textTransform: 'uppercase' }}>
           WHAT DID YOU<br /><span style={{ color: C.accent }}>EAT?</span>
@@ -388,7 +388,7 @@ Rules: protein/carbs/fat in grams. BRANDED / PACKAGED PRODUCTS — if the meal n
 
         {err && <div style={{ marginTop: 10, fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: C.danger, lineHeight: 1.4 }}>{err}</div>}
 
-        <button onClick={submit} disabled={pending || (!desc.trim() && !photo)} style={{ width: '100%', height: 52, marginTop: 14, background: (pending || (!desc.trim() && !photo)) ? C.surf3 : C.accent, border: 0, borderRadius: 12, color: (pending || (!desc.trim() && !photo)) ? C.textLow : '#0A0A0C', fontFamily: 'Barlow Condensed, sans-serif', fontSize: 16, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', cursor: pending ? 'default' : 'pointer' }}>
+        <button onClick={submit} disabled={pending || (!desc.trim() && !photo)} style={{ width: '100%', height: 52, marginTop: 14, background: (pending || (!desc.trim() && !photo)) ? C.surf3 : C.accent, border: 0, borderRadius: 12, color: (pending || (!desc.trim() && !photo)) ? C.textLow : C.onAccent, fontFamily: 'Barlow Condensed, sans-serif', fontSize: 16, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', cursor: pending ? 'default' : 'pointer' }}>
           {pending ? 'Estimating…' : 'Log it'}
         </button>
         <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 11.5, color: C.textLow, lineHeight: 1.5, margin: '12px 0 0', textAlign: 'center' }}>

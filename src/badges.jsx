@@ -195,7 +195,7 @@ function BadgesWall() {
           </div>
         </div>
         <div style={{ flex: 1, position: 'relative' }}>
-          <div style={{ height: 4, background: 'rgba(255,255,255,.08)', borderRadius: 2, overflow: 'hidden', marginBottom: 6 }}>
+          <div style={{ height: 4, background: C.ink(.08), borderRadius: 2, overflow: 'hidden', marginBottom: 6 }}>
             <div style={{ width: `${(earnedCount / totalCount) * 100}%`, height: '100%', background: C.accent, transition: 'width .3s' }} />
           </div>
           <div style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: C.textMid, lineHeight: 1.45 }}>
@@ -258,7 +258,7 @@ function BadgesWall() {
               style={{
                 position: 'absolute', top: 2, left: showLocked ? 16 : 2,
                 width: 12, height: 12, borderRadius: 6,
-                background: '#0A0A0C',
+                background: C.onAccent,
                 transition: 'left .15s',
               }}
             />
@@ -324,7 +324,7 @@ function BadgeTile({ badge, onClick }) {
       <div
         style={{
           width: 38, height: 38,
-          color: earned ? C.accent : 'rgba(242,241,236,.18)',
+          color: earned ? C.accent : C.ink(.18),
           marginTop: 4,
           filter: earned ? 'drop-shadow(0 0 8px rgba(242,163,15,.35))' : 'none',
           position: 'relative',
@@ -336,7 +336,7 @@ function BadgeTile({ badge, onClick }) {
             style={{
               position: 'absolute', bottom: -3, right: -6,
               fontFamily: 'JetBrains Mono, monospace', fontSize: 8, fontWeight: 600,
-              color: earned ? '#0A0A0C' : C.textLow,
+              color: earned ? C.onAccent : C.textLow,
               background: earned ? C.accent : C.surf3,
               padding: '1px 4px', borderRadius: 4, letterSpacing: 0.5,
               border: earned ? 0 : `1px solid ${C.line}`,
@@ -361,7 +361,7 @@ function BadgeTile({ badge, onClick }) {
       {/* Progress strip on locked badges */}
       {!earned && badge.progress && (
         <div style={{ width: '100%', padding: '0 6px', position: 'relative' }}>
-          <div style={{ height: 2, background: 'rgba(255,255,255,.06)', borderRadius: 1, overflow: 'hidden' }}>
+          <div style={{ height: 2, background: C.ink(.06), borderRadius: 1, overflow: 'hidden' }}>
             <div
               style={{
                 width: `${Math.min(100, (badge.progress.current / badge.progress.target) * 100)}%`,
@@ -435,7 +435,7 @@ function BadgeDetailModal({ badge, onClose }) {
         <div
           style={{
             width: 88, height: 88, margin: '0 auto 18px',
-            color: earned ? C.accent : 'rgba(242,241,236,.18)',
+            color: earned ? C.accent : C.ink(.18),
             filter: earned ? 'drop-shadow(0 0 16px rgba(242,163,15,.45))' : 'none',
             position: 'relative',
           }}
@@ -446,7 +446,7 @@ function BadgeDetailModal({ badge, onClose }) {
               style={{
                 position: 'absolute', bottom: -6, right: -12,
                 fontFamily: 'JetBrains Mono, monospace', fontSize: 11, fontWeight: 600,
-                color: earned ? '#0A0A0C' : C.textLow,
+                color: earned ? C.onAccent : C.textLow,
                 background: earned ? C.accent : C.surf3,
                 padding: '3px 7px', borderRadius: 6, letterSpacing: 0.8,
               }}
@@ -487,7 +487,7 @@ function BadgeDetailModal({ badge, onClose }) {
                 {badge.progress.current} / {badge.progress.target}{badge.progress.unit || ''}
               </span>
             </div>
-            <div style={{ height: 4, background: 'rgba(255,255,255,.06)', borderRadius: 2, overflow: 'hidden' }}>
+            <div style={{ height: 4, background: C.ink(.06), borderRadius: 2, overflow: 'hidden' }}>
               <div
                 style={{
                   width: `${Math.min(100, (badge.progress.current / badge.progress.target) * 100)}%`,

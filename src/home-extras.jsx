@@ -141,7 +141,7 @@ function ComebackCard({ daysMissed, onStart }) {
       style={{
         width: '100%', textAlign: 'left',
         padding: '20px 20px',
-        background: 'linear-gradient(135deg, #1A1612 0%, #100E0B 100%)',
+        background: C.hero,
         border: `1px solid ${C.accent}`,
         borderRadius: 16, cursor: 'pointer',
         position: 'relative', overflow: 'hidden',
@@ -192,7 +192,7 @@ function BirthdayCard({ name, onClose }) {
     <div
       style={{
         padding: '22px 18px',
-        background: 'linear-gradient(135deg, #2A1F0E 0%, #100E0B 100%)',
+        background: C.heroWarm,
         border: `1px solid ${C.accent}`,
         borderRadius: 16, position: 'relative', overflow: 'hidden',
       }}

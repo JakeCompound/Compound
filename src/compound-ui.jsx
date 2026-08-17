@@ -28,6 +28,8 @@ const THEMES = {
     accentSoft: 'rgba(184,116,0,.09)',
     success: '#2E7D4F',
     danger: '#C6483E',
+    blue: '#3E6FA8',
+    green: '#3A7D46',
     onAccent: '#FFFFFF',
     inkBase: '28,27,23',
     veilBase: '232,230,225',
@@ -48,6 +50,8 @@ const THEMES = {
     accentSoft: 'rgba(242,163,15,.08)',
     success: '#5AC57E',
     danger: '#E5564B',
+    blue: '#7CA8E0',
+    green: '#7BB661',
     onAccent: '#0A0A0C',
     inkBase: '255,255,255',
     veilBase: '7,7,9',
@@ -69,10 +73,19 @@ const C = {
   ...PALETTE,
   ink: (a) => `rgba(${PALETTE.inkBase},${a})`,   // neutral wash (borders, tracks, pips)
   veil: (a) => `rgba(${PALETTE.veilBase},${a})`, // bg-tinted glass (tab bar, fullscreen overlays)
-  // Premium hero-card backdrop (reports receipts, badge collection banner)
+  // Premium hero-card backdrop (reports receipts, badge collection, calculator
+  // target cards, comeback card, settings header, dashboard hero)
   hero: PALETTE.light
     ? 'linear-gradient(160deg, #FBFAF6 0%, #E9E3D8 100%)'
     : 'linear-gradient(160deg, #1A1612 0%, #100E0B 100%)',
+  // Amber-warmed celebration backdrop (birthday card)
+  heroWarm: PALETTE.light
+    ? 'linear-gradient(135deg, #F6ECD4 0%, #ECE8DE 100%)'
+    : 'linear-gradient(135deg, #2A1F0E 0%, #100E0B 100%)',
+  // Full-screen page backdrop (auth screen, desktop room around the frame)
+  page: PALETTE.light
+    ? 'radial-gradient(circle at 50% 0%, #F2EDE2 0%, #EBE9E3 55%, #E8E6E1 100%)'
+    : 'radial-gradient(circle at 50% 0%, #1a1410 0%, #0a0a0c 55%, #050507 100%)',
 };
 
 // Grain texture overlay — subtle film noise on dark surfaces (dark theme only;

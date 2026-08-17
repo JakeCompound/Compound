@@ -118,12 +118,12 @@ function NutritionToday({ user, onChanged, onSetupTargets }) {
         <CalRing consumed={totals.kcal} target={kcalTarget} />
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
           <MacroBar label="PROTEIN" value={totals.p} target={targets ? targets.protein : 0} color={C.accent} />
-          {targets && targets.carbs ? <MacroBar label="CARBS" value={totals.c} target={targets.carbs} color="#7CA8E0" /> : null}
-          {targets && targets.fat ? <MacroBar label="FAT" value={totals.f} target={targets.fat} color="#7BB661" /> : null}
+          {targets && targets.carbs ? <MacroBar label="CARBS" value={totals.c} target={targets.carbs} color={C.blue} /> : null}
+          {targets && targets.fat ? <MacroBar label="FAT" value={totals.f} target={targets.fat} color={C.green} /> : null}
           {earned > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 2, paddingTop: 8, borderTop: `1px solid ${C.line}` }}>
-              <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, letterSpacing: 1.4, color: '#7BB661' }}>EXERCISE</span>
-              <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: '#7BB661' }}>+{earned} kcal</span>
+              <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, letterSpacing: 1.4, color: C.green }}>EXERCISE</span>
+              <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: C.green }}>+{earned} kcal</span>
             </div>
           )}
           {showAlcohol && (
@@ -646,7 +646,7 @@ function NutritionWeek({ user }) {
   return (
     <div style={{ flex: 1, overflowY: 'auto', padding: '16px 22px 32px' }}>
       {/* Weekly budget headline */}
-      <div style={{ background: 'linear-gradient(160deg, #1A1612 0%, #100E0B 100%)', border: `1px solid ${C.line}`, borderRadius: 16, padding: 18, marginBottom: 16 }}>
+      <div style={{ background: C.hero, border: `1px solid ${C.line}`, borderRadius: 16, padding: 18, marginBottom: 16 }}>
         <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: C.accent, letterSpacing: 2, marginBottom: 8 }}>THIS WEEK · KCAL</div>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
           <span style={{ fontFamily: 'JetBrains Mono, monospace', fontWeight: 600, fontSize: 34, color: C.text, fontVariantNumeric: 'tabular-nums' }}>{weekTotal.toLocaleString()}</span>

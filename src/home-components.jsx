@@ -485,7 +485,7 @@ function InsightCard({ insight }) {
     <div
       style={{
         padding: '18px 18px',
-        background: 'linear-gradient(160deg, #1A1612 0%, #100E0B 100%)',
+        background: C.hero,
         border: `1px solid ${C.line}`,
         borderRadius: 14,
         position: 'relative', overflow: 'hidden',

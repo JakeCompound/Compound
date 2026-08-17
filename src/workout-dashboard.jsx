@@ -19,7 +19,7 @@ function WorkoutDashboard({ onBack }) {
           <div
             style={{
               padding: '28px 18px', textAlign: 'center',
-              background: 'linear-gradient(160deg, #1A1612 0%, #100E0B 100%)',
+              background: C.hero,
               border: `1px solid ${C.line}`, borderRadius: 16,
             }}
           >

@@ -89,7 +89,7 @@ function MacroCalculator({ user, initial, onDone, onBack, oneTap }) {
             <CalcHead tag={oneTap ? 'CONFIRM' : 'STEP 2 / 3'} title="YOUR" accent="PLAN." />
 
             {/* Result preview — the leangains formula needs nothing more from you */}
-            <div style={{ background: 'linear-gradient(160deg, #1A1612 0%, #100E0B 100%)', border: `1px solid ${C.accentDim}`, borderRadius: 14, padding: 16, marginTop: 4 }}>
+            <div style={{ background: C.hero, border: `1px solid ${C.accentDim}`, borderRadius: 14, padding: 16, marginTop: 4 }}>
               <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: C.accent, letterSpacing: 2, marginBottom: 8 }}>YOUR DAILY TARGET</div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
                 <span style={{ fontFamily: 'JetBrains Mono, monospace', fontWeight: 600, fontSize: 38, color: C.text, fontVariantNumeric: 'tabular-nums' }}>{result.calories}</span>
@@ -97,8 +97,8 @@ function MacroCalculator({ user, initial, onDone, onBack, oneTap }) {
               </div>
               <div style={{ display: 'flex', gap: 14, marginTop: 10 }}>
                 <MacroPill label="PROTEIN" value={`${result.protein}g`} color={C.accent} />
-                <MacroPill label="CARBS" value={`${result.carbs}g`} color="#7CA8E0" />
-                <MacroPill label="FAT" value={`${result.fat}g`} color="#7BB661" />
+                <MacroPill label="CARBS" value={`${result.carbs}g`} color={C.blue} />
+                <MacroPill label="FAT" value={`${result.fat}g`} color={C.green} />
               </div>
               <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: C.textLow, letterSpacing: 1, marginTop: 10 }}>
                 MAINTENANCE {result.tdee} − {gender === 'female' ? 350 : 500} · PROTEIN 30% · CARBS/FAT 50-50
@@ -117,7 +117,7 @@ function MacroCalculator({ user, initial, onDone, onBack, oneTap }) {
             <CalcHead tag={oneTap ? 'MACROS' : 'STEP 3 / 3'} title="DIAL IN" accent="MACROS." />
 
             {/* Calorie target + live remaining/over readout */}
-            <div style={{ background: 'linear-gradient(160deg, #1A1612 0%, #100E0B 100%)', border: `1px solid ${C.accentDim}`, borderRadius: 14, padding: 16 }}>
+            <div style={{ background: C.hero, border: `1px solid ${C.accentDim}`, borderRadius: 14, padding: 16 }}>
               <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: C.accent, letterSpacing: 2, marginBottom: 8 }}>CALORIE TARGET</div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
                 <span style={{ fontFamily: 'JetBrains Mono, monospace', fontWeight: 600, fontSize: 38, color: C.text, fontVariantNumeric: 'tabular-nums' }}>{result.calories}</span>

@@ -90,7 +90,7 @@ function SettingsScreen({ user, set, onClose, onReset, onRecalc }) {
         <div
           style={{
             padding: '16px 16px',
-            background: 'linear-gradient(160deg, #1A1612 0%, #100E0B 100%)',
+            background: C.hero,
             border: `1px solid ${C.line}`, borderRadius: 14,
             display: 'flex', alignItems: 'center', gap: 14,
             marginBottom: 16, marginTop: 8,

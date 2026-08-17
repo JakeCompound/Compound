@@ -717,7 +717,7 @@ function MovementToday({ user, onChanged }) {
           <div style={{ width: `${Math.min(100, (total / goal) * 100)}%`, height: '100%', background: C.accent, transition: 'width .3s' }} />
         </div>
         {earned > 0 && (
-          <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 1.2, color: '#7BB661', marginBottom: 10 }}>
+          <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 1.2, color: C.green, marginBottom: 10 }}>
             EARNED TODAY · +{earned} KCAL
           </div>
         )}

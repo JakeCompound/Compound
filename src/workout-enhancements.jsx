@@ -42,7 +42,7 @@ function PlateCalc({ weight, isWarmup }) {
   }
   const colorFor = (p) => ({
     25:   '#E5564B',
-    20:   '#7CA8E0',
+    20:   C.blue,
     15:   '#F2A30F',
     10:   '#5AC57E',
     5:    '#E8E6E1',

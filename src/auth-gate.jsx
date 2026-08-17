@@ -95,7 +95,7 @@ function AuthScreen() {
     <div
       style={{
         minHeight: '100vh',
-        background: 'radial-gradient(circle at 50% 0%, #1a1410 0%, #0a0a0c 55%, #050507 100%)',
+        background: C.page,
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
         padding: '40px 24px',
       }}

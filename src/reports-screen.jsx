@@ -150,8 +150,8 @@ function ReportsScreen({ user = {} }) {
             <SectionLabel meta={`${days}D`}>PILLAR TRENDS</SectionLabel>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
               <PillarCard label="SLEEP" value={pillarValue(R.pillars.sleep, 'h', 'sleep')} avgLabel="AVG" trend={R.pillars.sleep} color={C.accent} />
-              <PillarCard label="CALM" value={pillarValue(R.pillars.calm, '', 'calm')} avgLabel="/5" trend={R.pillars.calm} color="#7CA8E0" />
-              <PillarCard label="DIET" value={pillarValue(R.pillars.diet, '', 'diet')} avgLabel="/5" trend={R.pillars.diet} color="#7BB661" />
+              <PillarCard label="CALM" value={pillarValue(R.pillars.calm, '', 'calm')} avgLabel="/5" trend={R.pillars.calm} color={C.blue} />
+              <PillarCard label="DIET" value={pillarValue(R.pillars.diet, '', 'diet')} avgLabel="/5" trend={R.pillars.diet} color={C.green} />
               <PillarCard label="STEPS" value={pillarValue(R.pillars.steps, '', 'steps')} avgLabel="AVG" trend={R.pillars.steps} color="#F2A30F" />
             </div>
           </div>

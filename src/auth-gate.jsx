@@ -50,7 +50,7 @@ function AuthGate({ children }) {
 
 function Splash({ label }) {
   return (
-    <div style={{ minHeight: '100vh', background: '#050507', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+    <div style={{ minHeight: '100vh', background: C.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
       <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, letterSpacing: 3, color: C.accent }}>◆ COMPOUND</div>
       {label && <div style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12, color: C.textMid }}>{label}</div>}
     </div>

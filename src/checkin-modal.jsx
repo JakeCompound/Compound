@@ -629,7 +629,7 @@ function CheckinCelebration({ onClose, score }) {
     <div
       style={{
         position: 'absolute', inset: 0, zIndex: 200,
-        background: 'rgba(7,7,9,.94)',
+        background: C.veil(.94),
         backdropFilter: 'blur(10px)',
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
         gap: 14, padding: 32, textAlign: 'center',

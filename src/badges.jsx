@@ -163,7 +163,7 @@ function BadgesWall() {
       <div
         style={{
           padding: '14px 16px',
-          background: 'linear-gradient(160deg, #1A1612 0%, #100E0B 100%)',
+          background: C.hero,
           border: `1px solid ${C.line}`,
           borderRadius: 14,
           marginBottom: 14,

@@ -93,7 +93,7 @@ function ReportsScreen({ user = {} }) {
           <div
             style={{
               padding: '26px 18px', textAlign: 'center',
-              background: 'linear-gradient(160deg, #1A1612 0%, #100E0B 100%)',
+              background: C.hero,
               border: `1px solid ${C.line}`, borderRadius: 16,
             }}
           >
@@ -427,7 +427,7 @@ function MonthlyCard({ card }) {
   return (
     <div
       style={{
-        background: 'linear-gradient(160deg, #1A1612 0%, #100E0B 100%)',
+        background: C.hero,
         border: `1px solid ${C.line}`, borderRadius: 14,
         padding: 18, position: 'relative', overflow: 'hidden',
       }}
@@ -486,7 +486,7 @@ function MonthlyCard({ card }) {
 
 function CardStat({ label, value, highlight }) {
   return (
-    <div style={{ padding: '10px 12px', background: 'rgba(0,0,0,.25)', borderRadius: 10, border: `1px solid ${C.line}` }}>
+    <div style={{ padding: '10px 12px', background: C.ink(.05), borderRadius: 10, border: `1px solid ${C.line}` }}>
       <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: C.textLow, letterSpacing: 1.6 }}>
         {label}
       </div>

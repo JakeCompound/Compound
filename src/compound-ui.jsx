@@ -30,6 +30,7 @@ const THEMES = {
     danger: '#C6483E',
     onAccent: '#FFFFFF',
     inkBase: '28,27,23',
+    veilBase: '232,230,225',
   },
   dark: {
     light: false,
@@ -49,6 +50,7 @@ const THEMES = {
     danger: '#E5564B',
     onAccent: '#0A0A0C',
     inkBase: '255,255,255',
+    veilBase: '7,7,9',
   },
 };
 
@@ -63,7 +65,15 @@ function setThemeName(name) {
 }
 
 const PALETTE = THEMES[currentThemeName()];
-const C = { ...PALETTE, ink: (a) => `rgba(${PALETTE.inkBase},${a})` };
+const C = {
+  ...PALETTE,
+  ink: (a) => `rgba(${PALETTE.inkBase},${a})`,   // neutral wash (borders, tracks, pips)
+  veil: (a) => `rgba(${PALETTE.veilBase},${a})`, // bg-tinted glass (tab bar, fullscreen overlays)
+  // Premium hero-card backdrop (reports receipts, badge collection banner)
+  hero: PALETTE.light
+    ? 'linear-gradient(160deg, #FBFAF6 0%, #E9E3D8 100%)'
+    : 'linear-gradient(160deg, #1A1612 0%, #100E0B 100%)',
+};
 
 // Grain texture overlay — subtle film noise on dark surfaces (dark theme only;
 // the white-noise overlay blend just hazes a light background)

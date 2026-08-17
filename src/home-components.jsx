@@ -563,7 +563,7 @@ function TabBar({ active, onChange }) {
       style={{
         flexShrink: 0,
         padding: '8px 14px 4px',
-        background: 'rgba(7,7,9,.92)',
+        background: C.veil(.92),
         borderTop: `1px solid ${C.line}`,
         display: 'flex',
         position: 'relative',

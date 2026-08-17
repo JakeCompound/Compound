@@ -1335,7 +1335,7 @@ function SaveExitModal({ onResume, onExit }) {
       style={{
         position: 'absolute',
         inset: 0,
-        background: 'rgba(7,7,9,.84)',
+        background: C.veil(.84),
         backdropFilter: 'blur(8px)',
         zIndex: 200,
         display: 'flex',

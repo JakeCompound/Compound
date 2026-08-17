@@ -1,17 +1,55 @@
-// sw.js — COMPOUND service worker.  (v3 — ring badge)
+// sw.js — COMPOUND service worker.  (v4 — real offline caching)
 //
-// Its job for Phase 6 is Web Push: receive a pushed message from the server and
-// show a notification, even when the app (or the whole browser) is closed. It is
-// deliberately minimal — no offline caching yet; that can be layered on later.
+// Two jobs: Web Push (below) and offline support. The fetch handler must do
+// REAL work — Chrome detects no-op fetch handlers and fails installability
+// when it finds one (a site with NO service worker installs on the manifest
+// alone, but a site with a fake fetch handler does not).
+const CACHE = 'compound-v4';
+const PRECACHE = ['/', '/manifest.webmanifest', '/icon-180.png', '/icon-192.png', '/icon-512.png', '/badge-96.png', '/app-icon.js'];
 
-// Activate immediately on first install / update so pushes work right away.
-self.addEventListener('install', () => self.skipWaiting());
-self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
+self.addEventListener('install', (event) => {
+  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(PRECACHE)).catch(() => {}));
+  self.skipWaiting();
+});
+self.addEventListener('activate', (event) => {
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)));
+    await self.clients.claim();
+  })());
+});
 
-// No-op fetch handler. We don't cache anything yet, but its mere presence is
-// what makes Chrome offer "Install app" for the PWA. Letting it fall through
-// means the network handles every request normally.
-self.addEventListener('fetch', () => {});
+// Navigations: network-first with the cached shell as offline fallback.
+// Hashed build assets: cache-first (filenames change per deploy, safe forever).
+// Cross-origin (Supabase, fonts) and /api/* pass straight through.
+self.addEventListener('fetch', (event) => {
+  const req = event.request;
+  if (req.method !== 'GET') return;
+  const url = new URL(req.url);
+  if (url.origin !== self.location.origin) return;
+  if (url.pathname.startsWith('/api/')) return;
+
+  if (req.mode === 'navigate') {
+    event.respondWith(
+      fetch(req).then((res) => {
+        const copy = res.clone();
+        caches.open(CACHE).then((c) => c.put('/', copy)).catch(() => {});
+        return res;
+      }).catch(() => caches.match('/'))
+    );
+    return;
+  }
+
+  event.respondWith(
+    caches.match(req).then((hit) => hit || fetch(req).then((res) => {
+      if (res.ok && (url.pathname.startsWith('/assets/') || PRECACHE.includes(url.pathname))) {
+        const copy = res.clone();
+        caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
+      }
+      return res;
+    }))
+  );
+});
 
 // A push arrived. Payload is JSON: { title, body, tag, url }.
 self.addEventListener('push', (event) => {

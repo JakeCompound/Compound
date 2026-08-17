@@ -134,8 +134,9 @@ function TodayTodos({ user, set, state, onOpenCheckin, onWeighIn, onGoWorkout, o
     onChanged && onChanged();
   };
 
-  // On the join day, defer the daily weigh-in & check-in to tomorrow so day one
-  // is a clean start, not a list of things already "missed". Encouragement first.
+  // On the join day, defer only the daily weigh-in to tomorrow — its morning
+  // slot has usually already passed, so it would show as "missed" straight away.
+  // The nightly check-in starts the day the user joins.
   const joinDay = isJoinDay();
 
   const todos = [
@@ -174,13 +175,16 @@ function TodayTodos({ user, set, state, onOpenCheckin, onWeighIn, onGoWorkout, o
         </svg>
       ),
     }] : []),
-    ...(joinDay ? [] : [{
+    {
       id: 'checkin',
       label: 'Daily Check-in',
       sub: '9 quick questions',
       time: user.checkInTime || '21:00',
       done: !!state.todayCheckinDone,
       editable: true,
+      // Day one: whatever time the user joined, tonight's check-in stays open
+      // instead of flipping to red once their usual slot has passed.
+      softDeadline: joinDay,
       onDo: onOpenCheckin,
       glyph: (
         <svg width="20" height="20" viewBox="0 0 22 22" fill="none">
@@ -190,7 +194,7 @@ function TodayTodos({ user, set, state, onOpenCheckin, onWeighIn, onGoWorkout, o
           <line x1="15" y1="3" x2="15" y2="7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
         </svg>
       ),
-    }]),
+    },
   ].sort((a, b) => (a.time < b.time ? -1 : 1));
 
   const doneCount = todos.filter((t) => t.done).length;
@@ -213,12 +217,12 @@ function TodayTodos({ user, set, state, onOpenCheckin, onWeighIn, onGoWorkout, o
         ))}
       </div>
 
-      {/* Join day: the daily weigh-in & check-in start tomorrow — set the tone. */}
+      {/* Join day: the morning weigh-in starts tomorrow — set the tone. */}
       {joinDay && (
         <div style={{ marginTop: todos.length ? 10 : 2, padding: '12px 14px', background: C.surf1, border: `1px dashed ${C.accentDim}`, borderRadius: 12, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
           <span style={{ fontSize: 16, lineHeight: 1 }}>🌱</span>
           <div style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: C.textMid, lineHeight: 1.45 }}>
-            Day one — nothing to catch up on. Your daily <strong style={{ color: C.text }}>weigh-in</strong> and <strong style={{ color: C.text }}>check-in</strong> start <strong style={{ color: C.accent }}>tomorrow</strong>. Settle in tonight.
+            Day one — nothing to catch up on. Tonight's <strong style={{ color: C.text }}>check-in</strong> is ready above; your daily <strong style={{ color: C.text }}>weigh-in</strong> starts <strong style={{ color: C.accent }}>tomorrow morning</strong>.
           </div>
         </div>
       )}
@@ -298,8 +302,9 @@ function TodayTodos({ user, set, state, onOpenCheckin, onWeighIn, onGoWorkout, o
 
 function TodoRow({ todo, now, dateKey }) {
   const due = dueToday(todo.time);
-  const diff = due.getTime() - now; // >0 = upcoming, <0 = overdue
-  const overdue = diff < 0;
+  const diff = due.getTime() - now; // >0 = upcoming, <0 = past due time
+  const late = diff < 0;
+  const overdue = late && !todo.softDeadline; // soft deadline never turns red
   const missedMs = -diff;
   const missed = overdue && missedMs > MISS_GRACE_MS;
 
@@ -322,11 +327,17 @@ function TodoRow({ todo, now, dateKey }) {
     statusText = 'DONE';
     timerText = '✓';
     timerColor = C.success;
-  } else if (!overdue) {
+  } else if (!late) {
     accent = C.accent;
     statusText = `DUE ${todo.time}`;
     timerText = fmt(diff);
     timerColor = diff < 30 * 60 * 1000 ? C.accent : C.textMid; // <30m → accent
+  } else if (!overdue) {
+    // Past the usual slot but on a soft deadline (join day) — still open tonight.
+    accent = C.accent;
+    statusText = 'OPEN TONIGHT';
+    timerText = '·';
+    timerColor = C.textMid;
   } else {
     accent = C.danger;
     statusText = missed ? 'MISSED' : 'OVERDUE';

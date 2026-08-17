@@ -5,8 +5,8 @@
 // Everything COUNTS from day one — there is no waiting period. We record the
 // join date only to (a) show a welcome banner during the partial join week,
 // (b) hold back urgency/pressure UI until their first full week, and (c) defer
-// the daily weigh-in/check-in to-dos to day two so day one feels like a fresh
-// start. Logging, targets and weekly rings are live immediately.
+// the morning weigh-in to-do to day two (its slot has usually already passed).
+// The nightly check-in, logging, targets and weekly rings are live immediately.
 
 const JOIN_KEY = 'compound:joinedAt';
 
@@ -45,9 +45,9 @@ export function isFirstWeekPostJoin(now = new Date()) {
   return atMidnight(now) < start;
 }
 
-// True only on the calendar day the user joined. Used to defer the daily
-// weigh-in / check-in to the next day so day one feels like a fresh start,
-// not a list of things already "missed".
+// True only on the calendar day the user joined. Used to defer the morning
+// weigh-in to the next day (and soften the check-in deadline) so day one
+// feels like a fresh start, not a list of things already "missed".
 export function isJoinDay(now = new Date()) {
   const j = getJoinedAt();
   if (!j) return false;

@@ -723,6 +723,25 @@ function ScreenGratitudeBuilder({ data, set, ctx, onNext, onBack }) {
   const [activeCat, setActiveCat] = React.useState(GRATITUDE_CATEGORIES[0].id);
   const [input, setInput] = React.useState('');
 
+  // Switching category auto-scrolls on BOTH axes so no manual scrolling is ever
+  // needed: the active tab centres itself in the horizontal strip, and the page
+  // scrolls back up so the new section's prompt + suggestions start at the top.
+  const tabsRef = React.useRef(null);
+  const activeTabRef = React.useRef(null);
+  const skipFirstScroll = React.useRef(true);
+  React.useEffect(() => {
+    if (skipFirstScroll.current) { skipFirstScroll.current = false; return; }
+    // Vertical: bring the tab strip back to the top of the outer scroller.
+    tabsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // Horizontal: centre the active tab by scrolling the strip itself (not a
+    // second scrollIntoView — concurrent smooth scrollIntoViews cancel each other).
+    const strip = tabsRef.current, tab = activeTabRef.current;
+    if (strip && tab) {
+      const left = tab.offsetLeft - (strip.clientWidth - tab.offsetWidth) / 2;
+      strip.scrollTo({ left: Math.max(0, left), behavior: 'smooth' });
+    }
+  }, [activeCat]);
+
   const items = data.gratitude || [];
   const byCat = (id) => items.filter((g) => g.cat === id);
   const cat = GRATITUDE_CATEGORIES.find((c) => c.id === activeCat);
@@ -818,13 +837,14 @@ function ScreenGratitudeBuilder({ data, set, ctx, onNext, onBack }) {
       </div>
 
       {/* Category tabs */}
-      <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 8, marginLeft: -2, marginRight: -2 }}>
+      <div ref={tabsRef} style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 8, marginLeft: -2, marginRight: -2, scrollMarginTop: 8 }}>
         {GRATITUDE_CATEGORIES.map((c) => {
           const count = byCat(c.id).length;
           const active = c.id === activeCat;
           return (
             <button
               key={c.id}
+              ref={active ? activeTabRef : undefined}
               onClick={() => setActiveCat(c.id)}
               style={{
                 flexShrink: 0,

@@ -175,7 +175,8 @@ function HomeScreen({ user, set, state, onOpenCheckin, onGoTo, onOpenSettings, o
 }
 
 // Shown only during the partial week a user joins in. Sets expectations gently:
-// no pressure to "catch up", full weekly tracking begins Sunday. Dismissible.
+// everything counts from day one — a mid-week join is a head start on the first
+// full week, never a wait. Dismissible.
 function WelcomeBanner() {
   const [hidden, setHidden] = React.useState(() => {
     try { return localStorage.getItem('compound:welcomeDismissed') === '1'; } catch (e) { return false; }
@@ -194,10 +195,10 @@ function WelcomeBanner() {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, letterSpacing: 1.6, color: C.accent, marginBottom: 3 }}>WELCOME TO COMPOUND</div>
         <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 17, letterSpacing: 0.4, color: C.text, textTransform: 'uppercase', lineHeight: 1.1 }}>
-          You're in — ease into it
+          You're in — it counts from today
         </div>
         <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: C.textMid, lineHeight: 1.45, margin: '4px 0 0' }}>
-          You joined mid-week, so there's nothing to catch up on. Log what you can, build the habit — <span style={{ color: C.accent }}>full weekly tracking kicks in Sunday.</span>
+          <span style={{ color: C.accent }}>Everything starts now</span> — every meal, step and session you log already counts. You joined mid-week, so there's nothing to catch up on; a fresh week rolls over Sunday, like it does every week.
         </p>
       </div>
       <button

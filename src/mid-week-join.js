@@ -2,10 +2,11 @@
 //
 // The week runs Sunday→Saturday. Someone who joins on, say, Wednesday shouldn't
 // be told they're "behind" on workouts for a week they only caught the tail of.
-// So we record their join date and treat everything up to the FIRST Sunday after
-// joining as a grace period: urgency/pressure UI is held back, a welcome banner
-// explains that "full tracking kicks in Sunday", and the normal habit-building
-// reminders (check-in, weigh-in, workout) keep firing as usual.
+// Everything COUNTS from day one — there is no waiting period. We record the
+// join date only to (a) show a welcome banner during the partial join week,
+// (b) hold back urgency/pressure UI until their first full week, and (c) defer
+// the daily weigh-in/check-in to-dos to day two so day one feels like a fresh
+// start. Logging, targets and weekly rings are live immediately.
 
 const JOIN_KEY = 'compound:joinedAt';
 

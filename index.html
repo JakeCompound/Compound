@@ -12,6 +12,13 @@
   <meta name="apple-mobile-web-app-title" content="COMPOUND" />
   <meta name="theme-color" content="#070709" />
 
+  <!-- Manifest + icons MUST live in <head>: Chrome's manifest discovery is
+       head-only, and an undiscovered manifest silently downgrades "Install app"
+       to a Chrome-hosted shortcut instead of a real WebAPK. -->
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" href="/icon-192.png" />
+  <link rel="apple-touch-icon" href="/icon-180.png" />
+
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@300;400;500;600&display=swap" />
@@ -45,12 +52,6 @@
 </head>
 <body>
   <div id="root"></div>
-
-  <!-- Static PWA manifest + icons (real files, so Chrome offers a true "Install app"
-       and mints a standalone WebAPK — a runtime blob: manifest is NOT installable). -->
-  <link rel="manifest" href="/manifest.webmanifest" />
-  <link rel="icon" href="/icon-192.png" />
-  <link rel="apple-touch-icon" href="/icon-180.png" />
 
   <!-- App icon data (sets window.COMPOUND_ICON_180 / _512) — still used by the in-app shell. -->
   <script src="/app-icon.js"></script>

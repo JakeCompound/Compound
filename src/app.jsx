@@ -259,6 +259,29 @@ function App() {
     }
   };
 
+  // Recovery for a check-in logged on the wrong side of midnight (after the
+  // 3am grace): Settings offers to shift today's entry back to yesterday.
+  // Only when it can't clobber anything — today has an entry, yesterday none.
+  const moveCheckinToYesterday = () => {
+    const today = isoDate(new Date());
+    const y = new Date(); y.setDate(y.getDate() - 1);
+    const yKey = isoDate(y);
+    const list = loadCheckins();
+    const entry = list.find((h) => h.date === today);
+    if (!entry || list.some((h) => h.date === yKey)) return;
+    const next = [...list.filter((h) => h.date !== today), { ...entry, date: yKey }]
+      .sort((a, b) => (a.date < b.date ? -1 : 1));
+    saveCheckins(next);
+    setCheckins(next);
+    setTodayCompleted(false);
+  };
+  const canMoveCheckin = (() => {
+    const today = isoDate(new Date());
+    const y = new Date(); y.setDate(y.getDate() - 1);
+    const yKey = isoDate(y);
+    return checkins.some((h) => h.date === today) && !checkins.some((h) => h.date === yKey);
+  })();
+
   // reset todayCompleted whenever demo state switches
   React.useEffect(() => {
     setTodayCompleted(false);
@@ -508,6 +531,7 @@ function App() {
               onRecalc={() => { setShowSettings(false); setShowCalc(true); }}
               onClose={() => setShowSettings(false)}
               onReset={() => { setShowSettings(false); setView('onboarding'); setStep(0); }}
+              onFixCheckinDay={canMoveCheckin ? moveCheckinToYesterday : null}
             />
           </div>
         )}

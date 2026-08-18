@@ -116,6 +116,7 @@ function App() {
       dietTracking: false,
       checkInTime: '21:00',
       weighInTime: '06:00',
+      weighInEveryDays: 1, // 1 = daily … 7 = weekly
       gratitude: [],
       fitnessLevel: null,
       lifts: {},

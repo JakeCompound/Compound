@@ -88,6 +88,10 @@ function TodayTodos({ user, set, state, onOpenCheckin, onWeighIn, onGoWorkout, o
 
   const dateKey = window.isoDate ? window.isoDate(new Date()) : new Date().toISOString().slice(0, 10);
 
+  // Bumped when a missed-reason is saved so the acknowledged row drops out
+  // immediately (the filter below re-reads localStorage on every render).
+  const [, setReasonTick] = React.useState(0);
+
   // Effective schedule for THIS week (base schedule + any in-week override)
   const baseDays = scheduledWorkoutDays(user);
   const [override, setOverride] = React.useState(() => loadWeekOverride());
@@ -139,11 +143,25 @@ function TodayTodos({ user, set, state, onOpenCheckin, onWeighIn, onGoWorkout, o
   // The nightly check-in starts the day the user joins.
   const joinDay = isJoinDay();
 
+  // Weigh-in frequency (Settings → Reminders): 1 = daily … 7 = weekly. Due once
+  // enough days have passed since the last logged weigh-in; a day it was logged
+  // on always shows (as DONE), and it stays due until it's actually logged.
+  const weighEvery = Math.min(7, Math.max(1, user.weighInEveryDays || 1));
+  const weighDue = weighDoneToday || weighEvery === 1 || (() => {
+    try {
+      const ws = window.loadWeighins ? window.loadWeighins() : JSON.parse(localStorage.getItem('compound:weighins') || '[]');
+      if (!ws.length) return true; // never weighed in → due
+      const lastDate = ws.reduce((m, w) => (w.date > m ? w.date : m), '');
+      const days = Math.round((new Date(dateKey + 'T12:00:00') - new Date(lastDate + 'T12:00:00')) / 86400000);
+      return days >= weighEvery;
+    } catch (e) { return true; }
+  })();
+
   const todos = [
-    ...(joinDay ? [] : [{
+    ...(joinDay || !weighDue ? [] : [{
       id: 'weighin',
-      label: 'Daily Weigh-in',
-      sub: 'Pre-water · one number',
+      label: weighEvery === 1 ? 'Daily Weigh-in' : weighEvery === 7 ? 'Weekly Weigh-in' : 'Weigh-in',
+      sub: weighEvery === 1 ? 'Pre-water · one number' : weighEvery === 7 ? 'Once a week · pre-water' : `Every ${weighEvery} days · pre-water`,
       time: user.weighInTime || '06:30',
       done: !!weighDoneToday,
       editable: true,
@@ -195,7 +213,15 @@ function TodayTodos({ user, set, state, onOpenCheckin, onWeighIn, onGoWorkout, o
         </svg>
       ),
     },
-  ].sort((a, b) => (a.time < b.time ? -1 : 1));
+  ].sort((a, b) => (a.time < b.time ? -1 : 1))
+    // A missed to-do the user has already explained drops off the list — naming
+    // the reason is the acknowledgment; no point leaving a red row up all day.
+    // (Workouts keep their own Postpone flow.)
+    .filter((t) => {
+      if (t.done || t.canPostpone || t.softDeadline) return true;
+      const missed = now - dueToday(t.time).getTime() > MISS_GRACE_MS;
+      return !(missed && getTodoReason(dateKey, t.id));
+    });
 
   const doneCount = todos.filter((t) => t.done).length;
 
@@ -213,7 +239,7 @@ function TodayTodos({ user, set, state, onOpenCheckin, onWeighIn, onGoWorkout, o
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {todos.map((t) => (
-          <TodoRow key={t.id} todo={t} now={now} dateKey={dateKey} />
+          <TodoRow key={t.id} todo={t} now={now} dateKey={dateKey} onReasonSaved={() => setReasonTick((x) => x + 1)} />
         ))}
       </div>
 
@@ -300,7 +326,7 @@ function TodayTodos({ user, set, state, onOpenCheckin, onWeighIn, onGoWorkout, o
   );
 }
 
-function TodoRow({ todo, now, dateKey }) {
+function TodoRow({ todo, now, dateKey, onReasonSaved }) {
   const due = dueToday(todo.time);
   const diff = due.getTime() - now; // >0 = upcoming, <0 = past due time
   const late = diff < 0;
@@ -447,7 +473,7 @@ function TodoRow({ todo, now, dateKey }) {
                 {MISS_REASONS.map((r) => (
                   <button
                     key={r}
-                    onClick={() => { saveTodoReason(dateKey, todo.id, r); setReason(r); setAskReason(false); }}
+                    onClick={() => { saveTodoReason(dateKey, todo.id, r); setReason(r); setAskReason(false); onReasonSaved && onReasonSaved(); }}
                     style={{
                       padding: '7px 12px', borderRadius: 999,
                       background: C.surf1, border: `1px solid ${C.line}`,

@@ -42,7 +42,7 @@ function fmtWorkoutSchedule(user) {
   return groups.map((g) => `${g.days.join(' · ')} ${g.t}`).join(', ');
 }
 
-function SettingsScreen({ user, set, onClose, onReset, onRecalc }) {
+function SettingsScreen({ user, set, onClose, onReset, onRecalc, onFixCheckinDay }) {
   const [section, setSection] = React.useState(null); // null = main, else section id
   const [showClear, setShowClear] = React.useState(false); // "clear all cloud data" modal
   const [measureUnit, setMeasureUnit] = React.useState(() => { try { return localStorage.getItem('compound:measureUnit') === 'in' ? 'in' : 'cm'; } catch (e) { return 'cm'; } });
@@ -143,6 +143,11 @@ function SettingsScreen({ user, set, onClose, onReset, onRecalc }) {
           <SettingsRow icon={<IconBell />} label="Reminder times" hint={`Check-in ${user.checkInTime} · Weigh-in ${user.weighInTime} ${fmtWeighFreq(Math.min(7, Math.max(1, user.weighInEveryDays || 1))).toLowerCase()}`} onClick={() => setSection('reminders')} />
           <SettingsRow icon={<IconSpark />} label="Gratitude library" hint={`${(user.gratitude || []).length} items · 7 categories`} onClick={() => setSection('gratitude')} />
           <SettingsRow icon={<IconBellFilled />} label="Notification preferences" hint="What pings you, what doesn't" onClick={() => setSection('notifications')} />
+          {/* Recovery: a check-in logged after the 3am grace landed on today —
+              offered only while today has an entry and yesterday doesn't. */}
+          {onFixCheckinDay && (
+            <SettingsRow icon={<IconBolt />} label="Move today's check-in to yesterday" hint="Logged it this morning? Shift it back to last night" onClick={onFixCheckinDay} />
+          )}
         </SettingsGroup>
 
         <SettingsGroup label="NUTRITION">

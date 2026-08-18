@@ -143,11 +143,25 @@ function TodayTodos({ user, set, state, onOpenCheckin, onWeighIn, onGoWorkout, o
   // The nightly check-in starts the day the user joins.
   const joinDay = isJoinDay();
 
+  // Weigh-in frequency (Settings → Reminders): 1 = daily … 7 = weekly. Due once
+  // enough days have passed since the last logged weigh-in; a day it was logged
+  // on always shows (as DONE), and it stays due until it's actually logged.
+  const weighEvery = Math.min(7, Math.max(1, user.weighInEveryDays || 1));
+  const weighDue = weighDoneToday || weighEvery === 1 || (() => {
+    try {
+      const ws = window.loadWeighins ? window.loadWeighins() : JSON.parse(localStorage.getItem('compound:weighins') || '[]');
+      if (!ws.length) return true; // never weighed in → due
+      const lastDate = ws.reduce((m, w) => (w.date > m ? w.date : m), '');
+      const days = Math.round((new Date(dateKey + 'T12:00:00') - new Date(lastDate + 'T12:00:00')) / 86400000);
+      return days >= weighEvery;
+    } catch (e) { return true; }
+  })();
+
   const todos = [
-    ...(joinDay ? [] : [{
+    ...(joinDay || !weighDue ? [] : [{
       id: 'weighin',
-      label: 'Daily Weigh-in',
-      sub: 'Pre-water · one number',
+      label: weighEvery === 1 ? 'Daily Weigh-in' : weighEvery === 7 ? 'Weekly Weigh-in' : 'Weigh-in',
+      sub: weighEvery === 1 ? 'Pre-water · one number' : weighEvery === 7 ? 'Once a week · pre-water' : `Every ${weighEvery} days · pre-water`,
       time: user.weighInTime || '06:30',
       done: !!weighDoneToday,
       editable: true,

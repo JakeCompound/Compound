@@ -88,6 +88,10 @@ function TodayTodos({ user, set, state, onOpenCheckin, onWeighIn, onGoWorkout, o
 
   const dateKey = window.isoDate ? window.isoDate(new Date()) : new Date().toISOString().slice(0, 10);
 
+  // Bumped when a missed-reason is saved so the acknowledged row drops out
+  // immediately (the filter below re-reads localStorage on every render).
+  const [, setReasonTick] = React.useState(0);
+
   // Effective schedule for THIS week (base schedule + any in-week override)
   const baseDays = scheduledWorkoutDays(user);
   const [override, setOverride] = React.useState(() => loadWeekOverride());
@@ -195,7 +199,15 @@ function TodayTodos({ user, set, state, onOpenCheckin, onWeighIn, onGoWorkout, o
         </svg>
       ),
     },
-  ].sort((a, b) => (a.time < b.time ? -1 : 1));
+  ].sort((a, b) => (a.time < b.time ? -1 : 1))
+    // A missed to-do the user has already explained drops off the list — naming
+    // the reason is the acknowledgment; no point leaving a red row up all day.
+    // (Workouts keep their own Postpone flow.)
+    .filter((t) => {
+      if (t.done || t.canPostpone || t.softDeadline) return true;
+      const missed = now - dueToday(t.time).getTime() > MISS_GRACE_MS;
+      return !(missed && getTodoReason(dateKey, t.id));
+    });
 
   const doneCount = todos.filter((t) => t.done).length;
 
@@ -213,7 +225,7 @@ function TodayTodos({ user, set, state, onOpenCheckin, onWeighIn, onGoWorkout, o
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {todos.map((t) => (
-          <TodoRow key={t.id} todo={t} now={now} dateKey={dateKey} />
+          <TodoRow key={t.id} todo={t} now={now} dateKey={dateKey} onReasonSaved={() => setReasonTick((x) => x + 1)} />
         ))}
       </div>
 
@@ -300,7 +312,7 @@ function TodayTodos({ user, set, state, onOpenCheckin, onWeighIn, onGoWorkout, o
   );
 }
 
-function TodoRow({ todo, now, dateKey }) {
+function TodoRow({ todo, now, dateKey, onReasonSaved }) {
   const due = dueToday(todo.time);
   const diff = due.getTime() - now; // >0 = upcoming, <0 = past due time
   const late = diff < 0;
@@ -447,7 +459,7 @@ function TodoRow({ todo, now, dateKey }) {
                 {MISS_REASONS.map((r) => (
                   <button
                     key={r}
-                    onClick={() => { saveTodoReason(dateKey, todo.id, r); setReason(r); setAskReason(false); }}
+                    onClick={() => { saveTodoReason(dateKey, todo.id, r); setReason(r); setAskReason(false); onReasonSaved && onReasonSaved(); }}
                     style={{
                       padding: '7px 12px', borderRadius: 999,
                       background: C.surf1, border: `1px solid ${C.line}`,

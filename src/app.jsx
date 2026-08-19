@@ -14,6 +14,7 @@ import { alcoholOn } from './alcohol.js';
 import { ReportsScreen } from './reports-screen.jsx';
 import { SettingsScreen } from './settings-screen.jsx';
 import { markJoined } from './mid-week-join.js';
+import { initBackButton, setBackFallback, useBackClose } from './back-button.js';
 import { TweakButton, TweakColor, TweakRadio, TweakSection, TweakSelect, TweakToggle, TweaksPanel, useTweaks } from './tweaks-panel.jsx';
 import { PastWorkouts, WeeklyPlan, WorkoutDashboard } from './workout-dashboard.jsx';
 import { SavedWorkoutsScreen } from './workout-enhancements.jsx';
@@ -173,6 +174,24 @@ function App() {
 
   const next = () => setStep((s) => s + 1);
   const back = () => setStep((s) => Math.max(0, s - 1));
+
+  // ── Phone back button: navigate in-app instead of closing the PWA ────────
+  // Overlays register themselves via useBackClose (below and in components);
+  // this fallback handles screen-level navigation when nothing is open.
+  React.useEffect(() => { initBackButton(); }, []);
+  React.useEffect(() => {
+    setBackFallback(() => {
+      if (view === 'onboarding') {
+        if (step > 0 && !exited && !savingExit) { back(); return true; }
+        return false;
+      }
+      if (view !== 'app') return false;
+      // A live workout session keeps its own exit flow — don't yank it away.
+      if (tab === 'workout' && workoutView !== 'home' && workoutView !== 'session') { setWorkoutView('home'); return true; }
+      if (tab !== 'home') { setTab('home'); return true; }
+      return false;
+    });
+  }, [view, step, exited, savingExit, tab, workoutView]);
   const onSave = () => setSavingExit(true);
 
   const ctxFor = (idx, key) => {
@@ -231,6 +250,11 @@ function App() {
 
   const openCheckin = () => setCheckinOpen(true);
   const closeCheckin = () => setCheckinOpen(false);
+
+  // Hardware back closes these before any screen-level navigation kicks in.
+  useBackClose(checkinOpen, closeCheckin);
+  useBackClose(showSettings, () => setShowSettings(false));
+  useBackClose(showCalc, () => setShowCalc(false));
   const completeCheckin = (answers) => {
     setCheckinOpen(false);
     setCelebrate(true);

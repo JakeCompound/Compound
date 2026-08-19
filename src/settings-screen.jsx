@@ -5,6 +5,7 @@ import { supabase, supabaseConfigured } from './supabase.js';
 import { pushSupported, notifPermission, isSubscribed, subscribePush, unsubscribePush } from './push.js';
 import { clearAllCloudData } from './cloud-sync.js';
 import { alcoholOn } from './alcohol.js';
+import { useBackClose } from './back-button.js';
 
 // settings-screen.jsx — Full settings, accessible via Home cog
 // Profile, goals, reminders, equipment, gratitude management, account, danger zone.
@@ -44,6 +45,8 @@ function fmtWorkoutSchedule(user) {
 
 function SettingsScreen({ user, set, onClose, onReset, onRecalc, onFixCheckinDay }) {
   const [section, setSection] = React.useState(null); // null = main, else section id
+  // Hardware back steps out of a section before closing Settings itself.
+  useBackClose(!!section, () => setSection(null));
   const [showClear, setShowClear] = React.useState(false); // "clear all cloud data" modal
   const [measureUnit, setMeasureUnit] = React.useState(() => { try { return localStorage.getItem('compound:measureUnit') === 'in' ? 'in' : 'cm'; } catch (e) { return 'cm'; } });
 

@@ -4,6 +4,7 @@ import { SectionLabel } from './home-components.jsx';
 import { NutritionChat } from './nutrition-screen.jsx';
 import { AddRow, DrinkChooser, FoodAdd, NipQuickAdd, SoftDrinkQuickAdd } from './add-button.jsx';
 import { alcoholOn } from './alcohol.js';
+import { useBackClose } from './back-button.js';
 
 // nutrition-tab.jsx — Redesigned Nutrition: Today (food tracker) / Ask (AI chat).
 
@@ -74,6 +75,9 @@ function NutritionToday({ user, onChanged, onSetupTargets }) {
   const [, force] = React.useReducer((x) => x + 1, 0);
   const [qOpen, setQOpen] = React.useState(false);
   const [sheet, setSheet] = React.useState(null); // 'menu' | 'food' | 'drink' | 'soft' | 'nip'
+  // Hardware back closes an open sheet / the questions flow first.
+  useBackClose(!!sheet, () => setSheet(null));
+  useBackClose(qOpen, () => setQOpen(false));
   // Browsing a past day is temporary — always snap back to today on leaving,
   // so other screens (check-in, Home rings) never read a browsed day.
   React.useEffect(() => () => { window.setLogDate && window.setLogDate(null); }, []);
@@ -271,6 +275,7 @@ function MacroBar({ label, value, target, color }) {
 function FoodRow({ food, onChanged }) {
   const [popup, setPopup] = React.useState(null); // 'confidence' | 'health' | 'info'
   const [edit, setEdit] = React.useState(false);
+  useBackClose(edit, () => setEdit(false)); // hardware back closes the edit sheet
   const nOpen = (food.questions || []).filter((q) => q.answer == null).length;
   const servings = window.servingsOf ? window.servingsOf(food) : 1;
   // A drink-entry serving carries its nips too — keep the nip tally in step.

@@ -7,6 +7,7 @@ import { ThreeRings } from './three-rings.jsx';
 import { TodayTodos } from './todo-list.jsx';
 import { isFirstWeekPostJoin } from './mid-week-join.js';
 import { alcoholOn } from './alcohol.js';
+import { useBackClose } from './back-button.js';
 
 // home-screen.jsx — The Home tab — assembles all the components
 
@@ -19,6 +20,7 @@ function HomeScreen({ user, set, state, onOpenCheckin, onGoTo, onOpenSettings, o
   const loadW = () => { try { return JSON.parse(localStorage.getItem('compound:weighins') || '[]'); } catch (e) { return []; } };
   const [weighEntries, setWeighEntries] = React.useState(loadW);
   const [weighOpen, setWeighOpen] = React.useState(false);
+  useBackClose(weighOpen, () => setWeighOpen(false)); // hardware back closes the modal
   const lastEntry = weighEntries.length ? weighEntries[weighEntries.length - 1] : null;
   const lastWeigh = lastEntry ? lastEntry.value : null;
   const weighDoneToday = !!(lastEntry && lastEntry.date === todayKey);

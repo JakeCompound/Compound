@@ -50,11 +50,12 @@ export default async function handler(req, res) {
   // 2) Validate the content payload (text + base64 image blocks).
   const content = req.body && req.body.content;
   if (!Array.isArray(content) || content.length === 0) {
+    console.error('[api/ai] rejected: missing/empty content', { bodyType: typeof req.body });
     return res.status(400).json({ error: 'Missing content' });
   }
   // Lightweight spend guard: cap images and total payload size per request.
   const imageCount = content.filter((b) => b && b.type === 'image').length;
-  if (imageCount > 2) return res.status(400).json({ error: 'Too many images' });
+  if (imageCount > 2) { console.error('[api/ai] rejected: too many images', { imageCount }); return res.status(400).json({ error: 'Too many images' }); }
   if (JSON.stringify(content).length > 8_000_000) return res.status(413).json({ error: 'Payload too large' });
 
   // 3) Call Anthropic — content blocks are already in the messages format.
@@ -81,6 +82,10 @@ export default async function handler(req, res) {
     return res.status(200).json({ text });
   } catch (e) {
     const status = e && e.status ? e.status : 502;
+    // Log the real cause server-side — the client only ever sees a generic
+    // "couldn't reach the model" message, so this is the only place a future
+    // failure like this one is diagnosable from Vercel's runtime logs.
+    console.error('[api/ai] Anthropic request failed', { status, message: e && e.message, type: e && e.error && e.error.type });
     return res.status(status).json({ error: e && e.message ? e.message : 'AI request failed' });
   }
 }

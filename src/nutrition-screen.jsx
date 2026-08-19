@@ -37,33 +37,45 @@ function NutritionChat({ user }) {
     }
   }, [messages, pending]);
 
-  const send = async (text) => {
-    const t = (text || '').trim();
-    if (!t || pending) return;
-    setInput('');
-    const userMsg = { role: 'user', content: t, ts: Date.now() };
-    setMessages((m) => [...m, userMsg]);
+  // Ask a question. On failure the message keeps its text (not just an error
+  // stub) so retry() below can resend the exact same question.
+  const ask = async (t) => {
     setPending(true);
-
-    // Compose system context
     const ctx = buildContext(user);
     const prompt = `${ctx}\n\nUser question: ${t}\n\nGive a concise, direct, coach-like answer (Australian English, no fluff). Use short paragraphs and a bulleted list if needed. Reference their data when relevant but don't restate it.`;
-
     try {
       const reply = await window.claude.complete(prompt);
-      const aiMsg = { role: 'assistant', content: reply, ts: Date.now() };
-      setMessages((m) => [...m, aiMsg]);
+      setMessages((m) => [...m, { role: 'assistant', content: reply, ts: Date.now() }]);
     } catch (e) {
-      setMessages((m) => [...m, {
-        role: 'assistant',
-        content: "Couldn't reach the model — try again in a moment.",
-        ts: Date.now(),
-        error: true,
-      }]);
+      // One quiet automatic retry — most failures at this layer are a single
+      // transient hiccup (network blip, momentary Anthropic 5xx), not a real
+      // outage. Only surface the error state if the retry also fails.
+      try {
+        const reply = await window.claude.complete(prompt);
+        setMessages((m) => [...m, { role: 'assistant', content: reply, ts: Date.now() }]);
+      } catch (e2) {
+        setMessages((m) => [...m, {
+          role: 'assistant',
+          content: "Couldn't get an answer that time. Give it another shot?",
+          ts: Date.now(),
+          error: true,
+          retryText: t,
+        }]);
+      }
     } finally {
       setPending(false);
     }
   };
+
+  const send = (text) => {
+    const t = (text || '').trim();
+    if (!t || pending) return;
+    setInput('');
+    setMessages((m) => [...m, { role: 'user', content: t, ts: Date.now() }]);
+    ask(t);
+  };
+
+  const retry = (t) => { if (!pending) ask(t); };
 
   const clear = () => {
     setMessages([]);
@@ -94,7 +106,7 @@ function NutritionChat({ user }) {
         ) : (
           <>
             <ContextChip user={user} />
-            {messages.map((m, i) => <MessageBubble key={i} m={m} />)}
+            {messages.map((m, i) => <MessageBubble key={i} m={m} onRetry={retry} />)}
             {pending && <ThinkingBubble />}
           </>
         )}
@@ -247,7 +259,7 @@ function EmptyNutrition({ user, onPick }) {
   );
 }
 
-function MessageBubble({ m }) {
+function MessageBubble({ m, onRetry }) {
   const isUser = m.role === 'user';
   return (
     <div style={{ display: 'flex', justifyContent: isUser ? 'flex-end' : 'flex-start', marginBottom: 12 }}>
@@ -274,6 +286,19 @@ function MessageBubble({ m }) {
           </div>
         )}
         {m.content}
+        {m.error && m.retryText && (
+          <button
+            onClick={() => onRetry(m.retryText)}
+            style={{
+              display: 'block', marginTop: 10, padding: '8px 14px',
+              background: C.accent, border: 0, borderRadius: 8, color: C.onAccent,
+              fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 12,
+              letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer',
+            }}
+          >
+            Try again
+          </button>
+        )}
       </div>
     </div>
   );

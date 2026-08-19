@@ -91,6 +91,22 @@ function NutritionToday({ user, onChanged, onSetupTargets }) {
 
   const refresh = () => { force(); onChanged && onChanged(); };
 
+  // Swipe-delete mirrors the edit sheet's Delete: a drink-entry un-counts its
+  // nips (× servings) from the tally before the entry goes.
+  const deleteFood = (f) => {
+    if (f.nips > 0 && window.setNipsToday && window.loadNipsToday) {
+      window.setNipsToday(Math.max(0, +(window.loadNipsToday() - f.nips * (window.servingsOf ? window.servingsOf(f) : 1)).toFixed(2)));
+    }
+    window.removeFood(f.id);
+    refresh();
+  };
+  // Clears the viewed day's alcohol line entirely (nips + kcal).
+  const deleteAlcohol = () => {
+    if (window.setNipsToday) window.setNipsToday(0);
+    if (window.setAlcoholKcal) window.setAlcoholKcal(0);
+    refresh();
+  };
+
   // Earned exercise kcal for the ACTIVE day (steps above baseline + walks/
   // runs + workouts), added straight onto that day's allowance.
   const earned = window.dayEarnedKcal ? window.dayEarnedKcal(day) : 0;
@@ -179,9 +195,17 @@ function NutritionToday({ user, onChanged, onSetupTargets }) {
               const nips = window.loadNipsToday ? window.loadNipsToday() : 0;
               const akcal = window.loadAlcoholKcal ? window.loadAlcoholKcal() : 0;
               if (!alcoholOn(user) || (nips <= 0 && akcal <= 0)) return null;
-              return <AlcoholRow nips={nips} kcal={akcal} onAdd={() => setSheet('nip')} />;
+              return (
+                <SwipeRow onDelete={deleteAlcohol}>
+                  <AlcoholRow nips={nips} kcal={akcal} onAdd={() => setSheet('nip')} />
+                </SwipeRow>
+              );
             })()}
-            {foods.map((f) => <FoodRow key={f.id} food={f} onChanged={refresh} />)}
+            {foods.map((f) => (
+              <SwipeRow key={f.id} onDelete={() => deleteFood(f)}>
+                <FoodRow food={f} onChanged={refresh} />
+              </SwipeRow>
+            ))}
           </div>
         )}
       </div>
@@ -694,6 +718,56 @@ function NutritionWeek({ user }) {
       <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: C.textMid, lineHeight: 1.5, margin: '16px 4px 0' }}>
         Consistency beats perfection — it's the weekly average that moves the scale, not any single day.
       </p>
+    </div>
+  );
+}
+
+// Swipe a log row left to reveal Delete; snaps open/shut, tap-anywhere closes.
+// touch-action: pan-y keeps vertical list scrolling free. The transform is
+// 'none' at rest so absolutely-positioned sheets inside the row (MealEditSheet)
+// keep the app frame as their containing block.
+const SWIPE_W = 84;
+function SwipeRow({ onDelete, children }) {
+  const [dx, setDx] = React.useState(0);
+  const [dragging, setDragging] = React.useState(false);
+  const ref = React.useRef(null); // { x0, y0, base, locked }
+  const begin = (x, y) => { ref.current = { x0: x, y0: y, base: dx, locked: false }; };
+  const move = (x, y) => {
+    const d = ref.current; if (!d) return;
+    const mx = x - d.x0, my = y - d.y0;
+    if (!d.locked) {
+      if (Math.abs(mx) < 6) return;
+      if (Math.abs(my) > Math.abs(mx)) { ref.current = null; return; } // vertical scroll wins
+      d.locked = true; setDragging(true);
+    }
+    setDx(Math.min(0, Math.max(-SWIPE_W - 14, d.base + mx)));
+  };
+  const end = () => {
+    if (ref.current && ref.current.locked) setDx((x) => (x < -SWIPE_W / 2 ? -SWIPE_W : 0));
+    ref.current = null; setDragging(false);
+  };
+  return (
+    <div style={{ overflow: 'hidden', borderRadius: 12 }}>
+      <div
+        onTouchStart={(e) => begin(e.touches[0].clientX, e.touches[0].clientY)}
+        onTouchMove={(e) => move(e.touches[0].clientX, e.touches[0].clientY)}
+        onTouchEnd={end}
+        onTouchCancel={end}
+        onClickCapture={(e) => {
+          // Open row: any tap outside the Delete button just closes it.
+          if (dx < 0 && !(e.target.closest && e.target.closest('[data-swipe-del]'))) { e.preventDefault(); e.stopPropagation(); setDx(0); }
+        }}
+        style={{ display: 'flex', alignItems: 'stretch', transform: dx ? `translateX(${dx}px)` : 'none', transition: dragging ? 'none' : 'transform .18s ease', touchAction: 'pan-y' }}
+      >
+        <div style={{ flex: '0 0 100%', minWidth: '100%' }}>{children}</div>
+        <button
+          data-swipe-del=""
+          onClick={(e) => { e.stopPropagation(); setDx(0); onDelete(); }}
+          style={{ flex: `0 0 ${SWIPE_W - 8}px`, marginLeft: 8, background: C.danger, border: 0, borderRadius: 12, color: '#fff', fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 13, letterSpacing: 1.4, textTransform: 'uppercase', cursor: 'pointer' }}
+        >
+          Delete
+        </button>
+      </div>
     </div>
   );
 }

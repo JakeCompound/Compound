@@ -11,9 +11,13 @@ Audience is the owner first (Coach Luke's client), trains at **Focus Industrial*
 - **Type:** Barlow Condensed (headings, ALL CAPS), JetBrains Mono (numbers/data), Outfit (body).
 - **Patterns:** 2-line stacked headlines (white + amber), press-scale haptic buttons, grain overlay,
   auto-advance on single-select questions (no Continue), Back always present.
-- **Storage:** everything in `localStorage` under `compound:*` keys (to migrate to Supabase later).
-- Files are split into many small JSX modules loaded via `<script type="text/babel">` in `index.html`;
-  shared components exported to `window`. Bundle to `COMPOUND.html` via super_inline_html for phone links.
+- **Storage:** `localStorage` under `compound:*` keys is the synchronous source of truth; **Supabase is
+  live** — email/password auth (`auth-gate.jsx`), and `cloud-sync.js` hydrates on login then mirrors every
+  synced `compound:*` write to its mapped table (debounced). Public URL/anon key are hardcoded as fallback
+  in `supabase.js` (the Vercel env-var copy is corrupted with a stray em-dash).
+- **Build:** now a real **Vite + React 18** project (`src/*.jsx`, `npm run build`), deployed via Vercel —
+  production at **compoundhealth.app** (repo `JakeCompound/Compound`, `main` auto-deploys; PR branches get
+  preview URLs). `COMPOUND.html` is the legacy single-file bundle from the pre-Vite era.
 
 ## Navigation — 4 tabs + onboarding
 Home · Workout · Nutrition · Reports. Onboarding is a 14-step flow ending in a "track food?" step.
@@ -60,8 +64,28 @@ nutrition (calories/macros, food tracking, weekly nip limit — limit ONLY edita
 
 **PWA:** Add-to-Home-Screen prompt (Android install / iOS share-sheet), app icon, manifest, full-bleed on phone.
 
+## Recent changes — Claude Code session, 17–19 Aug 2026
+Shipped to production (PRs #1–#4 on `JakeCompound/Compound`, all merged to `main`):
+- **Check-in starts on join day** (PR #1): the join-day deferral now applies only to the morning weigh-in;
+  the nightly check-in appears on day one, with a soft deadline (shows "OPEN TONIGHT", never red) if the
+  user joins after their usual slot. `mid-week-join.js` comments updated to match.
+- **Missed to-dos disappear once a reason is given** (PR #2): tapping a "why missed" chip removes the red
+  row from the list immediately (reason stays recorded in `compound:todostate`). Workouts keep their own
+  Complete/Postpone flow.
+- **Weigh-in frequency setting** (PR #2): Settings → Reminders → chip picker, Daily → Weekly
+  (`user.weighInEveryDays`, default 1). The weigh-in to-do appears only when due, counted from the last
+  *logged* weigh-in; stays due until logged; label adapts. Stale "Friday weigh-in" copy cleaned up.
+- **3am check-in grace** (PR #3): a check-in finished before 3am is stamped to the previous evening
+  (`checkinEffectiveDate()` in `live-state.jsx`). Reopening in the window edits the same entry, the draft
+  survives midnight, the Sunday week-plan step keys off the night being logged, and grace-night check-ins
+  don't write nips/steps into the new day's ledgers. Rest of the app's day still rolls at midnight.
+- **Settings recovery row** (PR #4): "Move today's check-in to yesterday" under HABITS — appears only when
+  today has an entry and yesterday doesn't (post-3am mislog), one tap re-dates it, cloud sync mirrors it.
+- **Supabase auth ops** (no code): self-signup is the intended flow for new users (e.g. Coach Luke) —
+  dashboard "invite"/"add user" sends no usable credentials email. "Confirm email" is now OFF in Supabase
+  auth settings, so signup at compoundhealth.app is instant; re-enable only after wiring custom SMTP.
+
 ## What's NEXT / open ideas
-- Wire real backend (Supabase): accounts, cloud sync, real push notifications.
 - Real wearable integrations (Apple/Samsung Health) — currently honest "not connected" state.
 - Progress-photo upload + shareable monthly report card / badge sharing (currently decorative).
 - App Store / Play Store packaging (see earlier handoff discussion).
@@ -70,7 +94,8 @@ nutrition (calories/macros, food tracking, weekly nip limit — limit ONLY edita
 ## Gotchas for next session
 - localStorage keys are the source of truth; a one-time "clear today" block lives at the bottom of `app.jsx`
   (token-gated) — bump the token to wipe today's data for a clean demo.
-- Phone links from `get_public_file_url` expire ~1h; rebundle `COMPOUND.html` then regenerate.
+- Phone links from `get_public_file_url` are legacy (pre-Vite bundles) — the app now lives at
+  compoundhealth.app; PR branches get Vercel preview URLs for testing before merge.
 - html-to-image screenshots sometimes show false text-overlap on the to-do rows / wearable area — it's a
   capture artifact; the live DOM is fine.
 - Verifier subagent can time out on very long directed checks; prefer focused eval_js probes that don't

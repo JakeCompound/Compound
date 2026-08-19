@@ -2,6 +2,7 @@ import React from 'react';
 import { C, FieldLabel, MultiChip, StarRating, StepBar, Stepper } from './compound-ui.jsx';
 import { FooterNav } from './onboarding-screens.jsx';
 import { alcoholOn } from './alcohol.js';
+import { checkinEffectiveDate } from './live-state.jsx';
 
 // checkin-modal.jsx — Nightly 9-question check-in
 // Slides up from bottom over the Home screen.
@@ -27,7 +28,9 @@ const CALM_TIERS = [
 // In-progress check-in draft — survives a re-render/rotation that remounts the
 // modal. Keyed to the day so a stale draft never restores tomorrow.
 const CHECKIN_DRAFT_KEY = 'compound:checkinDraft';
-const ciToday = () => new Date().toISOString().slice(0, 10);
+// Keyed to the night being logged (3am grace), so a draft started before
+// midnight still restores just after it.
+const ciToday = () => checkinEffectiveDate();
 function loadCheckinDraft() {
   try { const d = JSON.parse(sessionStorage.getItem(CHECKIN_DRAFT_KEY)); if (d && d.date === ciToday()) return d; } catch (e) {}
   return null;
@@ -134,7 +137,9 @@ function CheckinModal({ open, onClose, onComplete, gratitudeLibrary = [], user =
   const set = (patch) => setAnswers((a) => ({ ...a, ...patch }));
 
   // Compose the actual sequence of steps based on conditional branches.
-  const isSunday = new Date().getDay() === 0;
+  // Sunday by the night being logged — a 12:30am Monday check-in is still
+  // Sunday's, so it keeps the week-plan step.
+  const isSunday = new Date(checkinEffectiveDate() + 'T12:00:00').getDay() === 0;
   const seq = (() => {
     const s = ['workout'];
     if (answers.workoutToday === true) s.push('workoutGroups', 'workoutMinutes', 'workoutIntensity');

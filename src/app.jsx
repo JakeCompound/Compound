@@ -5,7 +5,7 @@ import { C, GrainOverlay } from './compound-ui.jsx';
 import { TabBar } from './home-components.jsx';
 import { DEMO_STATES } from './home-data.jsx';
 import { HomeScreen } from './home-screen.jsx';
-import { deriveLiveState, isoDate, loadCheckins, recordCheckin, saveCheckins } from './live-state.jsx';
+import { checkinEffectiveDate, deriveLiveState, isoDate, loadCheckins, recordCheckin, saveCheckins } from './live-state.jsx';
 import { MacroCalculator } from './macro-calc-screen.jsx';
 import { InstallPrompt, ResponsiveFrame, useIsMobile } from './mobile-shell.jsx';
 import { NutritionTab } from './nutrition-tab.jsx';
@@ -116,6 +116,7 @@ function App() {
       dietTracking: false,
       checkInTime: '21:00',
       weighInTime: '06:00',
+      weighInEveryDays: 1, // 1 = daily … 7 = weekly
       gratitude: [],
       fitnessLevel: null,
       lifts: {},
@@ -240,13 +241,16 @@ function App() {
     }
     // Persist real data so the Life Score + pillars compute from it.
     if (answers) {
+      // A small-hours check-in belongs to yesterday (see checkinEffectiveDate);
+      // don't write its nips/steps into the day that only just started.
+      const graceNight = checkinEffectiveDate() !== isoDate(new Date());
       // Keep today's live nip tally in sync with the check-in.
-      if (window.setNipsToday) window.setNipsToday(answers.afd ? 0 : (answers.nips || 0));
+      if (!graceNight && window.setNipsToday) window.setNipsToday(answers.afd ? 0 : (answers.nips || 0));
       // If the user raised the steps number at check-in, top the ledger up so
       // the rings + earned kcal agree with what they reported.
       try {
         const ledger = window.dayStepTotal ? window.dayStepTotal() : 0;
-        if (typeof answers.steps === 'number' && answers.steps > ledger && window.addStepEntry) {
+        if (!graceNight && typeof answers.steps === 'number' && answers.steps > ledger && window.addStepEntry) {
           window.addStepEntry({ kind: 'update', steps: answers.steps - ledger, source: 'checkin' });
         }
       } catch (e) {}
@@ -254,6 +258,29 @@ function App() {
       setCheckins(updated);
     }
   };
+
+  // Recovery for a check-in logged on the wrong side of midnight (after the
+  // 3am grace): Settings offers to shift today's entry back to yesterday.
+  // Only when it can't clobber anything — today has an entry, yesterday none.
+  const moveCheckinToYesterday = () => {
+    const today = isoDate(new Date());
+    const y = new Date(); y.setDate(y.getDate() - 1);
+    const yKey = isoDate(y);
+    const list = loadCheckins();
+    const entry = list.find((h) => h.date === today);
+    if (!entry || list.some((h) => h.date === yKey)) return;
+    const next = [...list.filter((h) => h.date !== today), { ...entry, date: yKey }]
+      .sort((a, b) => (a.date < b.date ? -1 : 1));
+    saveCheckins(next);
+    setCheckins(next);
+    setTodayCompleted(false);
+  };
+  const canMoveCheckin = (() => {
+    const today = isoDate(new Date());
+    const y = new Date(); y.setDate(y.getDate() - 1);
+    const yKey = isoDate(y);
+    return checkins.some((h) => h.date === today) && !checkins.some((h) => h.date === yKey);
+  })();
 
   // reset todayCompleted whenever demo state switches
   React.useEffect(() => {
@@ -484,8 +511,9 @@ function App() {
             gratitudeLibrary={data.gratitude || []}
             user={data}
             initialAnswers={(() => {
-              const today = isoDate(new Date());
-              const e = checkins.find((h) => h.date === today);
+              // Effective date so a small-hours reopen edits the night just logged.
+              const key = checkinEffectiveDate();
+              const e = checkins.find((h) => h.date === key);
               return e ? e.answers : null;
             })()}
           />
@@ -503,6 +531,7 @@ function App() {
               onRecalc={() => { setShowSettings(false); setShowCalc(true); }}
               onClose={() => setShowSettings(false)}
               onReset={() => { setShowSettings(false); setView('onboarding'); setStep(0); }}
+              onFixCheckinDay={canMoveCheckin ? moveCheckinToYesterday : null}
             />
           </div>
         )}

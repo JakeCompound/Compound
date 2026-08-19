@@ -40,13 +40,23 @@ function deriveMetricsFromCheckin(a, user) {
   };
 }
 
-// Append today's check-in (replacing an existing entry for today).
+// A nightly check-in finished in the small hours belongs to the evening just
+// gone: before 3am it's read and stamped against yesterday's date, so a
+// 12:30am check-in doesn't land on the day that only just started. The grace
+// applies to check-in attribution only — the rest of the app's day (to-dos,
+// steps, food) still rolls at midnight.
+const CHECKIN_GRACE_HOUR = 3;
+function checkinEffectiveDate(now = new Date()) {
+  return isoDate(new Date(now.getFullYear(), now.getMonth(), now.getDate() - (now.getHours() < CHECKIN_GRACE_HOUR ? 1 : 0)));
+}
+
+// Append tonight's check-in (replacing an existing entry for the same night).
 function recordCheckin(answers, user) {
   const list = loadCheckins();
-  const today = isoDate(new Date());
+  const date = checkinEffectiveDate();
   const metrics = deriveMetricsFromCheckin(answers, user);
-  const entry = { date: today, answers, metrics };
-  const without = list.filter((h) => h.date !== today);
+  const entry = { date, answers, metrics };
+  const without = list.filter((h) => h.date !== date);
   const next = [...without, entry].sort((x, y) => (x.date < y.date ? -1 : 1));
   saveCheckins(next);
   return next;
@@ -396,9 +406,9 @@ function applyPlateauTrim() {
 }
 
 Object.assign(window, {
-  loadCheckins, saveCheckins, recordCheckin, deriveMetricsFromCheckin,
+  loadCheckins, saveCheckins, recordCheckin, checkinEffectiveDate, deriveMetricsFromCheckin,
   deriveLiveState, computeStreaks, buildWeek, isoDate, computeWeeklyNips,
   detectPlateau, dismissPlateau, applyPlateauTrim,
 });
 
-export { CHECKINS_KEY, ZERO_METRICS, applyPlateauTrim, buildLiveInsight, buildWeek, computeStreaks, computeWeeklyNips, deriveLiveState, deriveMetricsFromCheckin, detectPlateau, dismissPlateau, isoDate, loadCheckins, nextMilestone, recordCheckin, saveCheckins, strengthTrendUp, waistTrend };
+export { CHECKINS_KEY, ZERO_METRICS, applyPlateauTrim, buildLiveInsight, buildWeek, checkinEffectiveDate, computeStreaks, computeWeeklyNips, deriveLiveState, deriveMetricsFromCheckin, detectPlateau, dismissPlateau, isoDate, loadCheckins, nextMilestone, recordCheckin, saveCheckins, strengthTrendUp, waistTrend };

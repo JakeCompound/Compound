@@ -1,5 +1,5 @@
 import React from 'react';
-import { C, DateWheel, FieldLabel, SelectCard, Stepper, TextInput, TimeWheel, computeAge, currentThemeName, setThemeName } from './compound-ui.jsx';
+import { C, DateWheel, FieldLabel, MultiChip, SelectCard, Stepper, TextInput, TimeWheel, computeAge, currentThemeName, setThemeName } from './compound-ui.jsx';
 import { PerDayTimes, ScreenGratitudeBuilder } from './onboarding-screens.jsx';
 import { supabase, supabaseConfigured } from './supabase.js';
 import { pushSupported, notifPermission, isSubscribed, subscribePush, unsubscribePush } from './push.js';
@@ -42,7 +42,7 @@ function fmtWorkoutSchedule(user) {
   return groups.map((g) => `${g.days.join(' · ')} ${g.t}`).join(', ');
 }
 
-function SettingsScreen({ user, set, onClose, onReset, onRecalc }) {
+function SettingsScreen({ user, set, onClose, onReset, onRecalc, onFixCheckinDay }) {
   const [section, setSection] = React.useState(null); // null = main, else section id
   const [showClear, setShowClear] = React.useState(false); // "clear all cloud data" modal
   const [measureUnit, setMeasureUnit] = React.useState(() => { try { return localStorage.getItem('compound:measureUnit') === 'in' ? 'in' : 'cm'; } catch (e) { return 'cm'; } });
@@ -140,9 +140,14 @@ function SettingsScreen({ user, set, onClose, onReset, onRecalc }) {
         </SettingsGroup>
 
         <SettingsGroup label="HABITS">
-          <SettingsRow icon={<IconBell />} label="Reminder times" hint={`Check-in ${user.checkInTime} · Weigh-in ${user.weighInTime}`} onClick={() => setSection('reminders')} />
+          <SettingsRow icon={<IconBell />} label="Reminder times" hint={`Check-in ${user.checkInTime} · Weigh-in ${user.weighInTime} ${fmtWeighFreq(Math.min(7, Math.max(1, user.weighInEveryDays || 1))).toLowerCase()}`} onClick={() => setSection('reminders')} />
           <SettingsRow icon={<IconSpark />} label="Gratitude library" hint={`${(user.gratitude || []).length} items · 7 categories`} onClick={() => setSection('gratitude')} />
           <SettingsRow icon={<IconBellFilled />} label="Notification preferences" hint="What pings you, what doesn't" onClick={() => setSection('notifications')} />
+          {/* Recovery: a check-in logged after the 3am grace landed on today —
+              offered only while today has an entry and yesterday doesn't. */}
+          {onFixCheckinDay && (
+            <SettingsRow icon={<IconBolt />} label="Move today's check-in to yesterday" hint="Logged it this morning? Shift it back to last night" onClick={onFixCheckinDay} />
+          )}
         </SettingsGroup>
 
         <SettingsGroup label="NUTRITION">
@@ -552,8 +557,16 @@ function SettingsGoals({ user, set, onBack }) {
   );
 }
 
+// 1 → "Daily" … 7 → "Weekly", anything between → "Every N days"
+function fmtWeighFreq(n) {
+  if (n === 7) return 'Weekly';
+  if (n > 1) return `Every ${n} days`;
+  return 'Daily';
+}
+
 function SettingsReminders({ user, set, onBack }) {
   const [editing, setEditing] = React.useState(false);
+  const weighEvery = Math.min(7, Math.max(1, user.weighInEveryDays || 1));
   return (
     <div style={{ height: '100%', background: C.bg, display: 'flex', flexDirection: 'column' }}>
       <SettingsHeader title="REMINDERS" onBack={onBack} right={<EditToggle editing={editing} onToggle={() => setEditing((e) => !e)} />} />
@@ -565,16 +578,30 @@ function SettingsReminders({ user, set, onBack }) {
               <TimeWheel value={user.checkInTime} onChange={(v) => set({ checkInTime: v })} />
             </div>
             <div style={{ marginTop: 24 }}>
-              <FieldLabel>Friday weigh-in window</FieldLabel>
+              <FieldLabel>Weigh-in window</FieldLabel>
               <div style={{ marginTop: 12 }}>
                 <TimeWheel value={user.weighInTime} onChange={(v) => set({ weighInTime: v })} hourMin={3} hourMax={8} />
+              </div>
+            </div>
+            <div style={{ marginTop: 24 }}>
+              <FieldLabel>Weigh-in frequency</FieldLabel>
+              <div style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: C.textMid, lineHeight: 1.45, margin: '8px 0 12px' }}>
+                How often the weigh-in shows on your to-do list — daily through weekly.
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {[1, 2, 3, 4, 5, 6, 7].map((n) => (
+                  <MultiChip key={n} active={weighEvery === n} onClick={() => set({ weighInEveryDays: n })}>
+                    {n === 1 ? 'Daily' : n === 7 ? 'Weekly' : `${n} days`}
+                  </MultiChip>
+                ))}
               </div>
             </div>
           </>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
             <ReadField label="Nightly check-in" value={user.checkInTime || '—'} />
-            <ReadField label="Friday weigh-in window" value={user.weighInTime || '—'} />
+            <ReadField label="Weigh-in window" value={user.weighInTime || '—'} />
+            <ReadField label="Weigh-in frequency" value={fmtWeighFreq(weighEvery)} />
           </div>
         )}
       </div>

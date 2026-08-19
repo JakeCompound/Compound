@@ -88,6 +88,10 @@ function TodayTodos({ user, set, state, onOpenCheckin, onWeighIn, onGoWorkout, o
 
   const dateKey = window.isoDate ? window.isoDate(new Date()) : new Date().toISOString().slice(0, 10);
 
+  // Bumped when a missed-reason is saved so the acknowledged row drops out
+  // immediately (the filter below re-reads localStorage on every render).
+  const [, setReasonTick] = React.useState(0);
+
   // Effective schedule for THIS week (base schedule + any in-week override)
   const baseDays = scheduledWorkoutDays(user);
   const [override, setOverride] = React.useState(() => loadWeekOverride());
@@ -134,15 +138,30 @@ function TodayTodos({ user, set, state, onOpenCheckin, onWeighIn, onGoWorkout, o
     onChanged && onChanged();
   };
 
-  // On the join day, defer the daily weigh-in & check-in to tomorrow so day one
-  // is a clean start, not a list of things already "missed". Encouragement first.
+  // On the join day, defer only the daily weigh-in to tomorrow — its morning
+  // slot has usually already passed, so it would show as "missed" straight away.
+  // The nightly check-in starts the day the user joins.
   const joinDay = isJoinDay();
 
+  // Weigh-in frequency (Settings → Reminders): 1 = daily … 7 = weekly. Due once
+  // enough days have passed since the last logged weigh-in; a day it was logged
+  // on always shows (as DONE), and it stays due until it's actually logged.
+  const weighEvery = Math.min(7, Math.max(1, user.weighInEveryDays || 1));
+  const weighDue = weighDoneToday || weighEvery === 1 || (() => {
+    try {
+      const ws = window.loadWeighins ? window.loadWeighins() : JSON.parse(localStorage.getItem('compound:weighins') || '[]');
+      if (!ws.length) return true; // never weighed in → due
+      const lastDate = ws.reduce((m, w) => (w.date > m ? w.date : m), '');
+      const days = Math.round((new Date(dateKey + 'T12:00:00') - new Date(lastDate + 'T12:00:00')) / 86400000);
+      return days >= weighEvery;
+    } catch (e) { return true; }
+  })();
+
   const todos = [
-    ...(joinDay ? [] : [{
+    ...(joinDay || !weighDue ? [] : [{
       id: 'weighin',
-      label: 'Daily Weigh-in',
-      sub: 'Pre-water · one number',
+      label: weighEvery === 1 ? 'Daily Weigh-in' : weighEvery === 7 ? 'Weekly Weigh-in' : 'Weigh-in',
+      sub: weighEvery === 1 ? 'Pre-water · one number' : weighEvery === 7 ? 'Once a week · pre-water' : `Every ${weighEvery} days · pre-water`,
       time: user.weighInTime || '06:30',
       done: !!weighDoneToday,
       editable: true,
@@ -174,13 +193,16 @@ function TodayTodos({ user, set, state, onOpenCheckin, onWeighIn, onGoWorkout, o
         </svg>
       ),
     }] : []),
-    ...(joinDay ? [] : [{
+    {
       id: 'checkin',
       label: 'Daily Check-in',
       sub: '9 quick questions',
       time: user.checkInTime || '21:00',
       done: !!state.todayCheckinDone,
       editable: true,
+      // Day one: whatever time the user joined, tonight's check-in stays open
+      // instead of flipping to red once their usual slot has passed.
+      softDeadline: joinDay,
       onDo: onOpenCheckin,
       glyph: (
         <svg width="20" height="20" viewBox="0 0 22 22" fill="none">
@@ -190,8 +212,16 @@ function TodayTodos({ user, set, state, onOpenCheckin, onWeighIn, onGoWorkout, o
           <line x1="15" y1="3" x2="15" y2="7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
         </svg>
       ),
-    }]),
-  ].sort((a, b) => (a.time < b.time ? -1 : 1));
+    },
+  ].sort((a, b) => (a.time < b.time ? -1 : 1))
+    // A missed to-do the user has already explained drops off the list — naming
+    // the reason is the acknowledgment; no point leaving a red row up all day.
+    // (Workouts keep their own Postpone flow.)
+    .filter((t) => {
+      if (t.done || t.canPostpone || t.softDeadline) return true;
+      const missed = now - dueToday(t.time).getTime() > MISS_GRACE_MS;
+      return !(missed && getTodoReason(dateKey, t.id));
+    });
 
   const doneCount = todos.filter((t) => t.done).length;
 
@@ -209,16 +239,16 @@ function TodayTodos({ user, set, state, onOpenCheckin, onWeighIn, onGoWorkout, o
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {todos.map((t) => (
-          <TodoRow key={t.id} todo={t} now={now} dateKey={dateKey} />
+          <TodoRow key={t.id} todo={t} now={now} dateKey={dateKey} onReasonSaved={() => setReasonTick((x) => x + 1)} />
         ))}
       </div>
 
-      {/* Join day: the daily weigh-in & check-in start tomorrow — set the tone. */}
+      {/* Join day: the morning weigh-in starts tomorrow — set the tone. */}
       {joinDay && (
         <div style={{ marginTop: todos.length ? 10 : 2, padding: '12px 14px', background: C.surf1, border: `1px dashed ${C.accentDim}`, borderRadius: 12, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
           <span style={{ fontSize: 16, lineHeight: 1 }}>🌱</span>
           <div style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: C.textMid, lineHeight: 1.45 }}>
-            Day one — nothing to catch up on. Your daily <strong style={{ color: C.text }}>weigh-in</strong> and <strong style={{ color: C.text }}>check-in</strong> start <strong style={{ color: C.accent }}>tomorrow</strong>. Settle in tonight.
+            Day one — nothing to catch up on. Tonight's <strong style={{ color: C.text }}>check-in</strong> is ready above; your daily <strong style={{ color: C.text }}>weigh-in</strong> starts <strong style={{ color: C.accent }}>tomorrow morning</strong>.
           </div>
         </div>
       )}
@@ -296,10 +326,11 @@ function TodayTodos({ user, set, state, onOpenCheckin, onWeighIn, onGoWorkout, o
   );
 }
 
-function TodoRow({ todo, now, dateKey }) {
+function TodoRow({ todo, now, dateKey, onReasonSaved }) {
   const due = dueToday(todo.time);
-  const diff = due.getTime() - now; // >0 = upcoming, <0 = overdue
-  const overdue = diff < 0;
+  const diff = due.getTime() - now; // >0 = upcoming, <0 = past due time
+  const late = diff < 0;
+  const overdue = late && !todo.softDeadline; // soft deadline never turns red
   const missedMs = -diff;
   const missed = overdue && missedMs > MISS_GRACE_MS;
 
@@ -322,11 +353,17 @@ function TodoRow({ todo, now, dateKey }) {
     statusText = 'DONE';
     timerText = '✓';
     timerColor = C.success;
-  } else if (!overdue) {
+  } else if (!late) {
     accent = C.accent;
     statusText = `DUE ${todo.time}`;
     timerText = fmt(diff);
     timerColor = diff < 30 * 60 * 1000 ? C.accent : C.textMid; // <30m → accent
+  } else if (!overdue) {
+    // Past the usual slot but on a soft deadline (join day) — still open tonight.
+    accent = C.accent;
+    statusText = 'OPEN TONIGHT';
+    timerText = '·';
+    timerColor = C.textMid;
   } else {
     accent = C.danger;
     statusText = missed ? 'MISSED' : 'OVERDUE';
@@ -436,7 +473,7 @@ function TodoRow({ todo, now, dateKey }) {
                 {MISS_REASONS.map((r) => (
                   <button
                     key={r}
-                    onClick={() => { saveTodoReason(dateKey, todo.id, r); setReason(r); setAskReason(false); }}
+                    onClick={() => { saveTodoReason(dateKey, todo.id, r); setReason(r); setAskReason(false); onReasonSaved && onReasonSaved(); }}
                     style={{
                       padding: '7px 12px', borderRadius: 999,
                       background: C.surf1, border: `1px solid ${C.line}`,

@@ -1,6 +1,6 @@
 import React from 'react';
 import { C } from './compound-ui.jsx';
-import { isJoinDay } from './mid-week-join.js';
+import { isJoinDay, getJoinedAt } from './mid-week-join.js';
 
 // todo-list.jsx — "Today's To-Do List" for Home.
 // Tasks with live countdowns; turn red on expiry, count into the negatives,
@@ -79,7 +79,29 @@ function addPostpone(entry) {
   return all[k];
 }
 
-function TodayTodos({ user, set, state, onOpenCheckin, onWeighIn, onGoWorkout, onGoNutrition, onChanged, weighDoneToday }) {
+// Recent nights (most recent first) with no check-in logged — never reaching
+// back further than the user's join date. Capped at a week; further back than
+// that stops being a "quick catch-up" and starts being data entry.
+function missingCheckinDates(history, dateKey, maxDays = 7) {
+  const have = new Set((history || []).map((h) => h.date));
+  const joined = getJoinedAt();
+  const joinedKey = joined ? (window.isoDate ? window.isoDate(joined) : joined.toISOString().slice(0, 10)) : null;
+  const out = [];
+  for (let i = 1; i <= maxDays; i++) {
+    const d = new Date(dateKey + 'T12:00:00');
+    d.setDate(d.getDate() - i);
+    const key = window.isoDate ? window.isoDate(d) : d.toISOString().slice(0, 10);
+    if (joinedKey && key < joinedKey) break;
+    if (!have.has(key)) out.push(key);
+  }
+  return out;
+}
+function fmtCatchUpLabel(key) {
+  const d = new Date(key + 'T12:00:00');
+  return d.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' }).toUpperCase();
+}
+
+function TodayTodos({ user, set, state, history, onOpenCheckin, onCatchUpCheckin, onWeighIn, onGoWorkout, onGoNutrition, onChanged, weighDoneToday }) {
   const [now, setNow] = React.useState(Date.now());
   React.useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
@@ -91,6 +113,11 @@ function TodayTodos({ user, set, state, onOpenCheckin, onWeighIn, onGoWorkout, o
   // Bumped when a missed-reason is saved so the acknowledged row drops out
   // immediately (the filter below re-reads localStorage on every render).
   const [, setReasonTick] = React.useState(0);
+
+  // Catch up on a missed check-in from a recent night — going back today
+  // to log it, not just today's own to-dos.
+  const missingCheckins = missingCheckinDates(history, dateKey);
+  const [catchUpOpen, setCatchUpOpen] = React.useState(false);
 
   // Effective schedule for THIS week (base schedule + any in-week override)
   const baseDays = scheduledWorkoutDays(user);
@@ -143,15 +170,27 @@ function TodayTodos({ user, set, state, onOpenCheckin, onWeighIn, onGoWorkout, o
   // The nightly check-in starts the day the user joins.
   const joinDay = isJoinDay();
 
-  // Weigh-in frequency (Settings → Reminders): 1 = daily … 7 = weekly. Due once
-  // enough days have passed since the last logged weigh-in; a day it was logged
-  // on always shows (as DONE), and it stays due until it's actually logged.
+  // Weigh-in frequency (Settings → Reminders): 1 = daily … 7 = weekly. A
+  // weekly cadence can either float (due N days after the last log) or anchor
+  // to a chosen weekday (e.g. "Friday, whenever suits") — the anchored mode
+  // is deliberately loose: no clock deadline, and it stays quietly due (never
+  // red, never asked "why") until logged, no matter how many Fridays pass.
   const weighEvery = Math.min(7, Math.max(1, user.weighInEveryDays || 1));
+  const weighWeekday = weighEvery === 7 && Number.isInteger(user.weighInWeekday) ? user.weighInWeekday : null;
   const weighDue = weighDoneToday || weighEvery === 1 || (() => {
     try {
       const ws = window.loadWeighins ? window.loadWeighins() : JSON.parse(localStorage.getItem('compound:weighins') || '[]');
       if (!ws.length) return true; // never weighed in → due
       const lastDate = ws.reduce((m, w) => (w.date > m ? w.date : m), '');
+      if (weighWeekday != null) {
+        // Most recent occurrence of the chosen weekday on/before today —
+        // due once the last log predates it, however many weeks that spans.
+        const today = new Date(dateKey + 'T12:00:00');
+        const back = (today.getDay() - weighWeekday + 7) % 7;
+        const anchor = new Date(today.getTime() - back * 86400000);
+        const anchorKey = window.isoDate ? window.isoDate(anchor) : anchor.toISOString().slice(0, 10);
+        return lastDate < anchorKey;
+      }
       const days = Math.round((new Date(dateKey + 'T12:00:00') - new Date(lastDate + 'T12:00:00')) / 86400000);
       return days >= weighEvery;
     } catch (e) { return true; }
@@ -160,11 +199,15 @@ function TodayTodos({ user, set, state, onOpenCheckin, onWeighIn, onGoWorkout, o
   const todos = [
     ...(joinDay || !weighDue ? [] : [{
       id: 'weighin',
-      label: weighEvery === 1 ? 'Daily Weigh-in' : weighEvery === 7 ? 'Weekly Weigh-in' : 'Weigh-in',
-      sub: weighEvery === 1 ? 'Pre-water · one number' : weighEvery === 7 ? 'Once a week · pre-water' : `Every ${weighEvery} days · pre-water`,
+      label: 'Weigh-in',
+      sub: weighWeekday != null ? `${DAY_LABELS[weighWeekday]} · whenever suits, pre-water` : weighEvery === 1 ? 'Pre-water · one number' : `Every ${weighEvery} days · pre-water`,
       time: user.weighInTime || '06:30',
       done: !!weighDoneToday,
       editable: true,
+      // No countdown, no red "missed" state, no "why did you miss it" nag —
+      // a long-term habit like this shouldn't feel like a deadline.
+      timerless: true,
+      dueLabel: weighWeekday != null ? `DUE ${DAY_LABELS[weighWeekday]}` : 'DUE',
       onDo: onWeighIn,
       glyph: (
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -218,7 +261,7 @@ function TodayTodos({ user, set, state, onOpenCheckin, onWeighIn, onGoWorkout, o
     // the reason is the acknowledgment; no point leaving a red row up all day.
     // (Workouts keep their own Postpone flow.)
     .filter((t) => {
-      if (t.done || t.canPostpone || t.softDeadline) return true;
+      if (t.done || t.canPostpone || t.softDeadline || t.timerless) return true;
       const missed = now - dueToday(t.time).getTime() > MISS_GRACE_MS;
       return !(missed && getTodoReason(dateKey, t.id));
     });
@@ -242,6 +285,31 @@ function TodayTodos({ user, set, state, onOpenCheckin, onWeighIn, onGoWorkout, o
           <TodoRow key={t.id} todo={t} now={now} dateKey={dateKey} onReasonSaved={() => setReasonTick((x) => x + 1)} />
         ))}
       </div>
+
+      {/* Catch up on a recent night that never got a check-in */}
+      {missingCheckins.length > 0 && (
+        <button
+          onClick={() => setCatchUpOpen(true)}
+          style={{
+            width: '100%', marginTop: 8, padding: '11px 14px',
+            background: 'transparent', border: `1px dashed ${C.lineStrong}`, borderRadius: 12,
+            color: C.textMid, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 600, fontSize: 14,
+            letterSpacing: 1.2, textTransform: 'uppercase',
+          }}
+        >
+          <span style={{ color: C.accent, fontSize: 16, lineHeight: 1 }}>↺</span>
+          Catch up on {missingCheckins.length === 1 ? 'a missed check-in' : `${missingCheckins.length} missed check-ins`}
+        </button>
+      )}
+      {catchUpOpen && (
+        <CatchUpCheckinSheet
+          dates={missingCheckins}
+          onPick={(key) => { setCatchUpOpen(false); onCatchUpCheckin && onCatchUpCheckin(key); }}
+          onClose={() => setCatchUpOpen(false)}
+        />
+      )}
 
       {/* Join day: the morning weigh-in starts tomorrow — set the tone. */}
       {joinDay && (
@@ -330,7 +398,7 @@ function TodoRow({ todo, now, dateKey, onReasonSaved }) {
   const due = dueToday(todo.time);
   const diff = due.getTime() - now; // >0 = upcoming, <0 = past due time
   const late = diff < 0;
-  const overdue = late && !todo.softDeadline; // soft deadline never turns red
+  const overdue = late && !todo.softDeadline && !todo.timerless; // soft deadline / timerless never turn red
   const missedMs = -diff;
   const missed = overdue && missedMs > MISS_GRACE_MS;
 
@@ -353,6 +421,12 @@ function TodoRow({ todo, now, dateKey, onReasonSaved }) {
     statusText = 'DONE';
     timerText = '✓';
     timerColor = C.success;
+  } else if (todo.timerless) {
+    // Calm, non-urgent presence — no ticking clock, never turns red.
+    accent = C.accent;
+    statusText = todo.dueLabel || 'DUE';
+    timerText = '·';
+    timerColor = C.textMid;
   } else if (!late) {
     accent = C.accent;
     statusText = `DUE ${todo.time}`;
@@ -450,8 +524,9 @@ function TodoRow({ todo, now, dateKey, onReasonSaved }) {
         </div>
       )}
 
-      {/* Missed → ask for a reason (non-workout; the workout captures its reason on Postpone) */}
-      {missed && !todo.done && !todo.canPostpone && (
+      {/* Missed → ask for a reason (non-workout; the workout captures its reason on Postpone).
+          Timerless to-dos (weigh-in) never nag — a long-term habit shouldn't feel like a deadline. */}
+      {missed && !todo.done && !todo.canPostpone && !todo.timerless && (
         <div style={{ padding: '0 14px 14px', borderTop: `1px solid rgba(229,86,75,.18)` }}>
           {reason ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingTop: 12 }}>
@@ -556,6 +631,42 @@ function AddWorkoutSheet({ futureDays, onSwap, onExtra, onClose }) {
         >
           Just add it — keep all my sessions
         </button>
+      </div>
+    </div>
+  );
+}
+
+// Pick a recent night with no check-in to log it retroactively.
+function CatchUpCheckinSheet({ dates, onPick, onClose }) {
+  return (
+    <div onClick={onClose} style={{ position: 'absolute', inset: 0, zIndex: 220, background: 'rgba(0,0,0,.72)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'flex-end' }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', background: C.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: '20px 22px 24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 3, borderRadius: 2, background: C.ink(.18) }} /></div>
+        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.accent, letterSpacing: 2.4, marginBottom: 8 }}>CATCH UP</div>
+        <h3 style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 26, lineHeight: 1, letterSpacing: 0.5, color: C.text, margin: '0 0 10px', textTransform: 'uppercase' }}>
+          LOG A MISSED<br /><span style={{ color: C.accent }}>NIGHT</span>
+        </h3>
+        <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 13, color: C.textMid, lineHeight: 1.5, margin: '0 0 16px' }}>
+          Pick a night you didn't get to — it logs the same nine questions, just backdated to that night.
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {dates.map((key) => (
+            <button
+              key={key}
+              onClick={() => onPick(key)}
+              style={{
+                width: '100%', textAlign: 'left', padding: '13px 14px',
+                background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 12,
+                color: C.text, fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 15,
+                letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer',
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              }}
+            >
+              {fmtCatchUpLabel(key)}
+              <span style={{ color: C.accent, fontSize: 18 }}>→</span>
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );

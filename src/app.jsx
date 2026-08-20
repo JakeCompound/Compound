@@ -228,13 +228,20 @@ function App() {
   const [checkinOpen, setCheckinOpen] = React.useState(false);
   const [celebrate, setCelebrate] = React.useState(false);
   const [todayCompleted, setTodayCompleted] = React.useState(false);
+  // Set only while catching up on a specific missed past night (see
+  // TodayTodos' "catch up" sheet) — null means the normal, tonight flow.
+  const [checkinTargetDate, setCheckinTargetDate] = React.useState(null);
 
-  const openCheckin = () => setCheckinOpen(true);
-  const closeCheckin = () => setCheckinOpen(false);
-  const completeCheckin = (answers) => {
+  const openCheckin = () => { setCheckinTargetDate(null); setCheckinOpen(true); };
+  const openCheckinFor = (dateKey) => { setCheckinTargetDate(dateKey); setCheckinOpen(true); };
+  const closeCheckin = () => { setCheckinOpen(false); setCheckinTargetDate(null); };
+  const completeCheckin = (answers, forDate) => {
     setCheckinOpen(false);
+    setCheckinTargetDate(null);
     setCelebrate(true);
-    setTodayCompleted(true);
+    const targetKey = forDate || checkinEffectiveDate();
+    const isToday = targetKey === isoDate(new Date());
+    if (isToday) setTodayCompleted(true);
     // Persist workout-day plan set in the Sunday review
     if (answers && Array.isArray(answers.workoutDays) && answers.workoutDays.length) {
       set({ workoutDays: answers.workoutDays });
@@ -242,19 +249,19 @@ function App() {
     // Persist real data so the Life Score + pillars compute from it.
     if (answers) {
       // A small-hours check-in belongs to yesterday (see checkinEffectiveDate);
-      // don't write its nips/steps into the day that only just started.
-      const graceNight = checkinEffectiveDate() !== isoDate(new Date());
-      // Keep today's live nip tally in sync with the check-in.
-      if (!graceNight && window.setNipsToday) window.setNipsToday(answers.afd ? 0 : (answers.nips || 0));
+      // a catch-up entry belongs to whichever past night it targets. Either
+      // way, only sync live nips/steps when the entry is genuinely for today —
+      // never overwrite today's real tallies with an old night's numbers.
+      if (isToday && window.setNipsToday) window.setNipsToday(answers.afd ? 0 : (answers.nips || 0));
       // If the user raised the steps number at check-in, top the ledger up so
       // the rings + earned kcal agree with what they reported.
       try {
         const ledger = window.dayStepTotal ? window.dayStepTotal() : 0;
-        if (!graceNight && typeof answers.steps === 'number' && answers.steps > ledger && window.addStepEntry) {
+        if (isToday && typeof answers.steps === 'number' && answers.steps > ledger && window.addStepEntry) {
           window.addStepEntry({ kind: 'update', steps: answers.steps - ledger, source: 'checkin' });
         }
       } catch (e) {}
-      const updated = recordCheckin(answers, data);
+      const updated = recordCheckin(answers, data, forDate);
       setCheckins(updated);
     }
   };
@@ -345,7 +352,9 @@ function App() {
           user={data}
           set={set}
           state={stateForHome}
+          checkins={checkins}
           onOpenCheckin={openCheckin}
+          onOpenCheckinFor={openCheckinFor}
           onGoTo={(t) => setTab(t)}
           onOpenSettings={() => setShowSettings(true)}
           onChanged={() => setNutTick((x) => x + 1)}
@@ -510,9 +519,11 @@ function App() {
             onComplete={completeCheckin}
             gratitudeLibrary={data.gratitude || []}
             user={data}
+            targetDate={checkinTargetDate}
             initialAnswers={(() => {
-              // Effective date so a small-hours reopen edits the night just logged.
-              const key = checkinEffectiveDate();
+              // Effective date so a small-hours reopen edits the night just
+              // logged — or, when catching up, the specific night targeted.
+              const key = checkinTargetDate || checkinEffectiveDate();
               const e = checkins.find((h) => h.date === key);
               return e ? e.answers : null;
             })()}

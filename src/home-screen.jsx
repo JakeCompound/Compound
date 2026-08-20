@@ -10,7 +10,7 @@ import { alcoholOn } from './alcohol.js';
 
 // home-screen.jsx — The Home tab — assembles all the components
 
-function HomeScreen({ user, set, state, onOpenCheckin, onGoTo, onOpenSettings, onChanged, onRecalc, demoFlags, setDemoFlag }) {
+function HomeScreen({ user, set, state, checkins, onOpenCheckin, onOpenCheckinFor, onGoTo, onOpenSettings, onChanged, onRecalc, demoFlags, setDemoFlag }) {
   const lifeScore = computeLifeScore(state.metrics);
   const today = getTodayCopy(state.dayOfWeek);
 
@@ -144,7 +144,9 @@ function HomeScreen({ user, set, state, onOpenCheckin, onGoTo, onOpenSettings, o
               user={user}
               set={set}
               state={state}
+              history={checkins}
               onOpenCheckin={onOpenCheckin}
+              onCatchUpCheckin={onOpenCheckinFor}
               onWeighIn={() => setWeighOpen(true)}
               onGoWorkout={() => onGoTo && onGoTo('workout')}
               onGoNutrition={() => onGoTo && onGoTo('nutrition')}

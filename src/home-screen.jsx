@@ -14,20 +14,23 @@ function HomeScreen({ user, set, state, checkins, onOpenCheckin, onOpenCheckinFo
   const lifeScore = computeLifeScore(state.metrics);
   const today = getTodayCopy(state.dayOfWeek);
 
-  // Weigh-in (now a to-do) — local store + modal
+  // Weigh-in (now a to-do) — local store + modal. weighTargetDate lets the
+  // day-stepper's "catch up" flow log a past day's weight instead of today's.
   const todayKey = window.isoDate ? window.isoDate(new Date()) : new Date().toISOString().slice(0, 10);
   const loadW = () => { try { return JSON.parse(localStorage.getItem('compound:weighins') || '[]'); } catch (e) { return []; } };
   const [weighEntries, setWeighEntries] = React.useState(loadW);
   const [weighOpen, setWeighOpen] = React.useState(false);
+  const [weighTargetDate, setWeighTargetDate] = React.useState(null); // null = today
   const lastEntry = weighEntries.length ? weighEntries[weighEntries.length - 1] : null;
   const lastWeigh = lastEntry ? lastEntry.value : null;
   const weighDoneToday = !!(lastEntry && lastEntry.date === todayKey);
-  const saveWeighToday = (value) => {
-    const next = [...weighEntries.filter((e) => e.date !== todayKey), { date: todayKey, value }]
+  const saveWeighFor = (dateKey, value) => {
+    const next = [...weighEntries.filter((e) => e.date !== dateKey), { date: dateKey, value }]
       .sort((a, b) => (a.date < b.date ? -1 : 1));
     try { localStorage.setItem('compound:weighins', JSON.stringify(next)); } catch (e) {}
     setWeighEntries(next);
   };
+  const openWeighFor = (dateKey) => { setWeighTargetDate(dateKey || null); setWeighOpen(true); };
 
   const greeting = (() => {
     const h = new Date().getHours();
@@ -145,9 +148,11 @@ function HomeScreen({ user, set, state, checkins, onOpenCheckin, onOpenCheckinFo
               set={set}
               state={state}
               history={checkins}
+              weighins={weighEntries}
               onOpenCheckin={onOpenCheckin}
               onCatchUpCheckin={onOpenCheckinFor}
-              onWeighIn={() => setWeighOpen(true)}
+              onWeighIn={() => openWeighFor(null)}
+              onLogWeighFor={openWeighFor}
               onGoWorkout={() => onGoTo && onGoTo('workout')}
               onGoNutrition={() => onGoTo && onGoTo('nutrition')}
               onChanged={onChanged}
@@ -168,8 +173,9 @@ function HomeScreen({ user, set, state, checkins, onOpenCheckin, onOpenCheckinFo
         <WeighInModal
           start={lastWeigh != null ? lastWeigh : (user.weight || 80)}
           goal={user.weightGoal}
-          onSave={(v) => { saveWeighToday(v); setWeighOpen(false); }}
-          onClose={() => setWeighOpen(false)}
+          dateKey={weighTargetDate || todayKey}
+          onSave={(v) => { saveWeighFor(weighTargetDate || todayKey, v); setWeighOpen(false); setWeighTargetDate(null); }}
+          onClose={() => { setWeighOpen(false); setWeighTargetDate(null); }}
         />
       )}
     </div>

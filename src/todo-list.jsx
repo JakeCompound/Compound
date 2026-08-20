@@ -11,6 +11,8 @@ const MISS_GRACE_MS = 3 * 60 * 60 * 1000; // 3 hours past due before "missed + a
 
 const MISS_REASONS = ['Bored', 'Tired', 'Stressed', 'Hungry', 'Automatic', 'Forgot'];
 
+const dayStepBtn = { width: 32, height: 32, borderRadius: 9, border: `1px solid ${C.line}`, background: C.surf1, fontFamily: 'Barlow Condensed, sans-serif', fontSize: 18, lineHeight: 1, cursor: 'pointer', flexShrink: 0 };
+
 function loadTodoState() {
   try { return JSON.parse(localStorage.getItem(TODO_STATE_KEY) || '{}'); } catch (e) { return {}; }
 }
@@ -79,45 +81,41 @@ function addPostpone(entry) {
   return all[k];
 }
 
-// Recent nights (most recent first) with no check-in logged — never reaching
-// back further than the user's join date. Capped at a week; further back than
-// that stops being a "quick catch-up" and starts being data entry.
-function missingCheckinDates(history, dateKey, maxDays = 7) {
-  const have = new Set((history || []).map((h) => h.date));
+// The earliest date the day-stepper (and any catch-up) will go back to —
+// nothing meaningful exists before the user joined.
+function earliestBrowsableDate() {
   const joined = getJoinedAt();
-  const joinedKey = joined ? (window.isoDate ? window.isoDate(joined) : joined.toISOString().slice(0, 10)) : null;
-  const out = [];
-  for (let i = 1; i <= maxDays; i++) {
-    const d = new Date(dateKey + 'T12:00:00');
-    d.setDate(d.getDate() - i);
-    const key = window.isoDate ? window.isoDate(d) : d.toISOString().slice(0, 10);
-    if (joinedKey && key < joinedKey) break;
-    if (!have.has(key)) out.push(key);
-  }
-  return out;
-}
-function fmtCatchUpLabel(key) {
-  const d = new Date(key + 'T12:00:00');
-  return d.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' }).toUpperCase();
+  return joined ? (window.isoDate ? window.isoDate(joined) : joined.toISOString().slice(0, 10)) : null;
 }
 
-function TodayTodos({ user, set, state, history, onOpenCheckin, onCatchUpCheckin, onWeighIn, onGoWorkout, onGoNutrition, onChanged, weighDoneToday }) {
+function TodayTodos({ user, set, state, history, weighins, onOpenCheckin, onCatchUpCheckin, onWeighIn, onLogWeighFor, onGoWorkout, onGoNutrition, onChanged, weighDoneToday }) {
   const [now, setNow] = React.useState(Date.now());
   React.useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => setInterval && id && clearInterval(id);
   }, []);
 
-  const dateKey = window.isoDate ? window.isoDate(new Date()) : new Date().toISOString().slice(0, 10);
+  const todayKey = window.isoDate ? window.isoDate(new Date()) : new Date().toISOString().slice(0, 10);
+  const dateKey = todayKey;
 
   // Bumped when a missed-reason is saved so the acknowledged row drops out
   // immediately (the filter below re-reads localStorage on every render).
   const [, setReasonTick] = React.useState(0);
 
-  // Catch up on a missed check-in from a recent night — going back today
-  // to log it, not just today's own to-dos.
-  const missingCheckins = missingCheckinDates(history, dateKey);
-  const [catchUpOpen, setCatchUpOpen] = React.useState(false);
+  // Day-stepper — browse back to see (and catch up on) any earlier day's
+  // to-dos, not just today's. Local to this card, so it always resets to
+  // today when Home is left and come back to (the component remounts).
+  const [viewDate, setViewDate] = React.useState(null); // null = today
+  const day = viewDate || todayKey;
+  const onToday = day === todayKey;
+  const floor = earliestBrowsableDate();
+  const stepDay = (n) => {
+    const next = window.shiftDay(day, n);
+    if (next > todayKey) return; // no future days
+    if (n < 0 && floor && next < floor) return; // nothing before joining
+    setViewDate(next === todayKey ? null : next);
+  };
+  const canGoBack = !floor || window.shiftDay(day, -1) >= floor;
 
   // Effective schedule for THIS week (base schedule + any in-week override)
   const baseDays = scheduledWorkoutDays(user);
@@ -270,46 +268,44 @@ function TodayTodos({ user, set, state, history, onOpenCheckin, onCatchUpCheckin
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 10 }}>
-        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 2.4, color: C.textLow }}>
-          TODAY'S TO-DO LIST
-        </span>
-        {todos.length > 0 && (
+      {/* Day-stepper — browse back to see (and catch up on) any earlier day.
+          Same idiom as Nutrition's ‹ TODAY › stepper, for a habit Jake already knows. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        <button onClick={() => stepDay(-1)} disabled={!canGoBack} title="Previous day" style={{ ...dayStepBtn, color: canGoBack ? C.text : C.textLow, cursor: canGoBack ? 'pointer' : 'default' }}>‹</button>
+        <div style={{ flex: 1, textAlign: 'center' }}>
+          <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 15, letterSpacing: 1.2, color: onToday ? C.textLow : C.accent, textTransform: 'uppercase', lineHeight: 1 }}>
+            {onToday ? "TODAY'S TO-DO LIST" : (window.prettyDay ? window.prettyDay(day) : day)}
+          </div>
+          {!onToday && <button onClick={() => setViewDate(null)} style={{ background: 'transparent', border: 0, padding: '3px 0 0', color: C.textLow, fontFamily: 'JetBrains Mono, monospace', fontSize: 9, letterSpacing: 1.4, cursor: 'pointer' }}>BACK TO TODAY</button>}
+        </div>
+        <button onClick={() => stepDay(1)} disabled={onToday} title="Next day" style={{ ...dayStepBtn, color: onToday ? C.textLow : C.text, cursor: onToday ? 'default' : 'pointer' }}>›</button>
+      </div>
+
+      {!onToday && (
+        <HistoricDayCard
+          day={day}
+          history={history}
+          weighins={weighins}
+          user={user}
+          onLogCheckin={() => onCatchUpCheckin && onCatchUpCheckin(day)}
+          onLogWeigh={() => onLogWeighFor && onLogWeighFor(day)}
+        />
+      )}
+
+      {onToday && (
+      <>
+      {todos.length > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: -2 }}>
           <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, letterSpacing: 1, color: doneCount === todos.length ? C.success : C.accent }}>
             {doneCount}/{todos.length} DONE
           </span>
-        )}
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        </div>
+      )}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
         {todos.map((t) => (
           <TodoRow key={t.id} todo={t} now={now} dateKey={dateKey} onReasonSaved={() => setReasonTick((x) => x + 1)} />
         ))}
       </div>
-
-      {/* Catch up on a recent night that never got a check-in */}
-      {missingCheckins.length > 0 && (
-        <button
-          onClick={() => setCatchUpOpen(true)}
-          style={{
-            width: '100%', marginTop: 8, padding: '11px 14px',
-            background: 'transparent', border: `1px dashed ${C.lineStrong}`, borderRadius: 12,
-            color: C.textMid, cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 600, fontSize: 14,
-            letterSpacing: 1.2, textTransform: 'uppercase',
-          }}
-        >
-          <span style={{ color: C.accent, fontSize: 16, lineHeight: 1 }}>↺</span>
-          Catch up on {missingCheckins.length === 1 ? 'a missed check-in' : `${missingCheckins.length} missed check-ins`}
-        </button>
-      )}
-      {catchUpOpen && (
-        <CatchUpCheckinSheet
-          dates={missingCheckins}
-          onPick={(key) => { setCatchUpOpen(false); onCatchUpCheckin && onCatchUpCheckin(key); }}
-          onClose={() => setCatchUpOpen(false)}
-        />
-      )}
 
       {/* Join day: the morning weigh-in starts tomorrow — set the tone. */}
       {joinDay && (
@@ -362,6 +358,8 @@ function TodayTodos({ user, set, state, history, onOpenCheckin, onCatchUpCheckin
           <span style={{ color: C.accent, fontSize: 18, lineHeight: 1 }}>+</span>
           Add a workout to today
         </button>
+      )}
+      </>
       )}
 
       {addSheet && (
@@ -636,38 +634,69 @@ function AddWorkoutSheet({ futureDays, onSwap, onExtra, onClose }) {
   );
 }
 
-// Pick a recent night with no check-in to log it retroactively.
-function CatchUpCheckinSheet({ dates, onPick, onClose }) {
+// A past day's to-do state, browsed via the stepper: what got done, what
+// didn't (marked MISSED — a bygone day, so there's no live countdown, just a
+// plain outcome), and a one-tap way to catch up on check-in/weigh-in. A
+// workout can't be done after the fact, so its row is read-only.
+function HistoricDayCard({ day, history, weighins, user, onLogCheckin, onLogWeigh }) {
+  const checkinEntry = (history || []).find((h) => h.date === day);
+  const weighEntry = (weighins || []).find((w) => w.date === day);
+  let workoutLogged = false;
+  try { workoutLogged = (window.loadWorkouts ? window.loadWorkouts() : []).some((w) => w.date === day); } catch (e) {}
+  const workoutReported = !!(checkinEntry && checkinEntry.answers && checkinEntry.answers.workoutToday);
+  const workoutDone = workoutLogged || workoutReported;
+  const wasScheduledDay = scheduledWorkoutDays(user).includes(new Date(day + 'T12:00:00').getDay());
+  const showWorkoutRow = wasScheduledDay || workoutDone;
+
   return (
-    <div onClick={onClose} style={{ position: 'absolute', inset: 0, zIndex: 220, background: 'rgba(0,0,0,.72)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'flex-end' }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', background: C.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: '20px 22px 24px' }}>
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 3, borderRadius: 2, background: C.ink(.18) }} /></div>
-        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.accent, letterSpacing: 2.4, marginBottom: 8 }}>CATCH UP</div>
-        <h3 style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 26, lineHeight: 1, letterSpacing: 0.5, color: C.text, margin: '0 0 10px', textTransform: 'uppercase' }}>
-          LOG A MISSED<br /><span style={{ color: C.accent }}>NIGHT</span>
-        </h3>
-        <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 13, color: C.textMid, lineHeight: 1.5, margin: '0 0 16px' }}>
-          Pick a night you didn't get to — it logs the same nine questions, just backdated to that night.
-        </p>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {dates.map((key) => (
-            <button
-              key={key}
-              onClick={() => onPick(key)}
-              style={{
-                width: '100%', textAlign: 'left', padding: '13px 14px',
-                background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 12,
-                color: C.text, fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 15,
-                letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer',
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              }}
-            >
-              {fmtCatchUpLabel(key)}
-              <span style={{ color: C.accent, fontSize: 18 }}>→</span>
-            </button>
-          ))}
-        </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <HistoricRow
+        label="Check-in"
+        done={!!checkinEntry}
+        detail={checkinEntry ? '9 questions logged' : null}
+        onAction={onLogCheckin}
+        actionLabel={checkinEntry ? 'View / edit' : 'Log it now'}
+      />
+      <HistoricRow
+        label="Weigh-in"
+        done={!!weighEntry}
+        detail={weighEntry ? `${weighEntry.value} kg` : null}
+        onAction={onLogWeigh}
+        actionLabel={weighEntry ? 'Update' : 'Log it now'}
+      />
+      {showWorkoutRow && (
+        <HistoricRow label="Workout" done={workoutDone} detail={workoutDone ? null : "Can't backdate a session — the check-in's Yes/No is the record"} />
+      )}
+    </div>
+  );
+}
+
+function HistoricRow({ label, done, detail, onAction, actionLabel }) {
+  return (
+    <div style={{ background: done ? C.surf1 : 'transparent', border: `1px solid ${done ? C.line : C.lineStrong}`, borderRadius: 12, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div style={{ width: 32, height: 32, borderRadius: 9, flexShrink: 0, background: done ? C.success : C.surf3, color: done ? C.onAccent : C.textLow, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {done
+          ? <svg width="16" height="16" viewBox="0 0 20 20"><path d="M5 10 L9 14 L15 6" stroke="currentColor" strokeWidth="2.2" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          : <svg width="14" height="14" viewBox="0 0 14 14"><path d="M3.5 3.5 L10.5 10.5 M10.5 3.5 L3.5 10.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>}
       </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 15, letterSpacing: 0.6, color: C.text, textTransform: 'uppercase' }}>{label}</div>
+        <div style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12, color: C.textMid, marginTop: 1 }}>{detail || (done ? 'Done' : 'Missed')}</div>
+      </div>
+      {onAction && (
+        <button
+          onClick={onAction}
+          style={{
+            flexShrink: 0, padding: '8px 12px', borderRadius: 9,
+            background: done ? C.surf2 : C.accent, border: done ? `1px solid ${C.line}` : 0,
+            color: done ? C.textMid : C.onAccent,
+            fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 12,
+            letterSpacing: 0.8, textTransform: 'uppercase', cursor: 'pointer',
+          }}
+        >
+          {actionLabel}
+        </button>
+      )}
     </div>
   );
 }

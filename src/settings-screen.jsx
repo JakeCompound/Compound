@@ -143,7 +143,7 @@ function SettingsScreen({ user, set, onClose, onReset, onRecalc, onFixCheckinDay
         </SettingsGroup>
 
         <SettingsGroup label="HABITS">
-          <SettingsRow icon={<IconBell />} label="Reminder times" hint={`Check-in ${user.checkInTime} · Weigh-in ${user.weighInTime} ${fmtWeighFreq(Math.min(7, Math.max(1, user.weighInEveryDays || 1))).toLowerCase()}`} onClick={() => setSection('reminders')} />
+          <SettingsRow icon={<IconBell />} label="Reminder times" hint={`Check-in ${user.checkInTime} · Weigh-in ${fmtWeighFreq(Math.min(7, Math.max(1, user.weighInEveryDays || 1)), Number.isInteger(user.weighInWeekday) ? user.weighInWeekday : null).toLowerCase()}`} onClick={() => setSection('reminders')} />
           <SettingsRow icon={<IconSpark />} label="Gratitude library" hint={`${(user.gratitude || []).length} items · 7 categories`} onClick={() => setSection('gratitude')} />
           <SettingsRow icon={<IconBellFilled />} label="Notification preferences" hint="What pings you, what doesn't" onClick={() => setSection('notifications')} />
           {/* Recovery: a check-in logged after the 3am grace landed on today —
@@ -560,9 +560,11 @@ function SettingsGoals({ user, set, onBack }) {
   );
 }
 
-// 1 → "Daily" … 7 → "Weekly", anything between → "Every N days"
-function fmtWeighFreq(n) {
-  if (n === 7) return 'Weekly';
+const WEIGHIN_DAY_LABELS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+
+// 1 → "Daily" … 7 → "Weekly" (+ its anchor day), anything between → "Every N days"
+function fmtWeighFreq(n, weekday) {
+  if (n === 7) return Number.isInteger(weekday) ? `Weekly · ${WEIGHIN_DAY_LABELS[weekday]}` : 'Weekly';
   if (n > 1) return `Every ${n} days`;
   return 'Daily';
 }
@@ -570,6 +572,7 @@ function fmtWeighFreq(n) {
 function SettingsReminders({ user, set, onBack }) {
   const [editing, setEditing] = React.useState(false);
   const weighEvery = Math.min(7, Math.max(1, user.weighInEveryDays || 1));
+  const weighWeekday = Number.isInteger(user.weighInWeekday) ? user.weighInWeekday : 5; // default Friday
   return (
     <div style={{ height: '100%', background: C.bg, display: 'flex', flexDirection: 'column' }}>
       <SettingsHeader title="REMINDERS" onBack={onBack} right={<EditToggle editing={editing} onToggle={() => setEditing((e) => !e)} />} />
@@ -589,22 +592,40 @@ function SettingsReminders({ user, set, onBack }) {
             <div style={{ marginTop: 24 }}>
               <FieldLabel>Weigh-in frequency</FieldLabel>
               <div style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: C.textMid, lineHeight: 1.45, margin: '8px 0 12px' }}>
-                How often the weigh-in shows on your to-do list — daily through weekly.
+                How often the weigh-in shows on your to-do list — daily through weekly. There's no clock deadline; it just waits until you get to it.
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                 {[1, 2, 3, 4, 5, 6, 7].map((n) => (
-                  <MultiChip key={n} active={weighEvery === n} onClick={() => set({ weighInEveryDays: n })}>
+                  <MultiChip
+                    key={n}
+                    active={weighEvery === n}
+                    onClick={() => set(n === 7 ? { weighInEveryDays: 7, weighInWeekday: user.weighInWeekday ?? 5 } : { weighInEveryDays: n })}
+                  >
                     {n === 1 ? 'Daily' : n === 7 ? 'Weekly' : `${n} days`}
                   </MultiChip>
                 ))}
               </div>
+              {weighEvery === 7 && (
+                <div style={{ marginTop: 16 }}>
+                  <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, letterSpacing: 1.6, color: C.textLow, marginBottom: 8 }}>
+                    WHICH DAY
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {WEIGHIN_DAY_LABELS.map((lbl, i) => (
+                      <MultiChip key={i} active={weighWeekday === i} onClick={() => set({ weighInWeekday: i })}>
+                        {lbl}
+                      </MultiChip>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
             <ReadField label="Nightly check-in" value={user.checkInTime || '—'} />
             <ReadField label="Weigh-in window" value={user.weighInTime || '—'} />
-            <ReadField label="Weigh-in frequency" value={fmtWeighFreq(weighEvery)} />
+            <ReadField label="Weigh-in frequency" value={fmtWeighFreq(weighEvery, weighEvery === 7 ? weighWeekday : null)} />
           </div>
         )}
       </div>

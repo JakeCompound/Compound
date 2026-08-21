@@ -28,19 +28,28 @@ const CALM_TIERS = [
 // In-progress check-in draft — survives a re-render/rotation that remounts the
 // modal. Keyed to the day so a stale draft never restores tomorrow.
 const CHECKIN_DRAFT_KEY = 'compound:checkinDraft';
-// Keyed to the night being logged (3am grace), so a draft started before
-// midnight still restores just after it.
-const ciToday = () => checkinEffectiveDate();
-function loadCheckinDraft() {
-  try { const d = JSON.parse(sessionStorage.getItem(CHECKIN_DRAFT_KEY)); if (d && d.date === ciToday()) return d; } catch (e) {}
+// Keyed to the night being logged (3am grace, or an explicit catch-up date),
+// so a draft started before midnight still restores just after it.
+const ciToday = (targetDate) => targetDate || checkinEffectiveDate();
+function loadCheckinDraft(targetDate) {
+  try { const d = JSON.parse(sessionStorage.getItem(CHECKIN_DRAFT_KEY)); if (d && d.date === ciToday(targetDate)) return d; } catch (e) {}
   return null;
 }
-function saveCheckinDraft(step, answers, gratShuffle) {
-  try { sessionStorage.setItem(CHECKIN_DRAFT_KEY, JSON.stringify({ date: ciToday(), step, answers, gratShuffle })); } catch (e) {}
+function saveCheckinDraft(step, answers, gratShuffle, targetDate) {
+  try { sessionStorage.setItem(CHECKIN_DRAFT_KEY, JSON.stringify({ date: ciToday(targetDate), step, answers, gratShuffle })); } catch (e) {}
 }
 function clearCheckinDraft() { try { sessionStorage.removeItem(CHECKIN_DRAFT_KEY); } catch (e) {} }
 
-function CheckinModal({ open, onClose, onComplete, gratitudeLibrary = [], user = {}, initialAnswers = null }) {
+// 'MON 18 AUG' for the catch-up header — plain enough to disambiguate at a glance.
+function fmtCatchUpDate(dateKey) {
+  const d = new Date(dateKey + 'T12:00:00');
+  return d.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' }).toUpperCase();
+}
+
+// targetDate (optional, 'YYYY-MM-DD'): catch up on a specific missed past
+// night instead of tonight's. Everything else about the flow is identical —
+// it just changes which date the draft/answers are keyed and recorded to.
+function CheckinModal({ open, onClose, onComplete, gratitudeLibrary = [], user = {}, initialAnswers = null, targetDate = null }) {
   const [step, setStep] = React.useState(0);
   const [answers, setAnswers] = React.useState({
     workoutToday: null,
@@ -74,7 +83,7 @@ function CheckinModal({ open, onClose, onComplete, gratitudeLibrary = [], user =
 
     // Restore an in-progress check-in if we remounted mid-session (e.g. a
     // landscape rotation). Only for a fresh check-in, not when editing.
-    const draft = initialAnswers ? null : loadCheckinDraft();
+    const draft = initialAnswers ? null : loadCheckinDraft(targetDate);
     if (draft && Array.isArray(draft.gratShuffle) && draft.gratShuffle.length) {
       setStep(draft.step || 0);
       setAnswers((a) => ({ ...a, ...draft.answers }));
@@ -103,8 +112,8 @@ function CheckinModal({ open, onClose, onComplete, gratitudeLibrary = [], user =
   // Persist the in-progress draft on every change so a remount can restore it.
   React.useEffect(() => {
     if (!open || gratShuffle.length === 0) return;
-    saveCheckinDraft(step, answers, gratShuffle);
-  }, [open, step, answers, gratShuffle]);
+    saveCheckinDraft(step, answers, gratShuffle, targetDate);
+  }, [open, step, answers, gratShuffle, targetDate]);
 
   // Re-roll the un-ticked slots, pulling items the user hasn't seen yet this
   // session, so Refresh works through the whole library before repeating any.
@@ -138,8 +147,9 @@ function CheckinModal({ open, onClose, onComplete, gratitudeLibrary = [], user =
 
   // Compose the actual sequence of steps based on conditional branches.
   // Sunday by the night being logged — a 12:30am Monday check-in is still
-  // Sunday's, so it keeps the week-plan step.
-  const isSunday = new Date(checkinEffectiveDate() + 'T12:00:00').getDay() === 0;
+  // Sunday's, so it keeps the week-plan step. A catch-up session uses its
+  // own target night instead.
+  const isSunday = new Date(ciToday(targetDate) + 'T12:00:00').getDay() === 0;
   const seq = (() => {
     const s = ['workout'];
     if (answers.workoutToday === true) s.push('workoutGroups', 'workoutMinutes', 'workoutIntensity');
@@ -157,7 +167,7 @@ function CheckinModal({ open, onClose, onComplete, gratitudeLibrary = [], user =
   const advance = () => {
     if (step >= total - 1) {
       clearCheckinDraft();
-      onComplete && onComplete(answers);
+      onComplete && onComplete(answers, targetDate);
     } else {
       setStep(step + 1);
     }
@@ -483,7 +493,7 @@ function CheckinModal({ open, onClose, onComplete, gratitudeLibrary = [], user =
         <div style={{ padding: '4px 22px 8px', flexShrink: 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
             <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 2, color: C.accent }}>
-              CHECK-IN · {step + 1} / {total}
+              {targetDate ? `CATCH UP · ${fmtCatchUpDate(targetDate)}` : 'CHECK-IN'} · {step + 1} / {total}
             </span>
             <button
               onClick={handleClose}

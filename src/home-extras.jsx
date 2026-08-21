@@ -318,8 +318,15 @@ function WeighInBlock({ user }) {
   );
 }
 
-function WeighInModal({ start, goal, onSave, onClose }) {
+const WEIGHIN_WEEKDAY_NAMES = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+
+function WeighInModal({ start, goal, dateKey, onSave, onClose }) {
   const [val, setVal] = React.useState(start);
+  const todayKey = window.isoDate ? window.isoDate(new Date()) : new Date().toISOString().slice(0, 10);
+  const isPastDay = !!dateKey && dateKey !== todayKey;
+  const headerLabel = isPastDay
+    ? (window.prettyDay ? window.prettyDay(dateKey) : dateKey) + ' WEIGH-IN'
+    : `${WEIGHIN_WEEKDAY_NAMES[new Date().getDay()]} WEIGH-IN`;
   return (
     <div
       onClick={onClose}
@@ -337,10 +344,10 @@ function WeighInModal({ start, goal, onSave, onClose }) {
           <div style={{ width: 36, height: 3, borderRadius: 2, background: C.ink(.18) }} />
         </div>
         <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.accent, letterSpacing: 2.4, marginBottom: 8 }}>
-          FRIDAY WEIGH-IN
+          {headerLabel}
         </div>
         <h3 style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 26, lineHeight: 1, letterSpacing: 0.5, color: C.text, margin: 0, textTransform: 'uppercase' }}>
-          ON THE SCALES.<br /><span style={{ color: C.accent }}>POST-BATHROOM, PRE-WATER.</span>
+          {isPastDay ? <>LOGGING IT<br /><span style={{ color: C.accent }}>LATE IS FINE.</span></> : <>ON THE SCALES.<br /><span style={{ color: C.accent }}>POST-BATHROOM, PRE-WATER.</span></>}
         </h3>
         <div style={{ margin: '20px 0' }}>
           <Stepper value={val} onChange={setVal} min={30} max={250} step={0.1} unit="kg" large />

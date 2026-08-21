@@ -51,9 +51,11 @@ function checkinEffectiveDate(now = new Date()) {
 }
 
 // Append tonight's check-in (replacing an existing entry for the same night).
-function recordCheckin(answers, user) {
+// forDate overrides the effective-date guess — used to log a past, missed
+// night from the "catch up" flow instead of tonight's.
+function recordCheckin(answers, user, forDate) {
   const list = loadCheckins();
-  const date = checkinEffectiveDate();
+  const date = forDate || checkinEffectiveDate();
   const metrics = deriveMetricsFromCheckin(answers, user);
   const entry = { date, answers, metrics };
   const without = list.filter((h) => h.date !== date);

@@ -58,7 +58,7 @@ const MSG = {
 };
 
 // Which reminders are due for this subscriber right now?
-function dueKinds(prof, now) {
+function dueKinds(prof, now, ud) {
   const onb = (prof && prof.onboarding) || {};
   const prefs = (prof && prof.notif_prefs) || {};
   const on = (k) => prefs[k] !== false; // default ON
@@ -69,7 +69,7 @@ function dueKinds(prof, now) {
   // falls back to the usual workoutTime.
   const wtOverride = onb.workoutTimes && onb.workoutTimes[now.dow];
   const workout = normHHMM(wtOverride != null ? wtOverride : onb.workoutTime);
-  const days = Array.isArray(onb.workoutDays) ? onb.workoutDays : [];
+  const days = effectiveWorkoutDays(onb, ud, now);
 
   if (on('nightly') && checkIn && now.hhmm === checkIn) out.push('nightly');
   if (on('weighin') && weighIn && now.dow === 5 && now.hhmm === weighIn) out.push('weighin');
@@ -98,6 +98,19 @@ function streakEndingOn(dateSet, endStr) {
   return n;
 }
 
+// Effective scheduled workout days for `now`'s week: the base onboarding
+// schedule, overridden by any in-week postpone/cancel made in the app
+// (compound:workoutWeek → workout_week table, keyed by week start). Without
+// this, postponing or cancelling a day in the app wouldn't stop that day's
+// "missed workout" / "midday urgency" push — the whole point of offering
+// postpone/cancel is that the app stops nagging about a day you've handled.
+function effectiveWorkoutDays(onb, ud, now) {
+  const base = Array.isArray(onb.workoutDays) ? onb.workoutDays : [];
+  const weekStart = isoFromUTC(dnum(now.date) - now.dow * 86400000);
+  const override = ud && ud.weekOverride && ud.weekOverride[weekStart];
+  return Array.isArray(override) ? override : base;
+}
+
 // Returns [{kind, msg}] of event reminders due now. ignoreTime skips the
 // time-of-day gate (used by the dry-run debug path).
 function eventKinds(prof, now, ud, ignoreTime) {
@@ -114,7 +127,7 @@ function eventKinds(prof, now, ud, ignoreTime) {
     if (STREAK_MILESTONES.includes(s)) out.push({ kind: `streak-${s}`, msg: EVENT_MSG.streaks(s) });
   }
   if (on('missed') && at('missed')) {
-    const days = Array.isArray(onb.workoutDays) ? onb.workoutDays : [];
+    const days = effectiveWorkoutDays(onb, ud, now);
     if (days.includes(now.dow) && !wo.has(now.date)) out.push({ kind: 'missed', msg: EVENT_MSG.missed });
   }
   if (on('comeback') && at('comeback') && ci.size) {
@@ -122,7 +135,8 @@ function eventKinds(prof, now, ud, ignoreTime) {
     if (daysBetween(last, now.date) >= 3) out.push({ kind: 'comeback', msg: EVENT_MSG.comeback });
   }
   if (on('urgency') && at('urgency')) {
-    const target = (Array.isArray(onb.workoutDays) && onb.workoutDays.length) ? onb.workoutDays.length : (onb.trainingDays || 3);
+    const days = effectiveWorkoutDays(onb, ud, now);
+    const target = days.length ? days.length : (onb.trainingDays || 3);
     const weekStart = isoFromUTC(dnum(now.date) - now.dow * 86400000);
     let done = 0; wo.forEach((d) => { if (d >= weekStart && d <= now.date) done += 1; });
     const daysLeft = 7 - now.dow; // includes today
@@ -169,12 +183,15 @@ export default async function handler(req, res) {
   if (!isTest) {
     const { data: profs } = await supa.from('profiles').select('id,onboarding,notif_prefs');
     (profs || []).forEach((p) => { profMap[p.id] = p; });
-    // Event reminders need the user's check-in + workout dates.
-    const ensure = (u) => (udByUser[u] = udByUser[u] || { checkins: new Set(), workouts: new Set() });
+    // Event reminders need the user's check-in + workout dates, plus any
+    // in-week postpone/cancel override so a handled day doesn't get nagged.
+    const ensure = (u) => (udByUser[u] = udByUser[u] || { checkins: new Set(), workouts: new Set(), weekOverride: {} });
     const { data: cRows } = await supa.from('checkins').select('user_id,date');
     const { data: wRows } = await supa.from('workouts').select('user_id,date');
+    const { data: wwRows } = await supa.from('workout_week').select('user_id,week_start,data');
     (cRows || []).forEach((r) => ensure(r.user_id).checkins.add(r.date));
     (wRows || []).forEach((r) => ensure(r.user_id).workouts.add(r.date));
+    (wwRows || []).forEach((r) => { ensure(r.user_id).weekOverride[r.week_start] = r.data; });
   }
 
   if (isDry) {
@@ -219,7 +236,7 @@ export default async function handler(req, res) {
       continue;
     }
     const now = localNow(sub.timezone);
-    const kinds = dueKinds(profMap[sub.user_id], now);
+    const kinds = dueKinds(profMap[sub.user_id], now, udByUser[sub.user_id]);
     for (const kind of kinds) {
       // Atomic claim: insert dedup row; if it already existed, skip (already sent today).
       const { data: claimed } = await supa

@@ -153,6 +153,14 @@ function TodayTodos({ user, set, state, history, weighins, onOpenCheckin, onCatc
     if (weekPostpones().length > POSTPONE_SWAP_THRESHOLD) setSwapOffer({ to: toDay });
     onChanged && onChanged();
   };
+  // Cancel outright: drop today from this week's schedule, no makeup day.
+  // No swap-offer here — there's no "to" day to make the new default.
+  const doCancel = (reason) => {
+    applyOverride(effectiveDays.filter((d) => d !== todayDow));
+    addPostpone({ from: todayDow, to: null, reason, ts: Date.now() });
+    setPostponeOpen(false);
+    onChanged && onChanged();
+  };
   const acceptSwapDefault = () => {
     if (set && swapOffer) {
       const base = (Array.isArray(user.workoutDays) ? user.workoutDays : baseDays).filter((d) => d !== todayDow);
@@ -224,6 +232,11 @@ function TodayTodos({ user, set, state, history, weighins, onOpenCheckin, onCatc
       onDo: onGoWorkout,
       canPostpone: true,
       onPostpone: () => setPostponeOpen(true),
+      // Calm presence, not a deadline: no ticking countdown, never turns red.
+      // A scheduled day already has an explicit Postpone/Cancel — no need to
+      // also pressure it with urgency styling.
+      timerless: true,
+      dueLabel: `DUE ${(user.workoutTimes || {})[todayDow] || user.workoutTime || '17:00'}`,
       glyph: (
         <svg width="20" height="20" viewBox="0 0 22 22" fill="none">
           <rect x="1" y="8" width="2" height="6" rx="1" fill="currentColor" />
@@ -376,6 +389,7 @@ function TodayTodos({ user, set, state, history, weighins, onOpenCheckin, onCatc
           targets={postponeTargets}
           fromDow={todayDow}
           onConfirm={doPostpone}
+          onCancel={doCancel}
           onClose={() => setPostponeOpen(false)}
         />
       )}
@@ -504,7 +518,8 @@ function TodoRow({ todo, now, dateKey, onReasonSaved }) {
         </div>
       </button>
 
-      {/* Workout: explicit Complete + Postpone (Postpone also handles a missed session) */}
+      {/* Scheduled workout day: Complete, or open the Postpone/Cancel sheet —
+          no pressure, just an honest choice about the day. */}
       {todo.canPostpone && !todo.done && (
         <div style={{ display: 'flex', gap: 8, padding: '0 14px 14px' }}>
           <button
@@ -517,7 +532,7 @@ function TodoRow({ todo, now, dateKey, onReasonSaved }) {
             onClick={todo.onPostpone}
             style={{ flex: 1, padding: '10px 0', background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 10, color: C.textMid, fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 14, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer' }}
           >
-            {missed ? 'Move it' : 'Postpone'}
+            Postpone / Cancel
           </button>
         </div>
       )}
@@ -702,44 +717,55 @@ function HistoricRow({ label, done, detail, onAction, actionLabel }) {
 }
 
 // Postpone the day's workout to a free future day this week — reason required.
-function PostponeSheet({ targets, fromDow, onConfirm, onClose }) {
+function PostponeSheet({ targets, fromDow, onConfirm, onCancel, onClose }) {
   const [day, setDay] = React.useState(null);
   const [reason, setReason] = React.useState(null);
-  const canConfirm = day != null && !!reason;
+  const canMove = day != null && !!reason;
+  const canCancel = !!reason;
   return (
     <div onClick={onClose} style={{ position: 'absolute', inset: 0, zIndex: 220, background: 'rgba(0,0,0,.72)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'flex-end' }}>
       <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', background: C.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: '20px 22px 24px' }}>
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 3, borderRadius: 2, background: C.ink(.18) }} /></div>
-        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.accent, letterSpacing: 2.4, marginBottom: 8 }}>POSTPONE {DAY_LABELS[fromDow]}'S WORKOUT</div>
+        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.accent, letterSpacing: 2.4, marginBottom: 8 }}>{DAY_LABELS[fromDow]}'S WORKOUT</div>
         <h3 style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 26, lineHeight: 1, letterSpacing: 0.5, color: C.text, margin: '0 0 10px', textTransform: 'uppercase' }}>
-          MOVE IT TO<br /><span style={{ color: C.accent }}>ANOTHER DAY</span>
+          MOVE IT, OR<br /><span style={{ color: C.accent }}>SKIP IT.</span>
         </h3>
-        {targets.length === 0 ? (
-          <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 13, color: C.textMid, lineHeight: 1.5, margin: '4px 0 4px' }}>
-            No free days left this week. Complete it late, or add an extra day from the Workout tab.
-          </p>
-        ) : (
+        <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 13, color: C.textMid, lineHeight: 1.5, margin: '0 0 14px' }}>
+          {targets.length === 0
+            ? "No free days left this week to move it to — you can still skip it, no makeup needed. Just tell us what got in the way."
+            : "Pick a day later this week, or skip it outright — either way, tell us what got in the way. Naming it is the win."}
+        </p>
+
+        {targets.length > 0 && (
           <>
-            <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 13, color: C.textMid, lineHeight: 1.5, margin: '0 0 14px' }}>
-              Pick a day later this week, and tell us what got in the way — naming it is the win.
-            </p>
             <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, letterSpacing: 1.6, color: C.textLow, marginBottom: 8 }}>MOVE TO</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
               {targets.map((d) => (
-                <button key={d} onClick={() => setDay(d)} style={{ padding: '10px 16px', borderRadius: 10, background: day === d ? C.accentDim : C.surf1, border: day === d ? `1px solid ${C.accent}` : `1px solid ${C.line}`, color: day === d ? C.accent : C.text, fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 15, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer' }}>{DAY_LABELS[d]}</button>
+                <button key={d} onClick={() => setDay(day === d ? null : d)} style={{ padding: '10px 16px', borderRadius: 10, background: day === d ? C.accentDim : C.surf1, border: day === d ? `1px solid ${C.accent}` : `1px solid ${C.line}`, color: day === d ? C.accent : C.text, fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 15, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer' }}>{DAY_LABELS[d]}</button>
               ))}
             </div>
-            <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, letterSpacing: 1.6, color: C.textLow, marginBottom: 8 }}>WHY TODAY DIDN'T WORK</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 18 }}>
-              {MISS_REASONS.map((r) => (
-                <button key={r} onClick={() => setReason(r)} style={{ padding: '7px 12px', borderRadius: 999, background: reason === r ? C.accentDim : C.surf1, border: reason === r ? `1px solid ${C.accent}` : `1px solid ${C.line}`, color: reason === r ? C.accent : C.text, fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 600, fontSize: 13, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer' }}>{r}</button>
-              ))}
-            </div>
-            <button onClick={() => canConfirm && onConfirm(day, reason)} disabled={!canConfirm} style={{ width: '100%', height: 50, background: canConfirm ? C.accent : C.surf2, border: 0, borderRadius: 12, color: canConfirm ? C.onAccent : C.textLow, fontFamily: 'Barlow Condensed, sans-serif', fontSize: 15, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', cursor: canConfirm ? 'pointer' : 'default' }}>
-              {day != null ? `Move to ${DAY_LABELS[day]}` : 'Pick a day'}
-            </button>
           </>
         )}
+
+        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, letterSpacing: 1.6, color: C.textLow, marginBottom: 8 }}>WHY TODAY DIDN'T WORK</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 18 }}>
+          {MISS_REASONS.map((r) => (
+            <button key={r} onClick={() => setReason(reason === r ? null : r)} style={{ padding: '7px 12px', borderRadius: 999, background: reason === r ? C.accentDim : C.surf1, border: reason === r ? `1px solid ${C.accent}` : `1px solid ${C.line}`, color: reason === r ? C.accent : C.text, fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 600, fontSize: 13, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer' }}>{r}</button>
+          ))}
+        </div>
+
+        {targets.length > 0 && (
+          <button onClick={() => canMove && onConfirm(day, reason)} disabled={!canMove} style={{ width: '100%', height: 50, background: canMove ? C.accent : C.surf2, border: 0, borderRadius: 12, color: canMove ? C.onAccent : C.textLow, fontFamily: 'Barlow Condensed, sans-serif', fontSize: 15, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', cursor: canMove ? 'pointer' : 'default' }}>
+            {day != null ? `Move to ${DAY_LABELS[day]}` : 'Pick a day to move it'}
+          </button>
+        )}
+        <button
+          onClick={() => canCancel && onCancel(reason)}
+          disabled={!canCancel}
+          style={{ width: '100%', height: 46, marginTop: 8, background: 'transparent', border: `1px solid ${canCancel ? C.lineStrong : C.line}`, borderRadius: 12, color: canCancel ? C.textMid : C.textLow, fontFamily: 'Barlow Condensed, sans-serif', fontSize: 14, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', cursor: canCancel ? 'pointer' : 'default' }}
+        >
+          Skip this week — no makeup
+        </button>
       </div>
     </div>
   );

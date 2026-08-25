@@ -101,8 +101,13 @@ Otherwise compute: ethanol kcal = volume_ml × (ABV/100) × 0.789 × 7, then add
     } catch (e) { setNote('Estimate failed — try again or use the buttons.'); }
     finally { setPending(false); }
   };
+  // Guard against the estimate finishing after the sheet is already gone: while
+  // an AI call is in flight, the backdrop tap and bottom Done button are
+  // disabled instead of letting the user dismiss mid-request and lose it
+  // silently (the input looked like it "did nothing" when this raced).
+  const closeUnlessPending = () => { if (!pending) onClose(); };
   return (
-    <div onClick={onClose} style={{ position: 'absolute', inset: 0, zIndex: 220, background: 'rgba(0,0,0,.72)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'flex-end' }}>
+    <div onClick={closeUnlessPending} style={{ position: 'absolute', inset: 0, zIndex: 220, background: 'rgba(0,0,0,.72)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'flex-end' }}>
       <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', background: C.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: '20px 22px 24px' }}>
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 3, borderRadius: 2, background: C.ink(.18) }} /></div>
         <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.accent, letterSpacing: 2.4, marginBottom: 8 }}>TODAY'S DRINKS</div>
@@ -137,7 +142,7 @@ Otherwise compute: ethanol kcal = volume_ml × (ABV/100) × 0.789 × 7, then add
           </form>
           {note && <div style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: C.accent, marginTop: 8, lineHeight: 1.4 }}>{note}</div>}
         </div>
-        <button onClick={onClose} style={{ width: '100%', height: 50, marginTop: 16, background: C.accent, border: 0, borderRadius: 12, color: C.onAccent, fontFamily: 'Barlow Condensed, sans-serif', fontSize: 15, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', cursor: 'pointer' }}>Done</button>
+        <button onClick={closeUnlessPending} disabled={pending} style={{ width: '100%', height: 50, marginTop: 16, background: pending ? C.surf2 : C.accent, border: 0, borderRadius: 12, color: pending ? C.textLow : C.onAccent, fontFamily: 'Barlow Condensed, sans-serif', fontSize: 15, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', cursor: pending ? 'default' : 'pointer' }}>{pending ? 'Estimating…' : 'Done'}</button>
       </div>
     </div>
   );
@@ -396,8 +401,11 @@ function SoftDrinkQuickAdd({ onClose, onChanged }) {
     finally { setPending(false); }
   };
   const rowStyle = { width: '100%', textAlign: 'left', padding: '12px 14px', background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12 };
+  // Guard against the estimate finishing after the sheet is already gone — see
+  // the matching comment in NipQuickAdd.
+  const closeUnlessPending = () => { if (!pending) onClose(); };
   return (
-    <div onClick={onClose} style={{ position: 'absolute', inset: 0, zIndex: 220, background: 'rgba(0,0,0,.72)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'flex-end' }}>
+    <div onClick={closeUnlessPending} style={{ position: 'absolute', inset: 0, zIndex: 220, background: 'rgba(0,0,0,.72)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'flex-end' }}>
       <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxHeight: '92%', overflowY: 'auto', background: C.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: '20px 22px 24px' }}>
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 3, borderRadius: 2, background: C.ink(.18) }} /></div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
@@ -454,7 +462,7 @@ function SoftDrinkQuickAdd({ onClose, onChanged }) {
         <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12, color: C.textMid, lineHeight: 1.5, margin: '14px 0 0' }}>
           Drinks land in the food log — tap the <span style={{ color: C.accent }}>+</span> on a row for another one.
         </p>
-        <button onClick={onClose} style={{ width: '100%', height: 50, marginTop: 14, background: C.accent, border: 0, borderRadius: 12, color: C.onAccent, fontFamily: 'Barlow Condensed, sans-serif', fontSize: 15, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', cursor: 'pointer' }}>Done</button>
+        <button onClick={closeUnlessPending} disabled={pending} style={{ width: '100%', height: 50, marginTop: 14, background: pending ? C.surf2 : C.accent, border: 0, borderRadius: 12, color: pending ? C.textLow : C.onAccent, fontFamily: 'Barlow Condensed, sans-serif', fontSize: 15, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', cursor: pending ? 'default' : 'pointer' }}>{pending ? 'Estimating…' : 'Done'}</button>
       </div>
     </div>
   );

@@ -127,10 +127,14 @@ Otherwise compute: ethanol kcal = volume_ml × (ABV/100) × 0.789 × 7, then add
         {/* Custom drink — AI estimates the nips */}
         <div style={{ marginTop: 16, paddingTop: 16, borderTop: `1px solid ${C.line}` }}>
           <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: C.textLow, letterSpacing: 1.6, marginBottom: 8 }}>OR DESCRIBE A DRINK</div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <input value={desc} onChange={(e) => setDesc(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') estimate(); }} placeholder="e.g. Long Island iced tea, cider, espresso martini" style={{ flex: 1, background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 10, color: C.text, fontFamily: 'Outfit, sans-serif', fontSize: 14, padding: '12px 14px', outline: 'none' }} />
-            <button onClick={estimate} disabled={pending || !desc.trim()} style={{ width: 52, background: (pending || !desc.trim()) ? C.surf2 : C.accent, color: (pending || !desc.trim()) ? C.textLow : C.onAccent, border: 0, borderRadius: 10, fontSize: 18, cursor: (pending || !desc.trim()) ? 'default' : 'pointer' }}>{pending ? '…' : '→'}</button>
-          </div>
+          {/* A <form onSubmit> (not onKeyDown checking e.key) so Enter/Go/Send
+              works reliably across Android keyboards — some IMEs commit
+              autocomplete on Enter without firing a plain 'Enter' keydown,
+              which made the box appear to clear without ever submitting. */}
+          <form onSubmit={(e) => { e.preventDefault(); estimate(); }} style={{ display: 'flex', gap: 8 }}>
+            <input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="e.g. Long Island iced tea, cider, espresso martini" style={{ flex: 1, background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 10, color: C.text, fontFamily: 'Outfit, sans-serif', fontSize: 14, padding: '12px 14px', outline: 'none' }} />
+            <button type="submit" disabled={pending || !desc.trim()} style={{ width: 52, background: (pending || !desc.trim()) ? C.surf2 : C.accent, color: (pending || !desc.trim()) ? C.textLow : C.onAccent, border: 0, borderRadius: 10, fontSize: 18, cursor: (pending || !desc.trim()) ? 'default' : 'pointer' }}>{pending ? '…' : '→'}</button>
+          </form>
           {note && <div style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: C.accent, marginTop: 8, lineHeight: 1.4 }}>{note}</div>}
         </div>
         <button onClick={onClose} style={{ width: '100%', height: 50, marginTop: 16, background: C.accent, border: 0, borderRadius: 12, color: C.onAccent, fontFamily: 'Barlow Condensed, sans-serif', fontSize: 15, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', cursor: 'pointer' }}>Done</button>
@@ -438,10 +442,10 @@ function SoftDrinkQuickAdd({ onClose, onChanged }) {
 
         <div style={{ marginTop: 16, paddingTop: 16, borderTop: `1px solid ${C.line}` }}>
           <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: C.textLow, letterSpacing: 1.6, marginBottom: 8 }}>OR DESCRIBE A DRINK</div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <input value={desc} onChange={(e) => setDesc(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') estimate(); }} placeholder="e.g. large flat white, Coke Zero, iced latte" style={{ flex: 1, minWidth: 0, background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 10, color: C.text, fontFamily: 'Outfit, sans-serif', fontSize: 14, padding: '12px 14px', outline: 'none' }} />
-            <button onClick={estimate} disabled={pending || !desc.trim()} style={{ width: 52, flexShrink: 0, background: (pending || !desc.trim()) ? C.surf2 : C.accent, color: (pending || !desc.trim()) ? C.textLow : C.onAccent, border: 0, borderRadius: 10, fontSize: 18, cursor: (pending || !desc.trim()) ? 'default' : 'pointer' }}>{pending ? '…' : '→'}</button>
-          </div>
+          <form onSubmit={(e) => { e.preventDefault(); estimate(); }} style={{ display: 'flex', gap: 8 }}>
+            <input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="e.g. large flat white, Coke Zero, iced latte" style={{ flex: 1, minWidth: 0, background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 10, color: C.text, fontFamily: 'Outfit, sans-serif', fontSize: 14, padding: '12px 14px', outline: 'none' }} />
+            <button type="submit" disabled={pending || !desc.trim()} style={{ width: 52, flexShrink: 0, background: (pending || !desc.trim()) ? C.surf2 : C.accent, color: (pending || !desc.trim()) ? C.textLow : C.onAccent, border: 0, borderRadius: 10, fontSize: 18, cursor: (pending || !desc.trim()) ? 'default' : 'pointer' }}>{pending ? '…' : '→'}</button>
+          </form>
           {note && <div style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: C.accent, marginTop: 8, lineHeight: 1.4 }}>{note}</div>}
           {savePick && (
             <button onClick={() => pin(savePick)} style={{ marginTop: 8, background: 'transparent', border: `1px dashed ${C.accent}88`, borderRadius: 999, padding: '7px 12px', color: C.accent, fontFamily: 'JetBrains Mono, monospace', fontSize: 9.5, letterSpacing: 1.4, cursor: 'pointer' }}>+ SAVE "{savePick.name.toUpperCase()}" AS A QUICK PICK</button>

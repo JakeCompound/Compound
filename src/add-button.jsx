@@ -78,7 +78,11 @@ function NipQuickAdd({ onClose, onChanged }) {
     if (!desc.trim() || pending) return;
     setPending(true); setNote(null);
     try {
-      const raw = await window.claude.complete(`Estimate this drink. 1 nip = 30ml of 40% spirit ≈ 9.5g ethanol. Beer ≈ 1.5 nips, glass of wine ≈ 2, cocktail (e.g. Long Island Iced Tea) ≈ 3-4, cider ≈ 1.5 — but scale these DOWN for a stated lower ABV (e.g. a 3.5% "mid-strength" beer is meaningfully less than a 4.8% full-strength one) and up for higher. If it's a named/branded drink, use its real ABV and serving size from what you know (e.g. Carlton Dry: 330ml, 3.5% ABV). NEVER SKIP ALCOHOL CALORIES — compute ethanol kcal = volume_ml × (ABV/100) × 0.789 × 7, then add carbs/mixers on top; a beer or cider is virtually never under 60 kcal, a glass of wine never under 90. If your kcal number implies less than ~55 kcal per nip of alcohol, it's wrong — recompute. Drink: "${desc.trim()}". Respond ONLY JSON: {"nips": <number>, "kcal": <integer>, "name":"short name"}`);
+      const raw = await window.claude.complete(`Estimate this drink's alcohol content (in nips) and total calories. 1 nip = 30ml of 40% spirit ≈ 9.5g ethanol. Beer ≈ 1.5 nips, glass of wine ≈ 2, cocktail (e.g. Long Island Iced Tea) ≈ 3-4, cider ≈ 1.5 — scale these for the actual ABV (a 3.5% "mid-strength" beer is meaningfully less than a 4.8% full-strength one).
+
+If it's a NAMED/BRANDED drink (e.g. "Carlton Dry", "Corona", "Jack Daniel's and Coke"), SEARCH THE WEB for its real ABV, serving size and — if the brewer/distiller publishes one — its actual calorie count, and use that real kcal figure directly instead of estimating it yourself.
+
+Otherwise compute: ethanol kcal = volume_ml × (ABV/100) × 0.789 × 7, then add carbs/mixers on top. NEVER SKIP ALCOHOL CALORIES — a beer or cider is virtually never under 60 kcal, a glass of wine never under 90. Drink: "${desc.trim()}". Respond ONLY JSON: {"nips": <number>, "kcal": <integer>, "name":"short name"}`);
       const m = (typeof raw === 'string' ? raw : '').match(/\{[\s\S]*\}/);
       const obj = m ? JSON.parse(m[0]) : { nips: 0, kcal: 0 };
       const addN = Math.max(0, +obj.nips || 0);

@@ -265,7 +265,11 @@ function BeerLog({ onBack, onClose, onChanged }) {
     <DrinkTypeSheet tag="BEER" onBack={onBack} onClose={onClose} kcal={kcal} onLog={() => logComputed(nips, kcal, onChanged, onClose)}>
       <div style={FIELD_LABEL}>SIZE</div>
       <div style={CHIP_ROW}>
-        {BEER_SIZES.map((s) => <MultiChip key={s.key} active={size.key === s.key} onClick={() => setSize(s)}>{s.label}</MultiChip>)}
+        {BEER_SIZES.map((s) => (
+          <MultiChip key={s.key} active={size.key === s.key} onClick={() => setSize(s)}>
+            {s.label}<div style={{ fontSize: 9, letterSpacing: 1, marginTop: 2, opacity: 0.7 }}>{s.ml}ML</div>
+          </MultiChip>
+        ))}
       </div>
       <div style={FIELD_LABEL}>STYLE</div>
       <div style={CHIP_ROW}>

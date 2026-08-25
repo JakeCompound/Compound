@@ -151,7 +151,7 @@ function ThreeRings({ state, onOpenCheckin, onGoWorkout, onChanged, alcohol = tr
           color={scoreColor}
           glow={score >= 80}
           onClick={() => flip('life')}
-          top={mode.life === 'day' ? 'TODAY' : 'WK AVG'}
+          top={mode.life === 'day' ? (state.todayCheckinDone ? 'TODAY' : 'LAST NIGHT') : 'WK AVG'}
           value={score}
           sub="/ 100"
           label="Life Score"

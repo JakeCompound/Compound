@@ -1,12 +1,16 @@
 import React from 'react';
 import { C } from './compound-ui.jsx';
 import { alcoholOn } from './alcohol.js';
+import { useBackClose } from './back-button.js';
 
 // add-button.jsx — Floating "+" on Home → Drink (alcoholic / non-alcoholic) + Food.
 
 function AddButton({ dietTracking, alcohol = true, onChanged, onGoNutrition }) {
   const [menu, setMenu] = React.useState(false);
   const [sheet, setSheet] = React.useState(null); // 'drink' | 'food'
+  // Hardware back closes these (hooks must run before the early return below).
+  useBackClose(menu, () => setMenu(false));
+  useBackClose(!!sheet, () => setSheet(null));
   if (!alcohol && !dietTracking) return null; // nothing to add
   return (
     <>

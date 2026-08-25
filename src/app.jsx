@@ -513,7 +513,7 @@ function App() {
           <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column' }}>
             <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
               {renderTab()}
-              {tab === 'home' && (
+              {(tab === 'home' || tab === 'nutrition') && (
                 <AddButton
                   dietTracking={!!data.dietTracking}
                   alcohol={alcoholOn(data)}

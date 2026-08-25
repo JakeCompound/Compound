@@ -1,9 +1,10 @@
 import React from 'react';
-import { C } from './compound-ui.jsx';
+import { C, MultiChip, Stepper } from './compound-ui.jsx';
 import { alcoholOn } from './alcohol.js';
 import { useBackClose } from './back-button.js';
 
-// add-button.jsx — Floating "+" on Home → Drink (alcoholic / non-alcoholic) + Food.
+// add-button.jsx — Floating "+" on Home (and Nutrition) → Drink (alcoholic /
+// non-alcoholic) + Food.
 
 function AddButton({ dietTracking, alcohol = true, onChanged, onGoNutrition }) {
   const [menu, setMenu] = React.useState(false);
@@ -148,13 +149,54 @@ function PourChip({ label, sub, onClick }) {
 }
 
 // ── Drink chooser — alcoholic vs non-alcoholic ──────────────────────────────
+// ── Shared alcohol math ──────────────────────────────────────────────────────
+// 1 standard nip = 30ml of 40% spirit ≈ 9.5g ethanol (matches the AI-estimate
+// prompts elsewhere in this file, so numbers stay consistent app-wide).
+const NIP_GRAMS = 9.5;
+const ethanolGrams = (ml, abv) => ml * (abv / 100) * 0.789;
+const ethanolKcal = (ml, abv) => ethanolGrams(ml, abv) * 7;
+const toNips = (ml, abv) => +(ethanolGrams(ml, abv) / NIP_GRAMS).toFixed(1);
+
+// Log a deterministically-computed drink: add to today's running nips +
+// alcohol kcal (same store the pour chips and AI estimate write to), then close.
+function logComputed(nips, kcal, onChanged, onClose) {
+  const n = window.loadNipsToday ? window.loadNipsToday() : 0;
+  const k = window.loadAlcoholKcal ? window.loadAlcoholKcal() : 0;
+  if (window.setNipsToday) window.setNipsToday(+(n + nips).toFixed(2));
+  if (window.setAlcoholKcal) window.setAlcoholKcal(Math.max(0, k + kcal));
+  onChanged && onChanged();
+  onClose && onClose();
+}
+
+// Shared chrome for the Beer/Spirit/Wine screens: back chevron, tag, title,
+// scrollable body, sticky Log button.
+function DrinkTypeSheet({ tag, onBack, onClose, kcal, onLog, children }) {
+  return (
+    <div onClick={onClose} style={{ position: 'absolute', inset: 0, zIndex: 220, background: 'rgba(0,0,0,.72)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'flex-end' }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxHeight: '88vh', overflowY: 'auto', background: C.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: '20px 22px 24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 3, borderRadius: 2, background: C.ink(.18) }} /></div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+          <button onClick={onBack} style={{ background: 'transparent', border: 0, color: C.textLow, fontSize: 22, lineHeight: 1, cursor: 'pointer', padding: 0 }}>‹</button>
+          <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.accent, letterSpacing: 2.4 }}>{tag}</div>
+        </div>
+        {children}
+        <button onClick={onLog} style={{ width: '100%', height: 50, marginTop: 8, background: C.accent, border: 0, borderRadius: 12, color: C.onAccent, fontFamily: 'Barlow Condensed, sans-serif', fontSize: 15, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', cursor: 'pointer' }}>
+          Log it — {kcal} kcal
+        </button>
+      </div>
+    </div>
+  );
+}
+const FIELD_LABEL = { fontFamily: 'JetBrains Mono, monospace', fontSize: 9, letterSpacing: 1.6, color: C.textLow, marginBottom: 8 };
+const CHIP_ROW = { display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 };
+
 function DrinkChooser({ onClose, onChanged }) {
   let onboard = {};
   try { onboard = JSON.parse(localStorage.getItem('compound:onboarding') || '{}'); } catch (e) {}
   const alcOn = alcoholOn(onboard);
   // Only one side available → skip the extra tap.
   const [pick, setPick] = React.useState(alcOn ? null : 'soft');
-  if (pick === 'alc') return <NipQuickAdd onClose={onClose} onChanged={onChanged} />;
+  if (pick === 'alc') return <AlcoholTypeChooser onClose={onClose} onChanged={onChanged} />;
   if (pick === 'soft') return <SoftDrinkQuickAdd onClose={onClose} onChanged={onChanged} />;
   return (
     <div onClick={onClose} style={{ position: 'absolute', inset: 0, zIndex: 220, background: 'rgba(0,0,0,.72)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'flex-end' }}>
@@ -167,6 +209,145 @@ function DrinkChooser({ onClose, onChanged }) {
         </div>
       </div>
     </div>
+  );
+}
+
+// ── Alcoholic drink: Beer / Spirit / Wine, or Other (free-text AI) ──────────
+function AlcoholTypeChooser({ onClose, onChanged }) {
+  const [pick, setPick] = React.useState(null); // 'beer' | 'spirit' | 'wine' | 'other'
+  if (pick === 'beer') return <BeerLog onBack={() => setPick(null)} onClose={onClose} onChanged={onChanged} />;
+  if (pick === 'spirit') return <SpiritLog onBack={() => setPick(null)} onClose={onClose} onChanged={onChanged} />;
+  if (pick === 'wine') return <WineLog onBack={() => setPick(null)} onClose={onClose} onChanged={onChanged} />;
+  if (pick === 'other') return <NipQuickAdd onClose={onClose} onChanged={onChanged} />;
+  return (
+    <div onClick={onClose} style={{ position: 'absolute', inset: 0, zIndex: 220, background: 'rgba(0,0,0,.72)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'flex-end' }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', background: C.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: '20px 22px 24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 3, borderRadius: 2, background: C.ink(.18) }} /></div>
+        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.accent, letterSpacing: 2.4, marginBottom: 12 }}>WHAT ARE YOU HAVING?</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <AddRow label="Beer" sub="Size, style and strength — a few taps" glyph="🍺" onClick={() => setPick('beer')} />
+          <AddRow label="Spirit" sub="A nip, or a splash more" glyph="🥃" onClick={() => setPick('spirit')} />
+          <AddRow label="Wine" sub="Red or white, dry or sweet" glyph="🍷" onClick={() => setPick('wine')} />
+          <AddRow label="Other" sub="Cocktail, cider, anything — describe it, AI estimates" glyph="🍹" onClick={() => setPick('other')} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const BEER_SIZES = [
+  { key: 'stubbie', label: 'Stubbie/Can', ml: 330 },
+  { key: 'bottle', label: 'Bottle', ml: 375 },
+  { key: 'schooner', label: 'Schooner', ml: 425 },
+  { key: 'pint', label: 'Pint', ml: 570 },
+];
+// abv = a sensible default (editable below); carb100 = extra kcal per 100ml
+// from residual sugar on top of the alcohol itself, roughly by style.
+const BEER_STYLES = [
+  { key: 'lager', label: 'Lager', abv: 4.5, carb100: 8 },
+  { key: 'paleale', label: 'Pale Ale', abv: 5.0, carb100: 12 },
+  { key: 'ipa', label: 'IPA', abv: 6.0, carb100: 12 },
+  { key: 'pilsner', label: 'Pilsner', abv: 4.8, carb100: 7 },
+  { key: 'stout', label: 'Stout', abv: 5.5, carb100: 18 },
+  { key: 'wheat', label: 'Wheat', abv: 5.0, carb100: 14 },
+  { key: 'cider', label: 'Cider', abv: 4.5, carb100: 20 },
+  { key: 'other', label: 'Other', abv: 4.5, carb100: 10 },
+];
+
+function BeerLog({ onBack, onClose, onChanged }) {
+  const [size, setSize] = React.useState(BEER_SIZES[0]);
+  const [style, setStyle] = React.useState(BEER_STYLES[0]);
+  const [abv, setAbv] = React.useState(style.abv);
+  const pickStyle = (s) => { setStyle(s); setAbv(s.abv); }; // re-suggest ABV, still editable
+  const kcal = Math.round(ethanolKcal(size.ml, abv) + (size.ml / 100) * style.carb100);
+  const nips = toNips(size.ml, abv);
+  return (
+    <DrinkTypeSheet tag="BEER" onBack={onBack} onClose={onClose} kcal={kcal} onLog={() => logComputed(nips, kcal, onChanged, onClose)}>
+      <div style={FIELD_LABEL}>SIZE</div>
+      <div style={CHIP_ROW}>
+        {BEER_SIZES.map((s) => <MultiChip key={s.key} active={size.key === s.key} onClick={() => setSize(s)}>{s.label}</MultiChip>)}
+      </div>
+      <div style={FIELD_LABEL}>STYLE</div>
+      <div style={CHIP_ROW}>
+        {BEER_STYLES.map((s) => <MultiChip key={s.key} active={style.key === s.key} onClick={() => pickStyle(s)}>{s.label}</MultiChip>)}
+      </div>
+      <div style={FIELD_LABEL}>ALCOHOL % — EDIT IF THE LABEL SAYS OTHERWISE</div>
+      <div style={{ marginBottom: 16 }}><Stepper value={abv} onChange={setAbv} min={0.5} max={15} step={0.1} unit="%" /></div>
+      <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: C.textMid, margin: '0 0 16px' }}>
+        {size.label} of {style.label} at {abv.toFixed(1)}% ≈ <strong style={{ color: C.text }}>{nips} nips</strong>
+      </p>
+    </DrinkTypeSheet>
+  );
+}
+
+const SPIRIT_TYPES = ['Vodka', 'Gin', 'Rum', 'Bourbon', 'Scotch', 'Brandy', 'Other'];
+const SPIRIT_AMOUNTS = [{ key: 'nip', label: 'Nip', ml: 30 }, { key: 'double', label: 'Double', ml: 60 }, { key: 'large', label: 'Large', ml: 90 }];
+
+function SpiritLog({ onBack, onClose, onChanged }) {
+  const [type, setType] = React.useState(SPIRIT_TYPES[0]);
+  const [abv, setAbv] = React.useState(40); // most spirits — optional, editable
+  const [amount, setAmount] = React.useState(SPIRIT_AMOUNTS[0]);
+  const [ml, setMl] = React.useState(30);
+  const pickAmount = (a) => { setAmount(a); setMl(a.ml); };
+  const kcal = Math.round(ethanolKcal(ml, abv));
+  const nips = toNips(ml, abv);
+  return (
+    <DrinkTypeSheet tag="SPIRIT" onBack={onBack} onClose={onClose} kcal={kcal} onLog={() => logComputed(nips, kcal, onChanged, onClose)}>
+      <div style={FIELD_LABEL}>TYPE</div>
+      <div style={CHIP_ROW}>
+        {SPIRIT_TYPES.map((t) => <MultiChip key={t} active={type === t} onClick={() => setType(t)}>{t}</MultiChip>)}
+      </div>
+      <div style={FIELD_LABEL}>ALCOHOL % — OPTIONAL, MOST SPIRITS ARE 40%</div>
+      <div style={{ marginBottom: 16 }}><Stepper value={abv} onChange={setAbv} min={15} max={65} step={1} unit="%" /></div>
+      <div style={FIELD_LABEL}>AMOUNT</div>
+      <div style={CHIP_ROW}>
+        {SPIRIT_AMOUNTS.map((a) => <MultiChip key={a.key} active={amount.key === a.key && ml === a.ml} onClick={() => pickAmount(a)}>{a.label}</MultiChip>)}
+      </div>
+      <div style={{ marginBottom: 16 }}><Stepper value={ml} onChange={setMl} min={15} max={180} step={15} unit="ml" /></div>
+      <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: C.textMid, margin: '0 0 16px' }}>
+        {ml}ml of {type.toLowerCase()} at {abv}% ≈ <strong style={{ color: C.text }}>{nips} nips</strong>
+      </p>
+    </DrinkTypeSheet>
+  );
+}
+
+const WINE_SIZES = [{ key: 'small', label: 'Small glass', ml: 100 }, { key: 'standard', label: 'Standard glass', ml: 150 }, { key: 'large', label: 'Large glass', ml: 200 }];
+// Sensible ABV defaults by colour + sweetness — editable below.
+const WINE_ABV = { 'red-dry': 13.5, 'red-sweet': 13, 'white-dry': 12, 'white-sweet': 10.5 };
+
+function WineLog({ onBack, onClose, onChanged }) {
+  const [color, setColor] = React.useState('red'); // 'red' | 'white'
+  const [sweet, setSweet] = React.useState('dry'); // 'dry' | 'sweet'
+  const [size, setSize] = React.useState(WINE_SIZES[1]);
+  const [abv, setAbv] = React.useState(WINE_ABV['red-dry']);
+  const pickColor = (c) => { setColor(c); setAbv(WINE_ABV[`${c}-${sweet}`]); };
+  const pickSweet = (s) => { setSweet(s); setAbv(WINE_ABV[`${color}-${s}`]); };
+  // A dry wine has almost no residual sugar; a sweet/dessert wine has plenty.
+  const sugarKcal = (sweet === 'sweet' ? 25 : 5) * (size.ml / 150);
+  const kcal = Math.round(ethanolKcal(size.ml, abv) + sugarKcal);
+  const nips = toNips(size.ml, abv);
+  return (
+    <DrinkTypeSheet tag="WINE" onBack={onBack} onClose={onClose} kcal={kcal} onLog={() => logComputed(nips, kcal, onChanged, onClose)}>
+      <div style={FIELD_LABEL}>COLOUR</div>
+      <div style={CHIP_ROW}>
+        <MultiChip active={color === 'red'} onClick={() => pickColor('red')}>Red</MultiChip>
+        <MultiChip active={color === 'white'} onClick={() => pickColor('white')}>White</MultiChip>
+      </div>
+      <div style={FIELD_LABEL}>SWEETNESS</div>
+      <div style={CHIP_ROW}>
+        <MultiChip active={sweet === 'dry'} onClick={() => pickSweet('dry')}>Dry</MultiChip>
+        <MultiChip active={sweet === 'sweet'} onClick={() => pickSweet('sweet')}>Sweet</MultiChip>
+      </div>
+      <div style={FIELD_LABEL}>GLASS SIZE</div>
+      <div style={CHIP_ROW}>
+        {WINE_SIZES.map((s) => <MultiChip key={s.key} active={size.key === s.key} onClick={() => setSize(s)}>{s.label}</MultiChip>)}
+      </div>
+      <div style={FIELD_LABEL}>ALCOHOL % — EDIT IF THE LABEL SAYS OTHERWISE</div>
+      <div style={{ marginBottom: 16 }}><Stepper value={abv} onChange={setAbv} min={5} max={20} step={0.5} unit="%" /></div>
+      <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: C.textMid, margin: '0 0 16px' }}>
+        {size.label.toLowerCase()} of {sweet} {color} at {abv}% ≈ <strong style={{ color: C.text }}>{nips} nips</strong>
+      </p>
+    </DrinkTypeSheet>
   );
 }
 

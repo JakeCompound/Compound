@@ -2,7 +2,7 @@ import React from 'react';
 import { C } from './compound-ui.jsx';
 import { SectionLabel } from './home-components.jsx';
 import { NutritionChat } from './nutrition-screen.jsx';
-import { AddRow, DrinkChooser, FoodAdd, NipQuickAdd, SoftDrinkQuickAdd } from './add-button.jsx';
+import { NipQuickAdd } from './add-button.jsx';
 import { alcoholOn } from './alcohol.js';
 import { useBackClose } from './back-button.js';
 
@@ -10,9 +10,6 @@ import { useBackClose } from './back-button.js';
 
 const HEALTH_COLOR = { unhealthy: '#E5564B', neutral: '#E8A23F', healthy: '#5AC57E' };
 const CONF_COLOR = { low: '#E5564B', medium: '#E8A23F', high: '#5AC57E' };
-
-// Quick-add buttons in the Today view reuse Home's meal/drink sheets.
-const ADD_ACTION_BTN = { flex: 1, padding: '12px 14px', background: C.surf1, border: `1px solid ${C.accentDim}`, borderRadius: 12, color: C.accent, fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 15, letterSpacing: 1, textTransform: 'uppercase', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 };
 
 function NutritionTab({ user, dietTracking, onToggleTracking, onChanged, onSetupTargets }) {
   const [view, setView] = React.useState('today');
@@ -74,7 +71,7 @@ const dayBtn = { width: 34, height: 34, borderRadius: 10, border: `1px solid ${C
 function NutritionToday({ user, onChanged, onSetupTargets }) {
   const [, force] = React.useReducer((x) => x + 1, 0);
   const [qOpen, setQOpen] = React.useState(false);
-  const [sheet, setSheet] = React.useState(null); // 'menu' | 'food' | 'drink' | 'soft' | 'nip'
+  const [sheet, setSheet] = React.useState(null); // 'nip' — editing today's already-logged alcohol tally
   // Hardware back closes an open sheet / the questions flow first.
   useBackClose(!!sheet, () => setSheet(null));
   useBackClose(qOpen, () => setQOpen(false));
@@ -169,11 +166,6 @@ function NutritionToday({ user, onChanged, onSetupTargets }) {
         </button>
       )}
 
-      {/* Quick add — opens the same meal/drink sheets as Home's + button */}
-      <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
-        <button onClick={() => setSheet('menu')} style={ADD_ACTION_BTN}>+ Add item</button>
-      </div>
-
       {/* Meal Questions launcher with red count */}
       {questions.length > 0 && (
         <button onClick={() => setQOpen(true)} style={{ position: 'relative', width: '100%', marginTop: 14, padding: '14px 16px', background: C.surf2, border: `1px solid ${C.accentDim}`, borderRadius: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left' }}>
@@ -191,7 +183,7 @@ function NutritionToday({ user, onChanged, onSetupTargets }) {
         <SectionLabel meta={`${foods.length} ${foods.length === 1 ? 'MEAL' : 'MEALS'} · ${totals.kcal} KCAL`}>{onToday ? "TODAY'S LOG" : `${window.prettyDay(day)} · LOG`}</SectionLabel>
         {foods.length === 0 && !(window.loadNipsToday && window.loadNipsToday() > 0) ? (
           <div style={{ background: C.surf1, border: `1px dashed ${C.line}`, borderRadius: 12, padding: '20px 16px', textAlign: 'center', fontFamily: 'Outfit, sans-serif', fontSize: 13, color: C.textMid, lineHeight: 1.5 }}>
-            Nothing logged {onToday ? 'yet' : 'on this day'}. Tap <span style={{ color: C.accent }}>+ Add item</span> above to log a meal or a drink.
+            Nothing logged {onToday ? 'yet' : 'on this day'}. Tap <span style={{ color: C.accent }}>+</span> below to log a meal or a drink.
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -215,23 +207,8 @@ function NutritionToday({ user, onChanged, onSetupTargets }) {
       </div>
 
       {qOpen && <MealQuestionsFlow onClose={() => { setQOpen(false); refresh(); }} onChanged={refresh} />}
-      {sheet === 'menu' && (
-        <div onClick={() => setSheet(null)} style={{ position: 'absolute', inset: 0, zIndex: 210, background: 'rgba(0,0,0,.6)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'flex-end' }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', background: C.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: '20px 22px 24px' }}>
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 3, borderRadius: 2, background: C.ink(.18) }} /></div>
-            <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.accent, letterSpacing: 2.4, marginBottom: 12 }}>ADD TO {window.prettyDay(day)}</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <AddRow label="Meal" sub="Photo or describe — AI does the macros" glyph="🍽️" onClick={() => setSheet('food')} />
-              {alcoholOn(user)
-                ? <AddRow label="Drink" sub="Coffee, juice, energy — or a beer" glyph="🥤" onClick={() => setSheet('drink')} />
-                : <AddRow label="Drink" sub="Coffee, juice, energy, soft drink" glyph="☕" onClick={() => setSheet('soft')} />}
-            </div>
-          </div>
-        </div>
-      )}
-      {sheet === 'food' && <FoodAdd onClose={() => setSheet(null)} onChanged={refresh} />}
-      {sheet === 'drink' && <DrinkChooser onClose={() => setSheet(null)} onChanged={refresh} />}
-      {sheet === 'soft' && <SoftDrinkQuickAdd onClose={() => setSheet(null)} onChanged={refresh} />}
+      {/* Tapping the logged alcohol row still opens the tally editor directly —
+          adding/logging itself now goes through the same floating + as Home. */}
       {sheet === 'nip' && <NipQuickAdd onClose={() => setSheet(null)} onChanged={refresh} />}
     </div>
   );

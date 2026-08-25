@@ -78,11 +78,18 @@ function NipQuickAdd({ onClose, onChanged }) {
     if (!desc.trim() || pending) return;
     setPending(true); setNote(null);
     try {
-      const raw = await window.claude.complete(`Estimate this drink. 1 nip = 30ml spirit. Beer ≈ 1.5 nips, glass of wine ≈ 2, cocktail (e.g. Long Island Iced Tea) ≈ 3-4, cider ≈ 1.5. Also estimate total calories (ethanol = 7 kcal/g, 0.789 g/ml; plus mixers/sugar). If it's a branded drink, you may search the web for its real ABV/serving size. Drink: "${desc.trim()}". Respond ONLY JSON: {"nips": <number>, "kcal": <integer>, "name":"short name"}`);
+      const raw = await window.claude.complete(`Estimate this drink's alcohol content (in nips) and total calories. 1 nip = 30ml of 40% spirit ≈ 9.5g ethanol. Beer ≈ 1.5 nips, glass of wine ≈ 2, cocktail (e.g. Long Island Iced Tea) ≈ 3-4, cider ≈ 1.5 — scale these for the actual ABV (a 3.5% "mid-strength" beer is meaningfully less than a 4.8% full-strength one).
+
+If it's a NAMED/BRANDED drink (e.g. "Carlton Dry", "Corona", "Jack Daniel's and Coke"), SEARCH THE WEB for its real ABV, serving size and — if the brewer/distiller publishes one — its actual calorie count, and use that real kcal figure directly instead of estimating it yourself.
+
+Otherwise compute: ethanol kcal = volume_ml × (ABV/100) × 0.789 × 7, then add carbs/mixers on top. NEVER SKIP ALCOHOL CALORIES — a beer or cider is virtually never under 60 kcal, a glass of wine never under 90. Drink: "${desc.trim()}". Respond ONLY JSON: {"nips": <number>, "kcal": <integer>, "name":"short name"}`);
       const m = (typeof raw === 'string' ? raw : '').match(/\{[\s\S]*\}/);
       const obj = m ? JSON.parse(m[0]) : { nips: 0, kcal: 0 };
       const addN = Math.max(0, +obj.nips || 0);
-      const addK = Math.max(0, Math.round(+obj.kcal || addN * 65));
+      // Safety floor regardless of what the model returned: a nip's worth of
+      // alcohol alone is ~65 kcal (30ml @ 40% ABV × 0.789 g/ml × 7 kcal/g), so
+      // the total can never plausibly be less than that per nip.
+      const addK = Math.max(Math.round(addN * 65), Math.round(+obj.kcal || 0));
       if (addN > 0 || addK > 0) {
         const v = window.setNipsToday(+(n + addN).toFixed(2)); setN(v);
         const nk = window.setAlcoholKcal(kcal + addK); setKcal(nk);

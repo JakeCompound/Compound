@@ -393,8 +393,8 @@ function CheckinModal({ open, onClose, onComplete, gratitudeLibrary = [], user =
           <CIQuestion
             tag="LOVE · 8 / 9"
             title="QUALITY TIME"
-            accent="WITH PARTNER?"
-            sub="A Yes means at least one moment of undivided attention. Being in the same house doesn't count."
+            accent="WITH FAMILY/PARTNER?"
+            sub="A Yes means at least one moment of undivided attention — with a partner, kid, parent, or anyone close. Being in the same house doesn't count."
           >
             <YesNo value={answers.partnerTime} onChange={(v) => set({ partnerTime: v })} />
             <div style={{ marginTop: 18 }}>

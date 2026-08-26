@@ -151,16 +151,36 @@ const KEY_TO_DOMAIN = {};
 DOMAINS.forEach((d) => d.keys.forEach((k) => { KEY_TO_DOMAIN[k] = d; }));
 const SYNCED_KEYS = Object.keys(KEY_TO_DOMAIN);
 
-async function pullAll() { hydrating = true; try { for (const d of DOMAINS) { try { await d.pull(); } catch (e) { console.warn('[sync] pull failed', d.name, e.message); } } } finally { hydrating = false; } }
-async function pushAll() { for (const d of DOMAINS) { try { await d.push(); } catch (e) { console.warn('[sync] push failed', d.name, e.message); } } }
+// A domain's push is debounced (see schedule() below), so there's always a
+// short window where a fresh edit exists only in localStorage. If the page
+// reloads inside that window — e.g. right after logging a meal — the
+// in-memory debounce timer dies with the old page, the edit never reaches
+// Supabase, and syncOnLogin's pullAll() below would otherwise clobber it with
+// the cloud's now-stale copy. This flag survives the reload (it's plain
+// localStorage, not a timer) so the next boot can push it before pulling.
+const DIRTY_PREFIX = 'compound:dirty:';
+const dirtyKey = (name) => DIRTY_PREFIX + name;
+function markDirty(name) { try { ORIG_SET(dirtyKey(name), '1'); } catch (e) {} }
+function clearDirty(name) { try { localStorage.removeItem(dirtyKey(name)); } catch (e) {} }
+function isDirty(name) { try { return localStorage.getItem(dirtyKey(name)) === '1'; } catch (e) { return false; } }
 
-function clearSyncedLocal() { SYNCED_KEYS.forEach(del); }
+async function pullAll() { hydrating = true; try { for (const d of DOMAINS) { try { await d.pull(); } catch (e) { console.warn('[sync] pull failed', d.name, e.message); } } } finally { hydrating = false; } }
+async function pushAll() { for (const d of DOMAINS) { try { await d.push(); clearDirty(d.name); } catch (e) { console.warn('[sync] push failed', d.name, e.message); } } }
+
+function clearSyncedLocal() { SYNCED_KEYS.forEach(del); DOMAINS.forEach((d) => clearDirty(d.name)); }
 
 // One-time import vs hydrate, with account-switch safety.
 export async function syncOnLogin(userId) {
   uid = userId;
   const prevUser = localStorage.getItem('compound:cloudUser');
   if (prevUser && prevUser !== userId) clearSyncedLocal(); // different account on this device
+
+  // Anything left dirty from a previous session never made it to the cloud —
+  // push it up now, before the pull below can overwrite it with stale data.
+  for (const d of DOMAINS) {
+    if (!isDirty(d.name)) continue;
+    try { await d.push(); clearDirty(d.name); } catch (e) { console.warn('[sync] flush push failed', d.name, e.message); }
+  }
 
   let prof = null;
   try { const { data } = await supabase.from('profiles').select('onboarding').eq('id', userId).maybeSingle(); prof = data; } catch (e) {}
@@ -181,7 +201,9 @@ export async function syncOnLogin(userId) {
 const timers = {};
 function schedule(domain) {
   clearTimeout(timers[domain.name]);
-  timers[domain.name] = setTimeout(() => { domain.push().catch((e) => console.warn('[sync] mirror push failed', domain.name, e.message)); }, 800);
+  timers[domain.name] = setTimeout(() => {
+    domain.push().then(() => clearDirty(domain.name)).catch((e) => console.warn('[sync] mirror push failed', domain.name, e.message));
+  }, 800);
 }
 function installMirror() {
   if (patched) return; patched = true;
@@ -189,7 +211,7 @@ function installMirror() {
     ORIG_SET(key, val);
     if (!uid || hydrating) return;
     const d = KEY_TO_DOMAIN[key];
-    if (d) schedule(d);
+    if (d) { markDirty(d.name); schedule(d); }
   };
   // Offline outbox (simple): on reconnect, re-push everything from local → cloud.
   // localStorage stays the source of truth while offline, so a full re-push reconciles.

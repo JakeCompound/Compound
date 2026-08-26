@@ -21,6 +21,29 @@ let uid = null;
 let hydrating = false;
 let patched = false;
 
+// ── Save status — so the UI can show "Saving…" instead of letting the user
+// reload mid-push with no idea anything is in flight ──────────────────────
+let pendingPushes = 0;
+let lastPushError = null;
+function notifyStatus() {
+  try { window.dispatchEvent(new CustomEvent('compound:syncstatus', { detail: { pending: pendingPushes, error: lastPushError } })); } catch (e) {}
+}
+async function pushDomain(d) {
+  pendingPushes++; notifyStatus();
+  try {
+    await d.push();
+    clearDirty(d.name);
+    lastPushError = null;
+  } catch (e) {
+    lastPushError = { domain: d.name, message: e.message };
+    console.warn('[sync] push failed', d.name, e.message);
+  } finally {
+    pendingPushes = Math.max(0, pendingPushes - 1);
+    notifyStatus();
+  }
+}
+window.getSyncStatus = () => ({ pending: pendingPushes, error: lastPushError });
+
 async function replaceRows(table, rows) {
   await supabase.from(table).delete().eq('user_id', uid);
   if (rows && rows.length) { const { error } = await supabase.from(table).insert(rows); if (error) throw error; }
@@ -165,7 +188,7 @@ function clearDirty(name) { try { localStorage.removeItem(dirtyKey(name)); } cat
 function isDirty(name) { try { return localStorage.getItem(dirtyKey(name)) === '1'; } catch (e) { return false; } }
 
 async function pullAll() { hydrating = true; try { for (const d of DOMAINS) { try { await d.pull(); } catch (e) { console.warn('[sync] pull failed', d.name, e.message); } } } finally { hydrating = false; } }
-async function pushAll() { for (const d of DOMAINS) { try { await d.push(); clearDirty(d.name); } catch (e) { console.warn('[sync] push failed', d.name, e.message); } } }
+async function pushAll() { for (const d of DOMAINS) await pushDomain(d); }
 
 function clearSyncedLocal() { SYNCED_KEYS.forEach(del); DOMAINS.forEach((d) => clearDirty(d.name)); }
 
@@ -177,10 +200,7 @@ export async function syncOnLogin(userId) {
 
   // Anything left dirty from a previous session never made it to the cloud —
   // push it up now, before the pull below can overwrite it with stale data.
-  for (const d of DOMAINS) {
-    if (!isDirty(d.name)) continue;
-    try { await d.push(); clearDirty(d.name); } catch (e) { console.warn('[sync] flush push failed', d.name, e.message); }
-  }
+  for (const d of DOMAINS) { if (isDirty(d.name)) await pushDomain(d); }
 
   let prof = null;
   try { const { data } = await supabase.from('profiles').select('onboarding').eq('id', userId).maybeSingle(); prof = data; } catch (e) {}
@@ -201,9 +221,7 @@ export async function syncOnLogin(userId) {
 const timers = {};
 function schedule(domain) {
   clearTimeout(timers[domain.name]);
-  timers[domain.name] = setTimeout(() => {
-    domain.push().then(() => clearDirty(domain.name)).catch((e) => console.warn('[sync] mirror push failed', domain.name, e.message));
-  }, 800);
+  timers[domain.name] = setTimeout(() => { pushDomain(domain); }, 800);
 }
 function installMirror() {
   if (patched) return; patched = true;

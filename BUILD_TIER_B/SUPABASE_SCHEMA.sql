@@ -89,8 +89,15 @@ create table if not exists food_entries (
   health      text,                     -- red | orange | green
   info        text,
   questions   jsonb default '[]'::jsonb, -- [{q, options, answer}]
+  servings    int default 1,            -- the "+ another serving" stepper
+  nips        numeric default 0,        -- alcohol logged as a food/drink entry
+  kind        text default 'food',      -- 'food' | 'drink'
   ts          timestamptz not null default now()
 );
+-- Migration for a database created before servings/nips/kind existed:
+-- alter table food_entries add column if not exists servings int default 1;
+-- alter table food_entries add column if not exists nips numeric default 0;
+-- alter table food_entries add column if not exists kind text default 'food';
 
 -- ---- 8. NIP / ALCOHOL TALLY (one row per day) ------------------------------
 -- Replaces: compound:nipsToday + compound:alcoholKcal

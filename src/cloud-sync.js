@@ -86,7 +86,8 @@ const DOMAINS = [
         user_id: uid, date, name: m.name || null, photo_url: null,
         kcal: m.kcal ?? null, protein: m.p ?? null, carbs: m.c ?? null, fat: m.f ?? null,
         confidence: m.confidence || null, health: m.health || null, info: m.info || null,
-        questions: m.questions || [], ts: iso(m.ts) || new Date().toISOString(),
+        questions: m.questions || [], servings: m.servings || 1, nips: m.nips || 0,
+        kind: m.kind || 'food', ts: iso(m.ts) || new Date().toISOString(),
       })));
       await replaceRows('food_entries', rows);
     },
@@ -96,7 +97,8 @@ const DOMAINS = [
       (data || []).forEach((r) => {
         (o[r.date] = o[r.date] || []).push({
           id: 'f-db-' + r.id, name: r.name, photo: null, kcal: r.kcal, p: Number(r.protein || 0), c: Number(r.carbs || 0), f: Number(r.fat || 0),
-          confidence: r.confidence, health: r.health, info: r.info, questions: r.questions || [], ts: ms(r.ts),
+          confidence: r.confidence, health: r.health, info: r.info, questions: r.questions || [],
+          servings: r.servings || 1, nips: Number(r.nips || 0), kind: r.kind || 'food', ts: ms(r.ts),
         });
       });
       setJSON('compound:food', o);

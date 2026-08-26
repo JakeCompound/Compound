@@ -523,6 +523,7 @@ function App() {
               )}
             </div>
             <TabBar active={tab} onChange={setTab} />
+            <SyncBadge />
           </div>
         )}
 
@@ -690,6 +691,56 @@ function App() {
       </TweaksPanel>
 
       <InstallPrompt />
+    </div>
+  );
+}
+
+// ── Cloud-sync status ────────────────────────────────────────────────────────
+// A small top-of-screen pill so the user always knows whether their last edit
+// has actually reached the cloud — closing the app (or reloading) mid-save
+// used to silently lose that edit with zero feedback. See src/cloud-sync.js.
+function SyncBadge() {
+  const [status, setStatus] = React.useState(() => (window.getSyncStatus ? window.getSyncStatus() : { pending: 0, error: null }));
+  const [phase, setPhase] = React.useState('idle'); // idle | saving | saved | error
+  const wasSaving = React.useRef(false);
+  React.useEffect(() => {
+    const onStatus = (e) => setStatus(e.detail);
+    window.addEventListener('compound:syncstatus', onStatus);
+    return () => window.removeEventListener('compound:syncstatus', onStatus);
+  }, []);
+  React.useEffect(() => {
+    if (status.pending > 0) { wasSaving.current = true; setPhase('saving'); return; }
+    if (!wasSaving.current) return;
+    wasSaving.current = false;
+    if (status.error) { setPhase('error'); const t = setTimeout(() => setPhase('idle'), 4000); return () => clearTimeout(t); }
+    setPhase('saved');
+    const t = setTimeout(() => setPhase('idle'), 1200);
+    return () => clearTimeout(t);
+  }, [status]);
+  if (phase === 'idle') return null;
+  const bg = phase === 'error' ? 'rgba(229,86,75,.94)' : 'rgba(20,20,22,.88)';
+  return (
+    <div
+      style={{
+        position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', zIndex: 300,
+        display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 999,
+        background: bg, color: '#fff', pointerEvents: 'none', whiteSpace: 'nowrap',
+        fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 1.2,
+      }}
+    >
+      {phase === 'saving' && (
+        <>
+          <svg width="11" height="11" viewBox="0 0 16 16" aria-hidden style={{ flexShrink: 0 }}>
+            <circle cx="8" cy="8" r="6" stroke="rgba(255,255,255,.3)" strokeWidth="2" fill="none" />
+            <path d="M8 2 a6 6 0 0 1 6 6" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round">
+              <animateTransform attributeName="transform" type="rotate" from="0 8 8" to="360 8 8" dur="0.8s" repeatCount="indefinite" />
+            </path>
+          </svg>
+          SAVING…
+        </>
+      )}
+      {phase === 'saved' && <>✓ SAVED</>}
+      {phase === 'error' && <>⚠ SAVE FAILED — RETRYING</>}
     </div>
   );
 }

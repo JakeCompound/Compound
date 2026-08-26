@@ -28,18 +28,39 @@ let lastPushError = null;
 function notifyStatus() {
   try { window.dispatchEvent(new CustomEvent('compound:syncstatus', { detail: { pending: pendingPushes, error: lastPushError } })); } catch (e) {}
 }
+// One push per domain at a time — replaceRows is a DELETE + INSERT, so two
+// interleaved pushes of the same domain could tear each other's data. A write
+// landing mid-push queues exactly one follow-up push instead.
+const inFlight = {};
+// Failed pushes retry themselves with backoff — the badge's "retrying" is a
+// promise the code actually keeps, not just reassuring copy.
+const retryTimers = {};
+const retryDelays = {};
 async function pushDomain(d) {
+  if (inFlight[d.name]) { inFlight[d.name] = 'again'; return; }
+  inFlight[d.name] = true;
   pendingPushes++; notifyStatus();
   try {
     await d.push();
     clearDirty(d.name);
     lastPushError = null;
+    retryDelays[d.name] = 0;
   } catch (e) {
     lastPushError = { domain: d.name, message: e.message };
     console.warn('[sync] push failed', d.name, e.message);
+    const delay = retryDelays[d.name] = Math.min((retryDelays[d.name] || 2500) * 2, 60000);
+    if (!retryTimers[d.name]) {
+      retryTimers[d.name] = setTimeout(() => {
+        delete retryTimers[d.name];
+        if (uid && isDirty(d.name)) pushDomain(d);
+      }, delay);
+    }
   } finally {
     pendingPushes = Math.max(0, pendingPushes - 1);
     notifyStatus();
+    const again = inFlight[d.name] === 'again';
+    delete inFlight[d.name];
+    if (again && uid) pushDomain(d);
   }
 }
 window.getSyncStatus = () => ({ pending: pendingPushes, error: lastPushError });
@@ -112,7 +133,18 @@ const DOMAINS = [
         questions: m.questions || [], servings: m.servings || 1, nips: m.nips || 0,
         kind: m.kind || 'food', ts: iso(m.ts) || new Date().toISOString(),
       })));
-      await replaceRows('food_entries', rows);
+      try {
+        await replaceRows('food_entries', rows);
+      } catch (e) {
+        // A database missing the servings/nips/kind migration rejects the whole
+        // insert — and since replaceRows deletes before inserting, that used to
+        // leave the cloud food log EMPTY. Fall back to the base columns so the
+        // meals themselves always land; the extra fields sync once the columns
+        // exist (see BUILD_TIER_B/SUPABASE_SCHEMA.sql).
+        if (!/column|servings|nips|kind|schema/i.test((e && e.message) || '')) throw e;
+        console.warn('[sync] food push falling back to base columns:', e.message);
+        await replaceRows('food_entries', rows.map(({ servings, nips, kind, ...base }) => base));
+      }
     },
     async pull() {
       const { data } = await supabase.from('food_entries').select('*').eq('user_id', uid).order('ts');
@@ -187,7 +219,19 @@ function markDirty(name) { try { ORIG_SET(dirtyKey(name), '1'); } catch (e) {} }
 function clearDirty(name) { try { localStorage.removeItem(dirtyKey(name)); } catch (e) {} }
 function isDirty(name) { try { return localStorage.getItem(dirtyKey(name)) === '1'; } catch (e) { return false; } }
 
-async function pullAll() { hydrating = true; try { for (const d of DOMAINS) { try { await d.pull(); } catch (e) { console.warn('[sync] pull failed', d.name, e.message); } } } finally { hydrating = false; } }
+async function pullAll() {
+  hydrating = true;
+  try {
+    for (const d of DOMAINS) {
+      // Still dirty here = its flush push FAILED, so the local copy is newer
+      // than the cloud's. Pulling would overwrite the user's unsaved edits
+      // with stale (possibly half-deleted) cloud data — keep local, let the
+      // retry loop land it in the cloud instead.
+      if (isDirty(d.name)) { console.warn('[sync] pull skipped — local copy newer (unpushed)', d.name); continue; }
+      try { await d.pull(); } catch (e) { console.warn('[sync] pull failed', d.name, e.message); }
+    }
+  } finally { hydrating = false; }
+}
 async function pushAll() { for (const d of DOMAINS) await pushDomain(d); }
 
 function clearSyncedLocal() { SYNCED_KEYS.forEach(del); DOMAINS.forEach((d) => clearDirty(d.name)); }

@@ -123,6 +123,11 @@ const DOMAINS = [
   },
   {
     name: 'food', keys: ['compound:food'],
+    // servings/nips/kind ride INSIDE the questions jsonb (as a {__meta} entry)
+    // so they survive on a database that never got the dedicated columns —
+    // the live DB is missing them (migration never applied), which made every
+    // "+1 serving" silently reset to 1 on the next pull. The dedicated columns
+    // are still written when they exist and win on pull.
     async push() {
       const o = J('compound:food') || {};
       const rows = [];
@@ -130,17 +135,17 @@ const DOMAINS = [
         user_id: uid, date, name: m.name || null, photo_url: null,
         kcal: m.kcal ?? null, protein: m.p ?? null, carbs: m.c ?? null, fat: m.f ?? null,
         confidence: m.confidence || null, health: m.health || null, info: m.info || null,
-        questions: m.questions || [], servings: m.servings || 1, nips: m.nips || 0,
+        questions: [...(m.questions || []), { __meta: { servings: m.servings || 1, nips: m.nips || 0, kind: m.kind || 'food' } }],
+        servings: m.servings || 1, nips: m.nips || 0,
         kind: m.kind || 'food', ts: iso(m.ts) || new Date().toISOString(),
       })));
       try {
         await replaceRows('food_entries', rows);
       } catch (e) {
-        // A database missing the servings/nips/kind migration rejects the whole
+        // A database missing the servings/nips/kind columns rejects the whole
         // insert — and since replaceRows deletes before inserting, that used to
-        // leave the cloud food log EMPTY. Fall back to the base columns so the
-        // meals themselves always land; the extra fields sync once the columns
-        // exist (see BUILD_TIER_B/SUPABASE_SCHEMA.sql).
+        // leave the cloud food log EMPTY. Strip the columns and retry; the same
+        // values still land via the questions __meta entry above.
         if (!/column|servings|nips|kind|schema/i.test((e && e.message) || '')) throw e;
         console.warn('[sync] food push falling back to base columns:', e.message);
         await replaceRows('food_entries', rows.map(({ servings, nips, kind, ...base }) => base));
@@ -150,10 +155,15 @@ const DOMAINS = [
       const { data } = await supabase.from('food_entries').select('*').eq('user_id', uid).order('ts');
       const o = {};
       (data || []).forEach((r) => {
+        const qs = Array.isArray(r.questions) ? r.questions : [];
+        const meta = (qs.find((q) => q && q.__meta) || {}).__meta || {};
         (o[r.date] = o[r.date] || []).push({
           id: 'f-db-' + r.id, name: r.name, photo: null, kcal: r.kcal, p: Number(r.protein || 0), c: Number(r.carbs || 0), f: Number(r.fat || 0),
-          confidence: r.confidence, health: r.health, info: r.info, questions: r.questions || [],
-          servings: r.servings || 1, nips: Number(r.nips || 0), kind: r.kind || 'food', ts: ms(r.ts),
+          confidence: r.confidence, health: r.health, info: r.info,
+          questions: qs.filter((q) => !(q && q.__meta)), // meta is transport-only, never a real question
+          servings: r.servings || meta.servings || 1,
+          nips: Number(r.nips ?? meta.nips ?? 0),
+          kind: r.kind || meta.kind || 'food', ts: ms(r.ts),
         });
       });
       setJSON('compound:food', o);

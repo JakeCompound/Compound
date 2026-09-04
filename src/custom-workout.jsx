@@ -132,6 +132,62 @@ function CustomWorkoutBuilder({ user, onBack, onStart }) {
   );
 }
 
-Object.assign(window, { CustomWorkoutBuilder });
+// Bottom-sheet version of the same type-to-search picker — used INSIDE a live
+// session so a workout can be made up as you go: finish an exercise, search,
+// add the next one on the spot.
+function ExercisePickerSheet({ excludeIds = [], onPick, onClose }) {
+  const [query, setQuery] = React.useState('');
+  const q = query.trim().toLowerCase();
+  const results = q
+    ? EXERCISES.filter((e) =>
+        !excludeIds.includes(e.id) &&
+        (e.name.toLowerCase().includes(q) || e.groups.some((g) => g.toLowerCase().includes(q))))
+      .slice(0, 8)
+    : [];
+  return (
+    <div onClick={onClose} style={{ position: 'absolute', inset: 0, zIndex: 220, background: 'rgba(0,0,0,.72)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'flex-end' }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxHeight: '80vh', overflowY: 'auto', background: C.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: '20px 22px 24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 3, borderRadius: 2, background: C.ink(.18) }} /></div>
+        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.accent, letterSpacing: 2.4, marginBottom: 10 }}>ADD AN EXERCISE</div>
+        <input
+          autoFocus
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search — bench, row, curl, legs…"
+          style={{ width: '100%', boxSizing: 'border-box', background: C.surf1, border: `1px solid ${q ? C.accentDim : C.line}`, borderRadius: 12, color: C.text, fontFamily: 'Outfit, sans-serif', fontSize: 15, padding: '13px 14px', outline: 'none' }}
+        />
+        <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6, minHeight: 60 }}>
+          {q && results.length === 0 && (
+            <div style={{ background: C.surf1, border: `1px dashed ${C.line}`, borderRadius: 10, padding: '12px 14px', fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: C.textMid }}>
+              Nothing matches "{query}" — try a muscle group (chest, back, legs…) or a shorter word.
+            </div>
+          )}
+          {!q && (
+            <div style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: C.textMid, padding: '8px 2px' }}>
+              Type to search the library — it's added to this session with 3 sets (log as many as you actually do).
+            </div>
+          )}
+          {results.map((e) => (
+            <button
+              key={e.id}
+              onClick={() => onPick(e)}
+              style={{ width: '100%', textAlign: 'left', padding: '11px 13px', background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 }}
+            >
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 15.5, letterSpacing: 0.6, color: C.text, textTransform: 'uppercase' }}>{e.name}</div>
+                <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: C.textLow, letterSpacing: 1, marginTop: 2 }}>
+                  {e.groups.join(' · ').toUpperCase()}{e.type === 'bodyweight' ? ' · BODYWEIGHT' : ''}
+                </div>
+              </div>
+              <span style={{ flexShrink: 0, width: 26, height: 26, borderRadius: 13, background: C.accent + '1f', border: `1px solid ${C.accent}66`, color: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'JetBrains Mono, monospace', fontSize: 15 }}>+</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
-export { CustomWorkoutBuilder };
+Object.assign(window, { CustomWorkoutBuilder, ExercisePickerSheet });
+
+export { CustomWorkoutBuilder, ExercisePickerSheet };

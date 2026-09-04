@@ -2,7 +2,8 @@ import React from 'react';
 import { C, PrimaryButton } from './compound-ui.jsx';
 import { SectionLabel } from './home-components.jsx';
 import { QuickLogButton } from './quick-log.jsx';
-import { calc1RM } from './workout-data.jsx';
+import { buildSessionItem, calc1RM } from './workout-data.jsx';
+import { ExercisePickerSheet } from './custom-workout.jsx';
 import { ExerciseNote, PlateCalc, PrevPerfStrip, SaveAsRoutineCard, SessionNotesField } from './workout-enhancements.jsx';
 
 // workout-session.jsx — Live workout session, set logging, rest timer, completion
@@ -15,6 +16,7 @@ function WorkoutSession({ session, config, onExit, onComplete }) {
   const [askRIR, setAskRIR] = React.useState(null); // { exIdx, setIdx } or null
   const [confirmExit, setConfirmExit] = React.useState(false);
   const [completed, setCompleted] = React.useState(false);
+  const [pickerOpen, setPickerOpen] = React.useState(false); // add-exercise search sheet
 
   const exercise = exercises[currentIdx];
   const totalExercises = exercises.length;
@@ -38,6 +40,40 @@ function WorkoutSession({ session, config, onExit, onComplete }) {
       next[exIdx] = { ...next[exIdx], note };
       return next;
     });
+  };
+
+  // Make it up as you go: append a searched exercise to the running session.
+  const addExercise = (libEx) => {
+    const item = buildSessionItem(libEx, { durationMin: config.duration || 30, preFeel: 0, idx: exercises.length, setsPerExercise: 3 });
+    const newIdx = exercises.length;
+    setExercises((all) => [...all, item]);
+    // Jump to it only when the current exercise is already done (the usual
+    // "finished — now what?" moment); otherwise it queues in NEXT UP.
+    if (exercise && isExerciseComplete(exercise)) setCurrentIdx(newIdx);
+    setPickerOpen(false);
+  };
+
+  // One more set of the current exercise, mirroring its last set's targets.
+  const addSet = () => {
+    setExercises((all) => {
+      const next = [...all];
+      const ex = { ...next[currentIdx] };
+      const last = ex.sets[ex.sets.length - 1] || {};
+      ex.sets = [...ex.sets, {
+        target: last.target ?? 10, targetHold: last.targetHold ?? null,
+        suggested: last.weight ?? last.suggested ?? null, weight: last.weight ?? last.suggested ?? null,
+        reps: null, rir: null, complete: false, isWarmup: false,
+      }];
+      next[currentIdx] = ex;
+      return next;
+    });
+  };
+
+  // Closing the picker without adding: if everything is already done, the
+  // session is genuinely over — hand back to the completion screen.
+  const closePicker = () => {
+    setPickerOpen(false);
+    if (exercises.every(isExerciseComplete)) setCompleted(true);
   };
 
   // Total progress: completed sets / all sets
@@ -99,7 +135,7 @@ function WorkoutSession({ session, config, onExit, onComplete }) {
   }, [exercises]);
 
   if (completed) {
-    return <SessionComplete exercises={exercises} config={config} onDone={(analysis) => {
+    return <SessionComplete exercises={exercises} config={config} onKeepGoing={() => { setCompleted(false); setPickerOpen(true); }} onDone={(analysis) => {
       // Carry the AI kcal onto the stored entry so the day's earned-calorie
       // ledger uses the session-specific figure over the flat MET formula.
       const cfg = analysis && analysis.kcal != null
@@ -139,11 +175,12 @@ function WorkoutSession({ session, config, onExit, onComplete }) {
           onUpdateSet={(setIdx, patch) => updateSet(currentIdx, setIdx, patch)}
           onCompleteSet={completeSet}
           onUpdateNote={(note) => updateNote(currentIdx, note)}
+          onAddSet={addSet}
         />
 
         {/* Next-up preview */}
         {currentIdx < exercises.length - 1 && (
-          <div style={{ padding: '6px 22px 22px' }}>
+          <div style={{ padding: '6px 22px 8px' }}>
             <SectionLabel>NEXT UP</SectionLabel>
             <div style={{ display: 'flex', gap: 8, overflowX: 'auto', marginLeft: -22, marginRight: -22, paddingLeft: 22, paddingRight: 22 }}>
               {exercises.slice(currentIdx + 1).map((e, i) => (
@@ -166,11 +203,26 @@ function WorkoutSession({ session, config, onExit, onComplete }) {
             </div>
           </div>
         )}
+
+        {/* Make it up as you go — search & append the next exercise mid-session */}
+        <div style={{ padding: '6px 22px 22px' }}>
+          <button
+            onClick={() => setPickerOpen(true)}
+            style={{ width: '100%', padding: '13px 14px', background: 'transparent', border: `1px dashed ${C.accentDim}`, borderRadius: 12, color: C.accent, cursor: 'pointer', fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 14, letterSpacing: 1.2, textTransform: 'uppercase' }}
+          >
+            ＋ Add exercise
+          </button>
+        </div>
       </div>
 
       {/* Rest timer */}
       {restEndAt && (
         <RestTimer endsAt={restEndAt} onSkip={skipRest} onAdd={() => setRestEndAt(restEndAt + 15000)} />
+      )}
+
+      {/* Add-exercise search sheet */}
+      {pickerOpen && (
+        <ExercisePickerSheet onPick={addExercise} onClose={closePicker} />
       )}
 
       {/* RIR modal */}
@@ -196,7 +248,7 @@ function WorkoutSession({ session, config, onExit, onComplete }) {
 }
 
 // ── Current exercise ────────────────────────────────────────────────────
-function CurrentExercise({ exercise, onUpdateSet, onCompleteSet, onUpdateNote }) {
+function CurrentExercise({ exercise, onUpdateSet, onCompleteSet, onUpdateNote, onAddSet }) {
   return (
     <div style={{ padding: '20px 22px 14px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -259,6 +311,14 @@ function CurrentExercise({ exercise, onUpdateSet, onCompleteSet, onUpdateNote })
             onComplete={() => onCompleteSet(i)}
           />
         ))}
+        {onAddSet && (
+          <button
+            onClick={onAddSet}
+            style={{ padding: '10px 12px', background: 'transparent', border: `1px dashed ${C.lineStrong}`, borderRadius: 12, color: C.textMid, cursor: 'pointer', fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 1.6 }}
+          >
+            ＋ ADD SET
+          </button>
+        )}
       </div>
 
       {/* Per-exercise note */}
@@ -603,7 +663,7 @@ function ExitConfirmModal({ onResume, onSave, onDiscard }) {
 }
 
 // ── Session complete ─────────────────────────────────────────────────────
-function SessionComplete({ exercises, config, onDone }) {
+function SessionComplete({ exercises, config, onDone, onKeepGoing }) {
   const [sessionNote, setSessionNote] = React.useState('');
   const totalSets = exercises.reduce((n, e) => n + e.sets.length, 0);
   const completedSets = exercises.reduce((n, e) => n + e.sets.filter((s) => s.complete).length, 0);
@@ -801,7 +861,15 @@ Respond ONLY JSON: {"kcal": <integer total calories burned for the whole session
         <SaveAsRoutineCard session={exercises} config={config} />
       </div>
 
-      <div style={{ marginTop: 24, paddingTop: 8 }}>
+      <div style={{ marginTop: 24, paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {onKeepGoing && (
+          <button
+            onClick={onKeepGoing}
+            style={{ width: '100%', height: 48, background: 'transparent', border: `1px dashed ${C.accentDim}`, borderRadius: 12, color: C.accent, cursor: 'pointer', fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 14, letterSpacing: 1.2, textTransform: 'uppercase' }}
+          >
+            ＋ Not done — add another exercise
+          </button>
+        )}
         <PrimaryButton onClick={() => onDone(analysis)}>Back to Workout</PrimaryButton>
       </div>
     </div>

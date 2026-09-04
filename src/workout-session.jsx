@@ -365,30 +365,34 @@ function SetRow({ n, exId, setIdx, set, isHold, isWeighted, onChange, onComplete
         </span>
       )}
 
-      {/* Weight input */}
+      {/* Weight input — a real, visible box: with no history the value starts
+          empty, and the old borderless style made it look like weight wasn't
+          tracked at all. */}
       {isWeighted && (
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
           <input
             type="number"
+            inputMode="decimal"
             value={set.weight ?? ''}
-            onChange={(e) => onChange({ weight: Number(e.target.value) || 0 })}
+            onChange={(e) => onChange({ weight: e.target.value ? Number(e.target.value) : null })}
             disabled={set.complete}
+            placeholder={set.suggested != null ? String(set.suggested) : '··'}
             style={{
-              width: 52,
-              background: 'transparent', border: 0,
-              fontFamily: 'JetBrains Mono, monospace', fontSize: 20, fontWeight: 600,
-              color: set.complete ? C.textMid : C.text,
-              outline: 0, padding: 0, textAlign: 'left',
+              width: 56,
+              background: C.surf2, border: `1px solid ${set.weight ? C.accentDim : C.line}`, borderRadius: 6,
+              fontFamily: 'JetBrains Mono, monospace', fontSize: 18, fontWeight: 600,
+              color: set.complete ? C.textMid : (set.weight ? C.accent : C.text),
+              outline: 0, padding: '6px 8px', textAlign: 'center',
             }}
           />
-          <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.textLow, letterSpacing: 1.4 }}>
+          <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: C.textLow, letterSpacing: 1.2 }}>
             KG
           </span>
         </div>
       )}
 
-      <span style={{ flex: 1, fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: C.textLow, letterSpacing: 1.4 }}>
-        × {isHold ? `${set.targetHold}s` : `${set.target} reps`}
+      <span style={{ flex: 1, textAlign: 'right', fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.textLow, letterSpacing: 1.2 }}>
+        {isHold ? `${set.targetHold}s` : `target ${set.target}`}
       </span>
 
       {/* Reps input */}
@@ -396,18 +400,22 @@ function SetRow({ n, exId, setIdx, set, isHold, isWeighted, onChange, onComplete
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
           <input
             type="number"
+            inputMode="numeric"
             value={set.reps ?? ''}
             onChange={(e) => onChange({ reps: e.target.value ? Number(e.target.value) : null })}
             disabled={set.complete}
-            placeholder={String(set.target)}
+            placeholder="··"
             style={{
-              width: 40,
-              background: C.surf2, border: `1px solid ${C.line}`, borderRadius: 6,
+              width: 44,
+              background: C.surf2, border: `1px solid ${set.reps ? C.accentDim : C.line}`, borderRadius: 6,
               fontFamily: 'JetBrains Mono, monospace', fontSize: 18, fontWeight: 600,
               color: set.complete ? C.textMid : (set.reps ? C.accent : C.text),
               outline: 0, padding: '6px 8px', textAlign: 'center',
             }}
           />
+          <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: C.textLow, letterSpacing: 1.2 }}>
+            REPS
+          </span>
         </div>
       )}
 

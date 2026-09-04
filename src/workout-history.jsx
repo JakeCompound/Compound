@@ -58,6 +58,11 @@ function recordWorkout(exercises, config) {
     durationMin: config.duration,
     location: config.location,
     feeling: config.preFeel || 0,
+    custom: !!config.custom,
+    // Session-specific AI estimate — dayEarnedKcal prefers this over the flat
+    // duration × MET formula when present.
+    aiKcal: config.aiKcal != null ? Math.round(config.aiKcal) : null,
+    aiInsights: config.aiInsights || null,
     muscles: [...muscles],
     volume: Math.round(volume),
     completedSets,

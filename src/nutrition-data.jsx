@@ -372,7 +372,9 @@ function dayEarnedKcal(date) {
   try {
     const k = date || todayKey();
     const ws = (window.loadWorkouts ? window.loadWorkouts() : []).filter((w) => w.date === k && w.kind !== 'cardio');
-    workoutKcal = ws.reduce((s, w) => s + (w.durationMin || 0) * (LIFTING_MET * 3.5 * wKg / 200), 0);
+    // Prefer the session's AI-estimated burn (set at completion) over the flat
+    // duration × MET formula — it reads the actual volume done.
+    workoutKcal = ws.reduce((s, w) => s + (w.aiKcal != null ? w.aiKcal : (w.durationMin || 0) * (LIFTING_MET * 3.5 * wKg / 200)), 0);
   } catch (e) {}
   return Math.round(plainKcal + cardioKcal + workoutKcal);
 }

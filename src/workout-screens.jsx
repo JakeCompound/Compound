@@ -61,6 +61,16 @@ function WorkoutHome({ onNav, hasInProgress, user = {}, onChanged }) {
         <HeroCta onClick={() => onNav('new')} />
       </div>
 
+      {/* Build-your-own — don't like the generated session? Pick every exercise */}
+      <div style={{ marginTop: 10 }}>
+        <SecondaryCard
+          label="BUILD MY OWN"
+          sub="Search any exercise · your sets, weight & reps"
+          icon={<IconBuild />}
+          onClick={() => onNav('custom')}
+        />
+      </div>
+
       {/* Resume if in progress */}
       {hasInProgress && (
         <div style={{ marginTop: 10 }}>
@@ -307,6 +317,17 @@ function IconCal() {
     </svg>
   );
 }
+function IconBuild() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+      <line x1="3" y1="6" x2="12" y2="6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      <line x1="3" y1="10" x2="12" y2="10" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      <line x1="3" y1="14" x2="9" y2="14" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      <path d="M15.5 11 V17 M12.5 14 H18.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function IconHistory() {
   return (
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none">

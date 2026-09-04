@@ -99,8 +99,13 @@ function WorkoutSession({ session, config, onExit, onComplete }) {
   }, [exercises]);
 
   if (completed) {
-    return <SessionComplete exercises={exercises} config={config} onDone={() => {
-      if (window.recordWorkout) { try { window.recordWorkout(exercises, config); } catch (e) {} }
+    return <SessionComplete exercises={exercises} config={config} onDone={(analysis) => {
+      // Carry the AI kcal onto the stored entry so the day's earned-calorie
+      // ledger uses the session-specific figure over the flat MET formula.
+      const cfg = analysis && analysis.kcal != null
+        ? { ...config, aiKcal: analysis.kcal, aiInsights: analysis.insights || [] }
+        : config;
+      if (window.recordWorkout) { try { window.recordWorkout(exercises, cfg); } catch (e) {} }
       onComplete();
     }} />;
   }
@@ -617,6 +622,58 @@ function SessionComplete({ exercises, config, onDone }) {
     if (best > 0) pbs.push({ lift: e.name, value: best });
   }
 
+  // Est. 1RM for EVERY weighted exercise (Epley + RIR, top completed working
+  // set) — the deterministic math is the source of truth, not the AI.
+  const e1rms = [];
+  for (const e of exercises) {
+    if (e.type !== 'weighted') continue;
+    const best = e.sets
+      .filter((s) => s.complete && !s.isWarmup && s.weight && s.reps)
+      .map((s) => calc1RM(s.weight, s.reps, s.rir || 0))
+      .reduce((m, v) => Math.max(m, v), 0);
+    if (best > 0) e1rms.push({ name: e.name, value: best });
+  }
+
+  // Bodyweight for kcal math (falls back to 80kg if onboarding is empty)
+  let wKg = 80;
+  try { const onb = JSON.parse(localStorage.getItem('compound:onboarding') || '{}'); if (onb.weight) wKg = onb.weight; } catch (e) {}
+  const metKcal = Math.round((config.duration || 30) * (6 * 3.5 * wKg / 200)); // MET-6 fallback
+
+  // AI debrief — reads the whole session, returns kcal + short insights.
+  const [analysis, setAnalysis] = React.useState(null);
+  const [aiState, setAiState] = React.useState('loading'); // loading | done | failed
+  React.useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const lines = exercises.map((e) => {
+          const done = e.sets.filter((s) => s.complete && !s.isWarmup);
+          const setsTxt = done.map((s) =>
+            e.type === 'weighted'
+              ? `${s.weight || 0}kg×${s.reps || 0}${s.rir != null ? ` @RIR${s.rir}` : ''}`
+              : (e.isHold ? `${s.targetHold || 30}s hold` : `${s.reps || s.target || 0} reps`)
+          ).join(', ');
+          return `${e.name}: ${setsTxt || 'no completed sets'}`;
+        }).join('\n');
+        const oneRms = e1rms.map((r) => `${r.name} ${r.value}kg`).join('; ');
+        const raw = await window.claude.complete(`You are COMPOUND's strength coach. A ${wKg}kg person just finished a ~${config.duration} minute resistance session:
+${lines}
+${oneRms ? `Estimated 1RMs already computed (Epley + RIR): ${oneRms}.` : ''}
+Respond ONLY JSON: {"kcal": <integer total calories burned for the whole session — realistic for resistance training at this bodyweight (roughly 5-10 kcal per minute; intense high-volume work trends higher, long rests lower)>, "insights": ["2-3 short, specific, encouraging observations about THIS session — progression cues for next time, load balance across muscle groups, notable efforts. Each under 120 characters, no fluff."]}`);
+        const m = (typeof raw === 'string' ? raw : '').match(/\{[\s\S]*\}/);
+        if (!m) throw new Error('no json');
+        const obj = JSON.parse(m[0]);
+        // Sanity clamp: never stray past 0.5×–2× the MET-based figure.
+        let kcal = Math.round(+obj.kcal || 0);
+        kcal = kcal ? Math.max(Math.round(metKcal * 0.5), Math.min(Math.round(metKcal * 2), kcal)) : metKcal;
+        if (!active) return;
+        setAnalysis({ kcal, insights: Array.isArray(obj.insights) ? obj.insights.slice(0, 3).map(String) : [] });
+        setAiState('done');
+      } catch (e) { if (active) setAiState('failed'); }
+    })();
+    return () => { active = false; };
+  }, []);
+
   return (
     <div style={{ height: '100%', background: C.bg, display: 'flex', flexDirection: 'column', padding: '32px 24px 28px', overflow: 'auto' }}>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -654,6 +711,64 @@ function SessionComplete({ exercises, config, onDone }) {
         <CompleteStat label="VOLUME" value={`${Math.round(totalVolume).toLocaleString()}kg`} />
       </div>
 
+      {/* AI debrief — calories + coaching notes read from the actual sets */}
+      <div style={{ marginTop: 18, padding: '14px 16px', background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 14 }}>
+        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.accent, letterSpacing: 2.5, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span>⚡</span> AI DEBRIEF
+        </div>
+        {aiState === 'loading' ? (
+          <div style={{ fontFamily: 'Outfit, sans-serif', fontSize: 13, color: C.textMid, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden>
+              <circle cx="8" cy="8" r="6" stroke={C.line} strokeWidth="2" fill="none" />
+              <path d="M8 2 a6 6 0 0 1 6 6" stroke={C.accent} strokeWidth="2" fill="none" strokeLinecap="round">
+                <animateTransform attributeName="transform" type="rotate" from="0 8 8" to="360 8 8" dur="0.8s" repeatCount="indefinite" />
+              </path>
+            </svg>
+            Reading your session…
+          </div>
+        ) : (
+          <>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+              <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 28, fontWeight: 600, color: C.accent, fontVariantNumeric: 'tabular-nums' }}>
+                {analysis ? analysis.kcal : metKcal}
+              </span>
+              <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: C.textMid, letterSpacing: 1 }}>
+                KCAL BURNED{aiState === 'failed' ? ' · FORMULA EST.' : ''}
+              </span>
+            </div>
+            {analysis && analysis.insights.length > 0 && (
+              <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 7 }}>
+                {analysis.insights.map((ins, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                    <span style={{ color: C.accent, fontFamily: 'JetBrains Mono, monospace', fontSize: 11, lineHeight: 1.45, flexShrink: 0 }}>›</span>
+                    <span style={{ fontFamily: 'Outfit, sans-serif', fontSize: 13, color: C.text, lineHeight: 1.45 }}>{ins}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Est. 1RM per lift (Epley + RIR from the top completed working set) */}
+      {e1rms.length > 0 && (
+        <div style={{ marginTop: 10, padding: '14px 16px', background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 14 }}>
+          <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.textLow, letterSpacing: 2.5, marginBottom: 6 }}>
+            EST. 1RM · THIS SESSION
+          </div>
+          {e1rms.map((r) => (
+            <div key={r.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '5px 0' }}>
+              <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 600, fontSize: 15, color: C.text, letterSpacing: 0.8, textTransform: 'uppercase' }}>
+                {r.name}
+              </span>
+              <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 16, fontWeight: 600, color: C.text, fontVariantNumeric: 'tabular-nums' }}>
+                {r.value}<span style={{ fontSize: 10, color: C.textLow, marginLeft: 2 }}>KG</span>
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
       {pbs.length > 0 && (
         <div
           style={{
@@ -687,7 +802,7 @@ function SessionComplete({ exercises, config, onDone }) {
       </div>
 
       <div style={{ marginTop: 24, paddingTop: 8 }}>
-        <PrimaryButton onClick={onDone}>Back to Workout</PrimaryButton>
+        <PrimaryButton onClick={() => onDone(analysis)}>Back to Workout</PrimaryButton>
       </div>
     </div>
   );

@@ -117,7 +117,9 @@ function CustomWorkoutLog({ user, onExit, onComplete }) {
 
   const finish = () => {
     // A row counts once it has reps (holds count on any entry). Ticks are gone —
-    // Finish is the single confirmation for the whole sheet.
+    // Finish is the single confirmation for the whole sheet, and it SAVES the
+    // completed workout right here: history, volume, 1RMs and the week strip
+    // all have it even if the app is closed on the debrief screen.
     const finalExercises = exercises
       .map((e) => ({ ...e, sets: e.sets.map((s) => ({ ...s, rir: null, complete: e.isHold ? true : s.reps != null && s.reps > 0 })) }))
       .filter((e) => e.sets.some((s) => s.complete));
@@ -125,11 +127,20 @@ function CustomWorkoutLog({ user, onExit, onComplete }) {
     const groups = new Set();
     finalExercises.forEach((e) => (e.groups || []).forEach((g) => groups.add(g)));
     const config = { location: (user && user.equipment) || 'gym', duration: durationMin, groups: [...groups], preFeel: 0, custom: true };
-    setDone({ exercises: finalExercises, config });
+    let entryId = null;
+    if (window.recordWorkout) {
+      try {
+        const { list } = window.recordWorkout(finalExercises, config);
+        entryId = list[list.length - 1] && list[list.length - 1].id;
+      } catch (e) {}
+    }
+    clearDraft();
+    setDone({ exercises: finalExercises, config, entryId });
   };
 
   // Finish → the normal completion screen: stats, EST. 1RM per lift, and the
-  // AI debrief (kcal + insights) — this is the ONLY place AI runs.
+  // AI debrief (kcal + insights) — this is the ONLY place AI runs. The workout
+  // is already recorded; the debrief just patches its AI kcal onto the entry.
   if (done) {
     const SessionComplete = window.SessionComplete;
     return (
@@ -137,11 +148,9 @@ function CustomWorkoutLog({ user, onExit, onComplete }) {
         exercises={done.exercises}
         config={done.config}
         onDone={(analysis) => {
-          const cfg = analysis && analysis.kcal != null
-            ? { ...done.config, aiKcal: analysis.kcal, aiInsights: analysis.insights || [] }
-            : done.config;
-          if (window.recordWorkout) { try { window.recordWorkout(done.exercises, cfg); } catch (e) {} }
-          clearDraft();
+          if (analysis && analysis.kcal != null && done.entryId && window.updateWorkout) {
+            try { window.updateWorkout(done.entryId, { aiKcal: Math.round(analysis.kcal), aiInsights: analysis.insights || [] }); } catch (e) {}
+          }
           onComplete();
         }}
       />

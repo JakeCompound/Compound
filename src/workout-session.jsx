@@ -864,10 +864,14 @@ Respond ONLY JSON: {"kcal": <integer total calories burned for the whole session
       {/* Session notes */}
       <SessionNotesField value={sessionNote} onChange={setSessionNote} />
 
-      {/* Save as routine */}
-      <div style={{ marginTop: 8 }}>
-        <SaveAsRoutineCard session={exercises} config={config} />
-      </div>
+      {/* Save as a reusable routine — generated sessions only. The custom sheet
+          is already saved as a completed workout the moment Finish is hit, and
+          offering a second "save" there read as if the workout wasn't logged. */}
+      {!config.custom && (
+        <div style={{ marginTop: 8 }}>
+          <SaveAsRoutineCard session={exercises} config={config} />
+        </div>
+      )}
 
       <div style={{ marginTop: 24, paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
         {onKeepGoing && (

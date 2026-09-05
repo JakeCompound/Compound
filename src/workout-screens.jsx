@@ -61,11 +61,11 @@ function WorkoutHome({ onNav, hasInProgress, user = {}, onChanged }) {
         <HeroCta onClick={() => onNav('new')} />
       </div>
 
-      {/* Build-your-own — don't like the generated session? Pick every exercise */}
+      {/* Build-your-own — spreadsheet-style: add exercises as you go */}
       <div style={{ marginTop: 10 }}>
         <SecondaryCard
-          label="BUILD MY OWN"
-          sub="Search any exercise · your sets, weight & reps"
+          label={(window.hasCustomDraft && window.hasCustomDraft()) ? 'BUILD MY OWN · RESUME' : 'BUILD MY OWN'}
+          sub={(window.hasCustomDraft && window.hasCustomDraft()) ? 'Unfinished sheet saved — pick up where you left off' : 'Spreadsheet-style · add exercises as you go'}
           icon={<IconBuild />}
           onClick={() => onNav('custom')}
         />

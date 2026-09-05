@@ -95,6 +95,17 @@ function recordWorkout(exercises, config) {
   return { list, prs };
 }
 
+// Patch an already-recorded workout in place (e.g. attach the AI kcal once the
+// debrief finishes — the entry itself is saved the moment the session ends).
+function updateWorkout(id, patch) {
+  const list = loadWorkouts();
+  const idx = list.findIndex((e) => e.id === id);
+  if (idx === -1) return list;
+  list[idx] = { ...list[idx], ...patch };
+  saveWorkouts(list);
+  return list;
+}
+
 // All-time best e1RM per tracked lift.
 function allTimeBest1RM(history) {
   const best = {};
@@ -191,9 +202,9 @@ function sessionsThisWeek(history) {
 }
 
 Object.assign(window, {
-  loadWorkouts, saveWorkouts, recordWorkout, allTimeBest1RM, lift1RMSeries,
+  loadWorkouts, saveWorkouts, recordWorkout, updateWorkout, allTimeBest1RM, lift1RMSeries,
   pbWall, lastSetsFor, recoveryHeatmap, volumeSeries, relativeDay, dayAbbrev,
   sessionsThisWeek, sessionBest1RM,
 });
 
-export { WORKOUTS_KEY, allTimeBest1RM, dayAbbrev, lastSetsFor, lift1RMSeries, loadWorkouts, pbWall, recordWorkout, recoveryHeatmap, relativeDay, saveWorkouts, sessionBest1RM, sessionsThisWeek, volumeSeries };
+export { WORKOUTS_KEY, allTimeBest1RM, dayAbbrev, lastSetsFor, lift1RMSeries, loadWorkouts, pbWall, recordWorkout, recoveryHeatmap, relativeDay, saveWorkouts, sessionBest1RM, sessionsThisWeek, updateWorkout, volumeSeries };

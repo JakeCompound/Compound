@@ -19,7 +19,7 @@ import { TweakButton, TweakColor, TweakRadio, TweakSection, TweakSelect, TweakTo
 import { PastWorkouts, WeeklyPlan, WorkoutDashboard } from './workout-dashboard.jsx';
 import { SavedWorkoutsScreen } from './workout-enhancements.jsx';
 import { NewWorkoutFlow, WorkoutHome } from './workout-screens.jsx';
-import { CustomWorkoutBuilder } from './custom-workout.jsx';
+import { CustomWorkoutLog } from './custom-workout.jsx';
 import { WorkoutSession } from './workout-session.jsx';
 
 // app.jsx — COMPOUND root: state, step machine, persistence, frame, tweaks
@@ -418,12 +418,12 @@ function App() {
       }
       if (workoutView === 'custom') {
         return (
-          <CustomWorkoutBuilder
+          <CustomWorkoutLog
             user={data}
-            onBack={() => setWorkoutView('home')}
-            onStart={({ config, session }) => {
-              setActiveSession({ config, session });
-              setWorkoutView('session');
+            onExit={() => setWorkoutView('home')}
+            onComplete={() => {
+              setWorkoutView('home');
+              setNutTick((x) => x + 1); // recompute liveState so the week strip + earned kcal update
             }}
           />
         );

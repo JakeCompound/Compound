@@ -1,140 +1,29 @@
 import React from 'react';
 import { C } from './compound-ui.jsx';
-import { SectionLabel } from './home-components.jsx';
 import { EXERCISES, buildSessionItem } from './workout-data.jsx';
-import { SubHeader } from './workout-dashboard.jsx';
 
-// custom-workout.jsx — Build-your-own session. Search the exercise library
-// (everything the Reeplex + bench + bar/DB setup supports), pick how many sets
-// each, then the normal live session flow logs weight/reps per set, and the
-// completion screen's AI debrief reads it back (kcal, 1RMs, insights).
+// custom-workout.jsx — Build-your-own workout, spreadsheet-style. One scrolling
+// page: every exercise you've added stays visible with plain kg × reps rows —
+// no per-set tick, no RIR question, no rest timer. Add exercises and sets as
+// you go; the AI only kicks in at the end, when you hit Finish (the normal
+// SessionComplete screen runs the debrief + 1RMs there).
+//
+// The in-progress sheet persists to localStorage on every change, so backing
+// out or reloading mid-workout doesn't lose it.
 
-function CustomWorkoutBuilder({ user, onBack, onStart }) {
-  const [query, setQuery] = React.useState('');
-  const [picked, setPicked] = React.useState([]); // [{ exId, sets }]
+const DRAFT_KEY = 'compound:customDraft';
 
-  const q = query.trim().toLowerCase();
-  const results = q
-    ? EXERCISES.filter((e) =>
-        !picked.some((p) => p.exId === e.id) &&
-        (e.name.toLowerCase().includes(q) || e.groups.some((g) => g.toLowerCase().includes(q))))
-      .slice(0, 8)
-    : [];
-
-  const add = (e) => { setPicked((p) => [...p, { exId: e.id, sets: 3 }]); setQuery(''); };
-  const remove = (exId) => setPicked((p) => p.filter((x) => x.exId !== exId));
-  const bumpSets = (exId, d) => setPicked((p) => p.map((x) => (x.exId === exId ? { ...x, sets: Math.max(1, Math.min(8, x.sets + d)) } : x)));
-
-  const totalSets = picked.reduce((s, p) => s + p.sets, 0);
-  // Rough pacing guide only (~2.5 min a set incl. rest) — the completion screen
-  // and AI debrief use this as the session length.
-  const estMin = Math.max(10, Math.round((totalSets * 2.5) / 5) * 5);
-
-  const start = () => {
-    if (!picked.length) return;
-    const groups = new Set();
-    const session = picked.map((p, idx) => {
-      const e = EXERCISES.find((x) => x.id === p.exId);
-      e.groups.forEach((g) => groups.add(g));
-      return buildSessionItem(e, { durationMin: estMin, preFeel: 0, idx, setsPerExercise: p.sets });
-    });
-    onStart({
-      config: { location: (user && user.equipment) || 'gym', duration: estMin, groups: [...groups], preFeel: 0, custom: true },
-      session,
-    });
-  };
-
-  return (
-    <div style={{ height: '100%', background: C.bg, display: 'flex', flexDirection: 'column' }}>
-      <SubHeader title="BUILD MY OWN" sub="any exercise · your structure" onBack={onBack} />
-
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 22px 12px' }}>
-        {/* Type-to-search — no scrolling through the whole library */}
-        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: C.textLow, letterSpacing: 1.6, marginBottom: 8 }}>ADD AN EXERCISE</div>
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search — bench, row, curl, legs…"
-          style={{ width: '100%', boxSizing: 'border-box', background: C.surf1, border: `1px solid ${q ? C.accentDim : C.line}`, borderRadius: 12, color: C.text, fontFamily: 'Outfit, sans-serif', fontSize: 15, padding: '13px 14px', outline: 'none' }}
-        />
-
-        {q && (
-          <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {results.length === 0 && (
-              <div style={{ background: C.surf1, border: `1px dashed ${C.line}`, borderRadius: 10, padding: '12px 14px', fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: C.textMid }}>
-                Nothing matches "{query}" — try a muscle group (chest, back, legs…) or a shorter word.
-              </div>
-            )}
-            {results.map((e) => (
-              <button
-                key={e.id}
-                onClick={() => add(e)}
-                style={{ width: '100%', textAlign: 'left', padding: '11px 13px', background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 }}
-              >
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 15.5, letterSpacing: 0.6, color: C.text, textTransform: 'uppercase' }}>{e.name}</div>
-                  <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: C.textLow, letterSpacing: 1, marginTop: 2 }}>
-                    {e.groups.join(' · ').toUpperCase()}{e.type === 'bodyweight' ? ' · BODYWEIGHT' : ''}
-                  </div>
-                </div>
-                <span style={{ flexShrink: 0, width: 26, height: 26, borderRadius: 13, background: C.accent + '1f', border: `1px solid ${C.accent}66`, color: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'JetBrains Mono, monospace', fontSize: 15 }}>+</span>
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* The session so far */}
-        <div style={{ marginTop: 20 }}>
-          <SectionLabel meta={picked.length ? `${picked.length} ${picked.length === 1 ? 'EXERCISE' : 'EXERCISES'} · ${totalSets} SETS` : ''}>YOUR SESSION</SectionLabel>
-          {picked.length === 0 ? (
-            <div style={{ background: C.surf1, border: `1px dashed ${C.line}`, borderRadius: 12, padding: '18px 16px', textAlign: 'center', fontFamily: 'Outfit, sans-serif', fontSize: 13, color: C.textMid, lineHeight: 1.5 }}>
-              Search above and tap <span style={{ color: C.accent }}>+</span> to build your session. Weight and reps get logged set-by-set once you start.
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {picked.map((p, i) => {
-                const e = EXERCISES.find((x) => x.id === p.exId);
-                return (
-                  <div key={p.exId} style={{ padding: '12px 12px', background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{ width: 26, height: 26, borderRadius: 8, background: C.surf2, color: C.textLow, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'JetBrains Mono, monospace', fontSize: 10, fontWeight: 600, flexShrink: 0 }}>
-                      {String(i + 1).padStart(2, '0')}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 15.5, letterSpacing: 0.6, color: C.text, textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.name}</div>
-                      <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: C.textLow, letterSpacing: 1, marginTop: 2 }}>{e.groups.join(' · ').toUpperCase()}</div>
-                    </div>
-                    {/* Sets stepper */}
-                    <div style={{ display: 'flex', alignItems: 'center', height: 28, borderRadius: 14, border: `1px solid ${C.accent}55`, background: C.accent + '14', overflow: 'hidden', flexShrink: 0 }}>
-                      <button onClick={() => bumpSets(p.exId, -1)} disabled={p.sets <= 1} style={{ width: 26, height: 28, background: 'transparent', border: 0, borderRight: `1px solid ${C.accent}33`, color: p.sets > 1 ? C.accent : C.textLow, fontFamily: 'JetBrains Mono, monospace', fontSize: 14, lineHeight: 1, cursor: p.sets > 1 ? 'pointer' : 'default' }}>−</button>
-                      <div style={{ width: 44, textAlign: 'center', fontFamily: 'JetBrains Mono, monospace', fontSize: 10, fontWeight: 600, color: C.accent, letterSpacing: 0.5 }}>{p.sets} SET{p.sets > 1 ? 'S' : ''}</div>
-                      <button onClick={() => bumpSets(p.exId, 1)} style={{ width: 26, height: 28, background: 'transparent', border: 0, borderLeft: `1px solid ${C.accent}33`, color: C.accent, fontFamily: 'JetBrains Mono, monospace', fontSize: 15, lineHeight: 1, cursor: 'pointer' }}>+</button>
-                    </div>
-                    <button onClick={() => remove(p.exId)} title="Remove" style={{ flexShrink: 0, width: 26, height: 26, borderRadius: 13, background: 'rgba(229,86,75,.14)', border: '1px solid rgba(229,86,75,.5)', color: C.danger, cursor: 'pointer', fontFamily: 'JetBrains Mono, monospace', fontSize: 12, lineHeight: 1 }}>✕</button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Sticky start */}
-      <div style={{ flexShrink: 0, padding: '12px 22px 20px', borderTop: `1px solid ${C.line}`, background: C.bg }}>
-        <button
-          onClick={start}
-          disabled={!picked.length}
-          style={{ width: '100%', height: 52, background: picked.length ? C.accent : C.surf3, border: 0, borderRadius: 12, color: picked.length ? C.onAccent : C.textLow, fontFamily: 'Barlow Condensed, sans-serif', fontSize: 16, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', cursor: picked.length ? 'pointer' : 'default' }}
-        >
-          {picked.length ? `Start workout — ${picked.length} ${picked.length === 1 ? 'exercise' : 'exercises'} · ~${estMin}m` : 'Add an exercise to start'}
-        </button>
-      </div>
-    </div>
-  );
+function loadDraft() {
+  try { return JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); } catch (e) { return null; }
+}
+function saveDraft(d) {
+  try { localStorage.setItem(DRAFT_KEY, JSON.stringify(d)); } catch (e) {}
+}
+function clearDraft() {
+  try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
 }
 
-// Bottom-sheet version of the same type-to-search picker — used INSIDE a live
-// session so a workout can be made up as you go: finish an exercise, search,
-// add the next one on the spot.
+// ── Type-to-search picker (bottom sheet) ────────────────────────────────────
 function ExercisePickerSheet({ excludeIds = [], onPick, onClose }) {
   const [query, setQuery] = React.useState('');
   const q = query.trim().toLowerCase();
@@ -164,7 +53,7 @@ function ExercisePickerSheet({ excludeIds = [], onPick, onClose }) {
           )}
           {!q && (
             <div style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: C.textMid, padding: '8px 2px' }}>
-              Type to search the library — it's added to this session with 3 sets (log as many as you actually do).
+              Type to search the library — it lands on the sheet with 3 empty rows.
             </div>
           )}
           {results.map((e) => (
@@ -188,6 +77,234 @@ function ExercisePickerSheet({ excludeIds = [], onPick, onClose }) {
   );
 }
 
-Object.assign(window, { CustomWorkoutBuilder, ExercisePickerSheet });
+// ── The sheet ────────────────────────────────────────────────────────────────
+function CustomWorkoutLog({ user, onExit, onComplete }) {
+  const draft = React.useMemo(loadDraft, []);
+  const [exercises, setExercises] = React.useState(() => (draft && draft.exercises) || []);
+  const [startedAt] = React.useState(() => (draft && draft.startedAt) || Date.now());
+  const [pickerOpen, setPickerOpen] = React.useState(() => !(draft && draft.exercises && draft.exercises.length));
+  const [confirmExit, setConfirmExit] = React.useState(false);
+  const [done, setDone] = React.useState(false);
 
-export { CustomWorkoutBuilder, ExercisePickerSheet };
+  // Persist on every change — reload or accidental back never loses the sheet.
+  React.useEffect(() => {
+    if (exercises.length) saveDraft({ startedAt, exercises });
+  }, [exercises, startedAt]);
+
+  const addExercise = (libEx) => {
+    // durationMin 10 keeps buildSessionItem from prepending a warmup set —
+    // the sheet is freeform, warmups are just rows you choose to log.
+    const item = buildSessionItem(libEx, { durationMin: 10, preFeel: 0, idx: exercises.length, setsPerExercise: 3 });
+    item.sets = item.sets.map((s) => ({ ...s, reps: null }));
+    setExercises((all) => [...all, item]);
+    setPickerOpen(false);
+  };
+  const removeExercise = (id) => setExercises((all) => all.filter((e) => e.id !== id));
+  const addSet = (id) => setExercises((all) => all.map((e) => {
+    if (e.id !== id) return e;
+    const last = e.sets[e.sets.length - 1] || {};
+    return { ...e, sets: [...e.sets, { target: last.target ?? 10, targetHold: last.targetHold ?? null, suggested: last.weight ?? last.suggested ?? null, weight: last.weight ?? null, reps: null, rir: null, complete: false, isWarmup: false }] };
+  }));
+  const removeLastSet = (id) => setExercises((all) => all.map((e) => (e.id === id && e.sets.length > 1 ? { ...e, sets: e.sets.slice(0, -1) } : e)));
+  const updateSet = (id, setIdx, patch) => setExercises((all) => all.map((e) => {
+    if (e.id !== id) return e;
+    const sets = [...e.sets];
+    sets[setIdx] = { ...sets[setIdx], ...patch };
+    return { ...e, sets };
+  }));
+
+  const loggedSets = exercises.reduce((n, e) => n + e.sets.filter((s) => s.reps != null || (e.isHold && s.weight != null)).length, 0);
+
+  const finish = () => {
+    // A row counts once it has reps (holds count on any entry). Ticks are gone —
+    // Finish is the single confirmation for the whole sheet.
+    const finalExercises = exercises
+      .map((e) => ({ ...e, sets: e.sets.map((s) => ({ ...s, rir: null, complete: e.isHold ? true : s.reps != null && s.reps > 0 })) }))
+      .filter((e) => e.sets.some((s) => s.complete));
+    const durationMin = Math.max(5, Math.round((Date.now() - startedAt) / 60000));
+    const groups = new Set();
+    finalExercises.forEach((e) => (e.groups || []).forEach((g) => groups.add(g)));
+    const config = { location: (user && user.equipment) || 'gym', duration: durationMin, groups: [...groups], preFeel: 0, custom: true };
+    setDone({ exercises: finalExercises, config });
+  };
+
+  // Finish → the normal completion screen: stats, EST. 1RM per lift, and the
+  // AI debrief (kcal + insights) — this is the ONLY place AI runs.
+  if (done) {
+    const SessionComplete = window.SessionComplete;
+    return (
+      <SessionComplete
+        exercises={done.exercises}
+        config={done.config}
+        onDone={(analysis) => {
+          const cfg = analysis && analysis.kcal != null
+            ? { ...done.config, aiKcal: analysis.kcal, aiInsights: analysis.insights || [] }
+            : done.config;
+          if (window.recordWorkout) { try { window.recordWorkout(done.exercises, cfg); } catch (e) {} }
+          clearDraft();
+          onComplete();
+        }}
+      />
+    );
+  }
+
+  const inputStyle = (filled) => ({
+    width: '100%', boxSizing: 'border-box',
+    background: C.surf2, border: `1px solid ${filled ? C.accentDim : C.line}`, borderRadius: 8,
+    fontFamily: 'JetBrains Mono, monospace', fontSize: 17, fontWeight: 600,
+    color: filled ? C.accent : C.text,
+    outline: 0, padding: '9px 6px', textAlign: 'center',
+  });
+
+  return (
+    <div style={{ height: '100%', background: C.bg, display: 'flex', flexDirection: 'column' }}>
+      {/* Top bar */}
+      <div style={{ padding: '14px 22px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${C.line}` }}>
+        <button
+          onClick={() => (exercises.length ? setConfirmExit(true) : (clearDraft(), onExit()))}
+          style={{ background: 'transparent', border: 0, color: C.textMid, padding: 4, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+        >
+          <svg width="13" height="13" viewBox="0 0 13 13"><path d="M3 3 L10 10 M10 3 L3 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
+          <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 2 }}>EXIT</span>
+        </button>
+        <ElapsedTimer startedAt={startedAt} />
+        <div style={{ width: 70, textAlign: 'right', fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 1.5, color: C.textLow }}>
+          {loggedSets} SET{loggedSets === 1 ? '' : 'S'}
+        </div>
+      </div>
+
+      {/* The sheet — every exercise stays visible */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '14px 22px 12px' }}>
+        {exercises.length === 0 && (
+          <div style={{ background: C.surf1, border: `1px dashed ${C.line}`, borderRadius: 12, padding: '22px 16px', textAlign: 'center', fontFamily: 'Outfit, sans-serif', fontSize: 13, color: C.textMid, lineHeight: 1.5 }}>
+            Empty sheet. Add your first exercise below and fill in kg × reps as you train.
+          </div>
+        )}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {exercises.map((e, idx) => (
+            <div key={e.id} style={{ background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 14, padding: '12px 14px 12px' }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 18, letterSpacing: 0.6, color: C.text, textTransform: 'uppercase', lineHeight: 1.05 }}>
+                    {String(idx + 1).padStart(2, '0')} · {e.name}
+                  </div>
+                  <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: C.textLow, letterSpacing: 1.2, marginTop: 3 }}>{(e.groups || []).join(' · ').toUpperCase()}</div>
+                </div>
+                <button onClick={() => removeExercise(e.id)} title="Remove exercise" style={{ flexShrink: 0, width: 24, height: 24, borderRadius: 12, background: 'transparent', border: `1px solid ${C.line}`, color: C.textLow, cursor: 'pointer', fontFamily: 'JetBrains Mono, monospace', fontSize: 11, lineHeight: 1 }}>✕</button>
+              </div>
+
+              {/* Column labels */}
+              <div style={{ display: 'grid', gridTemplateColumns: '32px 1fr 1fr', gap: 8, marginTop: 10, fontFamily: 'JetBrains Mono, monospace', fontSize: 8.5, color: C.textLow, letterSpacing: 1.4 }}>
+                <span>SET</span>
+                <span style={{ textAlign: 'center' }}>{e.type === 'weighted' ? 'KG' : (e.isHold ? 'SECONDS' : '—')}</span>
+                <span style={{ textAlign: 'center' }}>{e.isHold ? '' : 'REPS'}</span>
+              </div>
+
+              {/* Rows — just numbers, no ticks, no questions */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
+                {e.sets.map((s, i) => (
+                  <div key={i} style={{ display: 'grid', gridTemplateColumns: '32px 1fr 1fr', gap: 8, alignItems: 'center' }}>
+                    <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: C.textLow, textAlign: 'center' }}>{i + 1}</span>
+                    {e.isHold ? (
+                      <>
+                        <input type="number" inputMode="numeric" value={s.weight ?? ''} placeholder={String(s.targetHold || 30)}
+                          onChange={(ev) => updateSet(e.id, i, { weight: ev.target.value ? Number(ev.target.value) : null })}
+                          style={inputStyle(s.weight != null)} />
+                        <span />
+                      </>
+                    ) : (
+                      <>
+                        {e.type === 'weighted' ? (
+                          <input type="number" inputMode="decimal" value={s.weight ?? ''} placeholder={s.suggested != null ? String(s.suggested) : '··'}
+                            onChange={(ev) => updateSet(e.id, i, { weight: ev.target.value ? Number(ev.target.value) : null })}
+                            style={inputStyle(s.weight != null)} />
+                        ) : (
+                          <span style={{ textAlign: 'center', fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.textLow }}>BW</span>
+                        )}
+                        <input type="number" inputMode="numeric" value={s.reps ?? ''} placeholder="··"
+                          onChange={(ev) => updateSet(e.id, i, { reps: ev.target.value ? Number(ev.target.value) : null })}
+                          style={inputStyle(s.reps != null)} />
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <button onClick={() => addSet(e.id)} style={{ flex: 1, padding: '8px 0', background: 'transparent', border: `1px dashed ${C.lineStrong}`, borderRadius: 10, color: C.textMid, cursor: 'pointer', fontFamily: 'JetBrains Mono, monospace', fontSize: 9.5, letterSpacing: 1.4 }}>＋ SET</button>
+                {e.sets.length > 1 && (
+                  <button onClick={() => removeLastSet(e.id)} style={{ width: 60, padding: '8px 0', background: 'transparent', border: `1px dashed ${C.line}`, borderRadius: 10, color: C.textLow, cursor: 'pointer', fontFamily: 'JetBrains Mono, monospace', fontSize: 9.5, letterSpacing: 1.4 }}>−</button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Add the next exercise — everything above stays put */}
+        <button
+          onClick={() => setPickerOpen(true)}
+          style={{ width: '100%', marginTop: 12, padding: '14px 14px', background: 'transparent', border: `1px dashed ${C.accentDim}`, borderRadius: 12, color: C.accent, cursor: 'pointer', fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 15, letterSpacing: 1.2, textTransform: 'uppercase' }}
+        >
+          ＋ Add exercise
+        </button>
+      </div>
+
+      {/* Finish — this is where the AI kicks in, not before */}
+      <div style={{ flexShrink: 0, padding: '12px 22px 20px', borderTop: `1px solid ${C.line}`, background: C.bg }}>
+        <button
+          onClick={finish}
+          disabled={!loggedSets}
+          style={{ width: '100%', height: 52, background: loggedSets ? C.accent : C.surf3, border: 0, borderRadius: 12, color: loggedSets ? C.onAccent : C.textLow, fontFamily: 'Barlow Condensed, sans-serif', fontSize: 16, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', cursor: loggedSets ? 'pointer' : 'default' }}
+        >
+          {loggedSets ? `Finish workout — ${loggedSets} set${loggedSets === 1 ? '' : 's'} logged` : 'Log a set to finish'}
+        </button>
+      </div>
+
+      {pickerOpen && <ExercisePickerSheet onPick={addExercise} onClose={() => setPickerOpen(false)} />}
+
+      {confirmExit && (
+        <div style={{ position: 'absolute', inset: 0, zIndex: 230, background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 28 }}>
+          <div style={{ width: '100%', background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 16, padding: 22 }}>
+            <h3 style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 24, color: C.text, margin: 0, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+              LEAVE THE<br /><span style={{ color: C.accent }}>SHEET?</span>
+            </h3>
+            <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 13, color: C.textMid, margin: '10px 0 18px', lineHeight: 1.5 }}>
+              It's saved — coming back to Build My Own picks up right where you left off.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <button onClick={() => setConfirmExit(false)} style={{ height: 48, background: C.accent, border: 0, borderRadius: 12, color: C.onAccent, fontFamily: 'Barlow Condensed, sans-serif', fontSize: 15, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', cursor: 'pointer' }}>Keep going</button>
+              <button onClick={() => { setConfirmExit(false); onExit(); }} style={{ height: 46, background: C.surf2, border: `1px solid ${C.line}`, borderRadius: 12, color: C.text, fontFamily: 'Barlow Condensed, sans-serif', fontSize: 14, fontWeight: 600, letterSpacing: 1.2, textTransform: 'uppercase', cursor: 'pointer' }}>Save & exit</button>
+              <button onClick={() => { clearDraft(); setConfirmExit(false); onExit(); }} style={{ height: 40, background: 'transparent', border: 0, color: C.danger, fontFamily: 'JetBrains Mono, monospace', fontSize: 11, letterSpacing: 1.8, textTransform: 'uppercase', cursor: 'pointer' }}>Discard workout</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ElapsedTimer({ startedAt }) {
+  const [now, setNow] = React.useState(Date.now());
+  React.useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const sec = Math.max(0, Math.floor((now - startedAt) / 1000));
+  const mm = String(Math.floor(sec / 60)).padStart(2, '0');
+  const ss = String(sec % 60).padStart(2, '0');
+  return (
+    <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 18, fontWeight: 600, color: C.accent, letterSpacing: 1, fontVariantNumeric: 'tabular-nums' }}>
+      {mm}:{ss}
+    </div>
+  );
+}
+
+// True when there's an unfinished sheet to resume (for the hub card's subtitle).
+function hasCustomDraft() {
+  const d = loadDraft();
+  return !!(d && d.exercises && d.exercises.length);
+}
+
+Object.assign(window, { CustomWorkoutLog, ExercisePickerSheet, hasCustomDraft });
+
+export { CustomWorkoutLog, ExercisePickerSheet, hasCustomDraft };

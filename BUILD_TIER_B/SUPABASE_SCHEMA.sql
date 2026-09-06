@@ -185,3 +185,35 @@ create trigger on_auth_user_created
 insert into storage.buckets (id, name, public)
 values ('meal-photos', 'meal-photos', false)
 on conflict (id) do nothing;
+
+-- ============================================================================
+-- Coach review access (applied to prod 7 Sep 2026).
+-- A row in `coaches` marks an account as a coach; coaches get read-only
+-- SELECT on members' entries for the in-app Monthly Review screen.
+-- nutrition_messages (private AI chat) and push tables stay private.
+-- ============================================================================
+create table if not exists coaches (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+alter table coaches enable row level security;
+create policy coaches_read_own on coaches for select using (user_id = auth.uid());
+
+create or replace function is_coach()
+returns boolean language sql stable security definer set search_path = public as
+$$ select exists (select 1 from public.coaches where user_id = auth.uid()) $$;
+revoke execute on function is_coach() from public, anon;
+grant execute on function is_coach() to authenticated;
+
+create policy coach_read on profiles     for select using (is_coach());
+create policy coach_read on weighins     for select using (is_coach());
+create policy coach_read on checkins     for select using (is_coach());
+create policy coach_read on workouts     for select using (is_coach());
+create policy coach_read on food_entries for select using (is_coach());
+create policy coach_read on nip_days     for select using (is_coach());
+create policy coach_read on measurements for select using (is_coach());
+create policy coach_read on step_days    for select using (is_coach());
+create policy coach_read on todo_state   for select using (is_coach());
+
+-- Enrol a coach by uid:
+-- insert into coaches (user_id) values ('<auth uid>') on conflict do nothing;

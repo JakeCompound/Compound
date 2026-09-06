@@ -6,6 +6,7 @@ import { pushSupported, notifPermission, isSubscribed, subscribePush, unsubscrib
 import { clearAllCloudData } from './cloud-sync.js';
 import { alcoholOn } from './alcohol.js';
 import { useBackClose } from './back-button.js';
+import { CoachReviewScreen, useIsCoach } from './coach-review.jsx';
 
 // settings-screen.jsx — Full settings, accessible via Home cog
 // Profile, goals, reminders, equipment, gratitude management, account, danger zone.
@@ -49,6 +50,7 @@ function SettingsScreen({ user, set, onClose, onReset, onRecalc, onFixCheckinDay
   useBackClose(!!section, () => setSection(null));
   const [showClear, setShowClear] = React.useState(false); // "clear all cloud data" modal
   const [measureUnit, setMeasureUnit] = React.useState(() => { try { return localStorage.getItem('compound:measureUnit') === 'in' ? 'in' : 'cm'; } catch (e) { return 'cm'; } });
+  const isCoach = useIsCoach(); // shows the COACH group only for coach accounts
 
   if (section === 'profile') {
     return <SettingsProfileEdit user={user} set={set} onBack={() => setSection(null)} />;
@@ -80,6 +82,9 @@ function SettingsScreen({ user, set, onClose, onReset, onRecalc, onFixCheckinDay
 
   if (section === 'niplimit') {
     return <SettingsNipLimit onBack={() => setSection(null)} />;
+  }
+  if (section === 'coachreview') {
+    return <CoachReviewScreen onBack={() => setSection(null)} />;
   }
 
   // ── Main settings page ─────────────────────────────────────────────────
@@ -183,6 +188,17 @@ function SettingsScreen({ user, set, onClose, onReset, onRecalc, onFixCheckinDay
             />
           )}
         </SettingsGroup>
+
+        {isCoach && (
+          <SettingsGroup label="COACH">
+            <SettingsRow
+              icon={<IconUser />}
+              label="Monthly review"
+              hint="Everyone's trends — weight, food, training, drinks"
+              onClick={() => setSection('coachreview')}
+            />
+          </SettingsGroup>
+        )}
 
         <SettingsGroup label="DATA">
           <SettingsRow

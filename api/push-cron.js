@@ -85,10 +85,46 @@ const EVENT_TIME = { streaks: '21:30', missed: '20:00', comeback: '18:00', urgen
 const EVENT_MSG = {
   streaks: (n) => ({ title: 'COMPOUND', body: `${n}-day check-in streak. Don't break the chain. 🔥`, tag: 'streak', url: '/' }),
   missed: { title: 'COMPOUND', body: "Missed today's workout? Move it to another day — a short one still counts.", tag: 'missed', url: '/' },
-  comeback: { title: 'COMPOUND', body: "It's been a few days. One check-in gets you back — no judgement.", tag: 'comeback', url: '/' },
   urgency: { title: 'COMPOUND', body: "Midday nudge: the week's tight on workouts. A quick session keeps it on track.", tag: 'urgency', url: '/' },
   report: { title: 'COMPOUND', body: 'Your monthly report is ready — see how last month stacked up.', tag: 'report', url: '/' },
 };
+// Rewarming copy by how long they've been gone — flat tone, no cheerleading.
+function comebackMsg(gap) {
+  let body;
+  if (gap <= 3) body = 'Three days quiet. Nothing to catch up on — tonight\'s check-in just starts the count again.';
+  else if (gap <= 7) body = 'A week out. The plan hasn\'t moved. Check in tonight and you\'re current — no backlog.';
+  else {
+    const rotate = [
+      'Still here when you\'re ready. One check-in is the whole restart.',
+      'No streak to rebuild, nothing to make up. Just log today.',
+      'The month is still recoverable. 90 seconds tonight.',
+    ];
+    body = rotate[Math.floor(gap / 3) % rotate.length];
+  }
+  return { title: 'COMPOUND', body, tag: 'comeback', url: '/' };
+}
+
+// Meal-slot reminders: fire when that slot is still empty at its local time.
+// Slot is inferred from WHEN an entry was logged (same rule as the app's
+// Breakfast/Lunch/Dinner sections): before 11am = breakfast, before 4pm =
+// lunch, after = dinner. No reminders for members gone cold 3+ days — the
+// rewarming sequence owns them; three meal nags a day would bury it.
+const MEAL_TIME = { breakfast: '10:00', lunch: '15:00', dinner: '20:00' };
+const MEAL_MSG = {
+  breakfast: { title: 'COMPOUND', body: "Breakfast isn't logged. Type it or snap it — 20 seconds.", tag: 'meal', url: '/' },
+  lunch: { title: 'COMPOUND', body: 'No lunch on the log yet. Get it in while you still remember it.', tag: 'meal', url: '/' },
+  dinner: { title: 'COMPOUND', body: "Dinner's not logged. Close out the day's food.", tag: 'meal', url: '/' },
+};
+function slotForHour(h) { return h < 11 ? 'breakfast' : h < 16 ? 'lunch' : 'dinner'; }
+// Local hour + date of a timestamp in the subscriber's timezone.
+function localHourDate(ts, tz) {
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz || 'UTC', hour12: false, hour: '2-digit', year: 'numeric', month: '2-digit', day: '2-digit',
+  });
+  const p = Object.fromEntries(fmt.formatToParts(new Date(ts)).map((x) => [x.type, x.value]));
+  return { hour: parseInt(p.hour, 10) % 24, date: `${p.year}-${p.month}-${p.day}` };
+}
+
 const isoFromUTC = (ms) => new Date(ms).toISOString().slice(0, 10);
 const dnum = (s) => { const [y, m, d] = String(s).split('-').map(Number); return Date.UTC(y, (m || 1) - 1, d || 1); };
 const daysBetween = (a, b) => Math.round((dnum(b) - dnum(a)) / 86400000);
@@ -113,7 +149,7 @@ function effectiveWorkoutDays(onb, ud, now) {
 
 // Returns [{kind, msg}] of event reminders due now. ignoreTime skips the
 // time-of-day gate (used by the dry-run debug path).
-function eventKinds(prof, now, ud, ignoreTime) {
+function eventKinds(prof, now, ud, ignoreTime, tz) {
   const prefs = (prof && prof.notif_prefs) || {};
   const onb = (prof && prof.onboarding) || {};
   const on = (k) => prefs[k] !== false;
@@ -130,9 +166,29 @@ function eventKinds(prof, now, ud, ignoreTime) {
     const days = effectiveWorkoutDays(onb, ud, now);
     if (days.includes(now.dow) && !wo.has(now.date)) out.push({ kind: 'missed', msg: EVENT_MSG.missed });
   }
-  if (on('comeback') && at('comeback') && ci.size) {
-    const last = [...ci].sort().pop();
-    if (daysBetween(last, now.date) >= 3) out.push({ kind: 'comeback', msg: EVENT_MSG.comeback });
+  // Rewarming ladder: day 3, day 7, then every 3 days; weekly after a month
+  // so a member who's clearly stepped away isn't nagged forever.
+  const lastCi = ci.size ? [...ci].sort().pop() : null;
+  const gap = lastCi ? daysBetween(lastCi, now.date) : 0;
+  if (on('comeback') && at('comeback') && lastCi) {
+    const due = gap === 3 || gap === 7
+      || (gap > 7 && gap <= 30 && (gap - 7) % 3 === 0)
+      || (gap > 30 && gap % 7 === 0);
+    if (due) out.push({ kind: 'comeback', msg: comebackMsg(gap) });
+  }
+
+  // Meal-slot reminders — only for active members with food tracking on.
+  if (on('meals') && onb.dietTracking) {
+    const foodLocal = ((ud && ud.foodTs) || []).map((t) => localHourDate(t, tz));
+    const recentFood = foodLocal.some((f) => daysBetween(f.date, now.date) <= 2);
+    const cold = (lastCi ? gap >= 3 : true) && !recentFood;
+    if (!cold) {
+      const todaysHours = foodLocal.filter((f) => f.date === now.date).map((f) => f.hour);
+      for (const slot of ['breakfast', 'lunch', 'dinner']) {
+        if (!(ignoreTime || now.hhmm === MEAL_TIME[slot])) continue;
+        if (!todaysHours.some((h) => slotForHour(h) === slot)) out.push({ kind: `meal-${slot}`, msg: MEAL_MSG[slot] });
+      }
+    }
   }
   if (on('urgency') && at('urgency')) {
     const days = effectiveWorkoutDays(onb, ud, now);
@@ -160,9 +216,9 @@ export default async function handler(req, res) {
   if (req.body && req.body.eventsDryRun === true && req.body.sample) {
     const s = req.body.sample;
     const prof = { onboarding: s.onboarding || {}, notif_prefs: s.notif_prefs || {} };
-    const ud = { checkins: new Set(s.checkins || []), workouts: new Set(s.workouts || []) };
+    const ud = { checkins: new Set(s.checkins || []), workouts: new Set(s.workouts || []), foodTs: s.foodTs || [] };
     const now = s.now || localNow(s.timezone);
-    return res.status(200).json({ dryRun: true, sample: true, now, events: eventKinds(prof, now, ud, true).map((e) => e.kind) });
+    return res.status(200).json({ dryRun: true, sample: true, now, events: eventKinds(prof, now, ud, true, s.timezone).map((e) => e.kind) });
   }
 
   if (!VAPID_PRIVATE) return res.status(500).json({ error: 'VAPID_PRIVATE_KEY not set' });
@@ -185,13 +241,17 @@ export default async function handler(req, res) {
     (profs || []).forEach((p) => { profMap[p.id] = p; });
     // Event reminders need the user's check-in + workout dates, plus any
     // in-week postpone/cancel override so a handled day doesn't get nagged.
-    const ensure = (u) => (udByUser[u] = udByUser[u] || { checkins: new Set(), workouts: new Set(), weekOverride: {} });
+    const ensure = (u) => (udByUser[u] = udByUser[u] || { checkins: new Set(), workouts: new Set(), weekOverride: {}, foodTs: [] });
     const { data: cRows } = await supa.from('checkins').select('user_id,date');
     const { data: wRows } = await supa.from('workouts').select('user_id,date');
     const { data: wwRows } = await supa.from('workout_week').select('user_id,week_start,data');
     (cRows || []).forEach((r) => ensure(r.user_id).checkins.add(r.date));
     (wRows || []).forEach((r) => ensure(r.user_id).workouts.add(r.date));
     (wwRows || []).forEach((r) => { ensure(r.user_id).weekOverride[r.week_start] = r.data; });
+    // Recent food entries feed the meal-slot reminders (a 4-day window covers
+    // "today" in any timezone plus the 3-day activity gate).
+    const { data: fRows } = await supa.from('food_entries').select('user_id,ts').gte('ts', new Date(Date.now() - 4 * 86400000).toISOString());
+    (fRows || []).forEach((r) => ensure(r.user_id).foodTs.push(r.ts));
   }
 
   if (isDry) {
@@ -199,14 +259,14 @@ export default async function handler(req, res) {
     if (req.body.sample) {
       const s = req.body.sample;
       const prof = { onboarding: s.onboarding || {}, notif_prefs: s.notif_prefs || {} };
-      const ud = { checkins: new Set(s.checkins || []), workouts: new Set(s.workouts || []) };
+      const ud = { checkins: new Set(s.checkins || []), workouts: new Set(s.workouts || []), foodTs: s.foodTs || [] };
       const now = s.now || localNow(s.timezone);
-      return res.status(200).json({ dryRun: true, sample: true, now, events: eventKinds(prof, now, ud, true).map((e) => e.kind) });
+      return res.status(200).json({ dryRun: true, sample: true, now, events: eventKinds(prof, now, ud, true, s.timezone).map((e) => e.kind) });
     }
     const rows = subs.map((sub) => ({
       endpoint: sub.endpoint.slice(-12),
       now: localNow(sub.timezone),
-      events: eventKinds(profMap[sub.user_id], localNow(sub.timezone), udByUser[sub.user_id], true).map((e) => e.kind),
+      events: eventKinds(profMap[sub.user_id], localNow(sub.timezone), udByUser[sub.user_id], true, sub.timezone).map((e) => e.kind),
     }));
     return res.status(200).json({ dryRun: true, subs: rows });
   }
@@ -250,7 +310,7 @@ export default async function handler(req, res) {
     }
 
     // Event-based reminders (same atomic-claim + dedup pattern).
-    const events = eventKinds(profMap[sub.user_id], now, udByUser[sub.user_id], false);
+    const events = eventKinds(profMap[sub.user_id], now, udByUser[sub.user_id], false, sub.timezone);
     for (const ev of events) {
       const { data: claimed } = await supa
         .from('push_sent')

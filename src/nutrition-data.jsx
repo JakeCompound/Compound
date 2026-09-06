@@ -188,6 +188,16 @@ function prettyDay(key) {
 }
 
 function foodForDay(date) { const all = loadFood(); return all[date || logDate()] || []; }
+
+// Which meal an entry belongs to — inferred from WHEN it was logged, so every
+// existing entry (and everything cloud sync round-trips) already has a slot
+// with no stored field. Boundaries sit an hour past each reminder time
+// (10am / 3pm / 8pm): before 11am = breakfast, before 4pm = lunch, then dinner.
+const MEAL_SLOTS = ['breakfast', 'lunch', 'dinner'];
+function mealSlot(f) {
+  const h = new Date(f && f.ts ? f.ts : Date.now()).getHours();
+  return h < 11 ? 'breakfast' : h < 16 ? 'lunch' : 'dinner';
+}
 function addFood(entry) {
   const all = loadFood();
   const k = logDate();
@@ -405,7 +415,7 @@ function setNipsToday(n, date) {
 
 Object.assign(window, {
   GOALS, CUT_RATES, GAIN_RATES, LIFESTYLES, calcTargets,
-  loadTargets, saveTargets, loadFood, saveFood, foodForDay, addFood, updateFood, removeFood,
+  loadTargets, saveTargets, loadFood, saveFood, foodForDay, mealSlot, MEAL_SLOTS, addFood, updateFood, removeFood,
   dayTotals, openMealQuestions, todayKey: todayKey,
   loadNipsToday, setNipsToday,
   loadAlcoholKcal, setAlcoholKcal, addAlcoholKcal,
@@ -416,4 +426,4 @@ Object.assign(window, {
   loadSoftPresets, saveSoftPresets, pinSoftPreset, unpinSoftPreset, DEFAULT_SOFT_PRESETS,
 });
 
-export { ALC_KCAL_KEY, CUT_RATES, DEFAULT_MINUTES, DEFAULT_SESSIONS, DEFAULT_SOFT_PRESETS, DEFAULT_STEPS, FOOD_KEY, GAIN_RATES, GOALS, KCAL_PER_LB, LB_PER_KG, LIFESTYLES, LIFTING_MET, MAINTENANCE_MULT, NIPS_KEY, SOFT_KEY, STEPLOG_KEY, STEPS_KCAL_FACTOR, TARGETS_KEY, addAlcoholKcal, addFood, addServing, addStepEntry, calcTargets, dayEarnedKcal, dayStepTotal, dayTotals, estimateCardioKcal, foodForDay, isLogToday, loadAlcoholKcal, loadFood, loadNipsToday, loadSoftPresets, loadStepLog, loadTargets, logDate, openMealQuestions, pinSoftPreset, prettyDay, quickLogFood, recentEntries, removeFood, removeServing, removeStepEntry, saveFood, saveSoftPresets, saveTargets, servingsOf, setAlcoholKcal, setLogDate, setNipsToday, setServings, shiftDay, stepEntriesForDay, todayKey, unpinSoftPreset, updateFood };
+export { ALC_KCAL_KEY, MEAL_SLOTS, mealSlot, CUT_RATES, DEFAULT_MINUTES, DEFAULT_SESSIONS, DEFAULT_SOFT_PRESETS, DEFAULT_STEPS, FOOD_KEY, GAIN_RATES, GOALS, KCAL_PER_LB, LB_PER_KG, LIFESTYLES, LIFTING_MET, MAINTENANCE_MULT, NIPS_KEY, SOFT_KEY, STEPLOG_KEY, STEPS_KCAL_FACTOR, TARGETS_KEY, addAlcoholKcal, addFood, addServing, addStepEntry, calcTargets, dayEarnedKcal, dayStepTotal, dayTotals, estimateCardioKcal, foodForDay, isLogToday, loadAlcoholKcal, loadFood, loadNipsToday, loadSoftPresets, loadStepLog, loadTargets, logDate, openMealQuestions, pinSoftPreset, prettyDay, quickLogFood, recentEntries, removeFood, removeServing, removeStepEntry, saveFood, saveSoftPresets, saveTargets, servingsOf, setAlcoholKcal, setLogDate, setNipsToday, setServings, shiftDay, stepEntriesForDay, todayKey, unpinSoftPreset, updateFood };

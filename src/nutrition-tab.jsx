@@ -181,29 +181,45 @@ function NutritionToday({ user, onChanged, onSetupTargets }) {
       {/* Food log */}
       <div style={{ marginTop: 18 }}>
         <SectionLabel meta={`${foods.length} ${foods.length === 1 ? 'MEAL' : 'MEALS'} · ${totals.kcal} KCAL`}>{onToday ? "TODAY'S LOG" : `${window.prettyDay(day)} · LOG`}</SectionLabel>
-        {foods.length === 0 && !(window.loadNipsToday && window.loadNipsToday() > 0) ? (
-          <div style={{ background: C.surf1, border: `1px dashed ${C.line}`, borderRadius: 12, padding: '20px 16px', textAlign: 'center', fontFamily: 'Outfit, sans-serif', fontSize: 13, color: C.textMid, lineHeight: 1.5 }}>
-            Nothing logged {onToday ? 'yet' : 'on this day'}. Tap <span style={{ color: C.accent }}>+</span> below to log a meal or a drink.
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {(() => {
-              const nips = window.loadNipsToday ? window.loadNipsToday() : 0;
-              const akcal = window.loadAlcoholKcal ? window.loadAlcoholKcal() : 0;
-              if (!alcoholOn(user) || (nips <= 0 && akcal <= 0)) return null;
-              return (
-                <SwipeRow onDelete={deleteAlcohol}>
-                  <AlcoholRow nips={nips} kcal={akcal} onAdd={() => setSheet('nip')} />
-                </SwipeRow>
-              );
-            })()}
-            {foods.map((f) => (
-              <SwipeRow key={f.id} onDelete={() => deleteFood(f)}>
-                <FoodRow food={f} onChanged={refresh} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {(() => {
+            const nips = window.loadNipsToday ? window.loadNipsToday() : 0;
+            const akcal = window.loadAlcoholKcal ? window.loadAlcoholKcal() : 0;
+            if (!alcoholOn(user) || (nips <= 0 && akcal <= 0)) return null;
+            return (
+              <SwipeRow onDelete={deleteAlcohol}>
+                <AlcoholRow nips={nips} kcal={akcal} onAdd={() => setSheet('nip')} />
               </SwipeRow>
-            ))}
-          </div>
-        )}
+            );
+          })()}
+          {/* Breakfast / Lunch / Dinner — slot inferred from log time, and the
+              10am / 3pm / 8pm reminders fire off whichever section is empty. */}
+          {['breakfast', 'lunch', 'dinner'].map((slot) => {
+            const rows = foods.filter((f) => window.mealSlot(f) === slot);
+            const kcal = Math.round(rows.reduce((t, f) => t + (f.kcal || 0) * (window.servingsOf ? window.servingsOf(f) : 1), 0));
+            return (
+              <div key={slot}>
+                <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', margin: '8px 2px 6px' }}>
+                  <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9.5, letterSpacing: 2.2, color: C.textLow, textTransform: 'uppercase' }}>{slot}</span>
+                  {rows.length > 0 && <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9.5, color: C.textLow, fontVariantNumeric: 'tabular-nums' }}>{kcal} KCAL</span>}
+                </div>
+                {rows.length === 0 ? (
+                  <div style={{ background: 'transparent', border: `1px dashed ${C.line}`, borderRadius: 12, padding: '11px 14px', fontFamily: 'Outfit, sans-serif', fontSize: 12, color: C.textLow }}>
+                    {onToday ? <>Not logged yet — tap <span style={{ color: C.accent }}>+</span> when you eat.</> : 'Nothing logged.'}
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {rows.map((f) => (
+                      <SwipeRow key={f.id} onDelete={() => deleteFood(f)}>
+                        <FoodRow food={f} onChanged={refresh} />
+                      </SwipeRow>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {qOpen && <MealQuestionsFlow onClose={() => { setQOpen(false); refresh(); }} onChanged={refresh} />}

@@ -1,5 +1,6 @@
 import React from 'react';
 import { C, DateWheel, FieldLabel, MONTHS_SHORT, PrimaryButton, SaveExitButton, ScreenHead, SelectCard, StepBar, Stepper, TextInput, TimeWheel, computeAge } from './compound-ui.jsx';
+import { ReminderNudge } from './push-nudge.jsx';
 
 // onboarding-screens.jsx — All onboarding screens for COMPOUND
 
@@ -1287,6 +1288,11 @@ function ScreenComplete({ data, onFinish }) {
           </div>
         ))}
       </div>
+
+      {/* The reminder times above are useless until the browser grants
+          notification permission — ask HERE, at peak motivation, instead of
+          hiding the switch in Settings (where no real user ever found it). */}
+      <ReminderNudge variant="onboarding" checkInTime={data.checkInTime} />
 
       <div style={{ marginTop: 'auto' }}>
         <PrimaryButton onClick={onFinish}>Enter Compound</PrimaryButton>

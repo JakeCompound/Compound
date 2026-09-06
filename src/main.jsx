@@ -8,8 +8,14 @@
 // imports inside each module, so nothing depends on global script scope anymore.
 import React from 'react';
 import { createRoot } from 'react-dom/client';
+import { inject } from '@vercel/analytics';
 import './ai.js'; // defines window.claude.complete (AI proxy client)
 import './push.js'; // registers the service worker for Web Push
+
+// Vercel Web Analytics — page views + visitors, no cookies. Needs Web
+// Analytics enabled once on the Vercel project (Settings → Analytics) or the
+// beacon script 404s harmlessly. No-op on localhost.
+inject();
 
 import './tweaks-panel.jsx';
 import './mobile-shell.jsx';

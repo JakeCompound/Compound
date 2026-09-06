@@ -488,12 +488,14 @@ function FoodAdd({ onClose, onChanged, onGoNutrition }) {
   const submit = async () => {
     if (!desc.trim() && !photo) return;
     setPending(true); setErr(null);
-    const prompt = `You are COMPOUND's nutrition estimator. Estimate the calories and macros for this meal as accurately as you can from the description${photo ? ' and photo' : ''}.
+    const prompt = `You are COMPOUND's nutrition estimator. Estimate the calories and macros for what was eaten, as accurately as you can from the description${photo ? ' and photo' : ''}.
 
-Meal: "${desc.trim() || '(see photo)'}"
+Food: "${desc.trim() || '(see photo)'}"
+
+The text may describe ONE meal or SEVERAL (e.g. a whole day: "eggs on toast for brekky, chicken wrap for lunch, steak and veg for dinner"). Split multiple meals into separate entries — never mash a day into one blob.
 
 Respond ONLY with valid JSON:
-{
+{ "meals": [ {
   "name": "short meal name",
   "kcal": <integer calories>,
   "p": <protein g>, "c": <carbs g>, "f": <fat g>,
@@ -502,30 +504,39 @@ Respond ONLY with valid JSON:
   "info": "one encouraging, informative sentence — never scolding. Note what's good and flag what bumps calories, warmly.",
   "nips": <number — standard-nip alcohol equivalent if this includes ANY alcohol (1 beer ≈ 1.5, 1 glass of wine ≈ 2, 1 spirit nip = 1, 1 standard drink ≈ 1.4); 0 if no alcohol>,
   "questions": [ { "q": "highest-value clarifying question", "options": ["chip1","chip2","chip3"] } ]
-}
+} ] }
+One object per meal (1–6). Across ALL meals combined, ask at most 2 questions total — pick only the ones that would materially change the numbers.
 Rules: protein/carbs/fat in grams. BRANDED / PACKAGED PRODUCTS — if the meal names a brand or packaged product (e.g. "Musashi 45g protein bar", a fast-food item, a packaged snack), SEARCH THE WEB for its official nutrition panel and use the label values exactly; set confidence "high" and mention in "info" that it's from the label. Beware: a weight in a protein-bar's name (like "45g") is usually its PROTEIN content, not the bar's weight. PORTION AMBIGUITY — when the item is inherently multi-serving or its size is unstated (a whole pizza, a whole cake, "wine" with no amount), you MUST state the size you assumed in "info" WITH the kcal consequence of the likely alternative (e.g. "assumed a large takeaway pizza — a frozen supermarket one is ~1,200 kcal, tap the question to fix"), set confidence "medium" at most, and make your FIRST clarifying question the size/style/brand (e.g. for pizza: "Large takeaway (thick)", "Medium takeaway", "Woodfired/thin", "Frozen/supermarket" — a whole woodfired pizza is ~1,100–1,300 kcal vs ~2,400+ for a thick large takeaway). Never present a size guess as settled fact. ENERGY CONSISTENCY — kcal must approximately equal protein×4 + carbs×4 + fat×9 (+ alcohol×7); if your numbers don't reconcile within ~10%, correct them before answering. ALCOHOL CALORIES — never eyeball spirits. Compute ethanol calories = volume_ml × (ABV/100) × 0.789 × 7 kcal, then add mixers. A 30ml nip of 40% spirit ≈ 65 kcal; a 30ml nip of 58% ≈ 95 kcal; scale by the stated ABV and count EVERY nip. Count ALL alcohol into "nips" even when logged as food/drink — never miss alcohol. Still count its calories in kcal. Health rating: leniency applies to FOOD only — reward real food. Rate alcohol HONESTLY: 1–2 drinks "neutral", heavier intake "unhealthy". Never imply heavy drinking is fine. Max 2 questions, only if they'd materially change the estimate (else empty array). Keep "info" warm, honest and brief.`;
     try {
       const raw = await window.claude.complete(photo ? [{ type: 'text', text: prompt }, { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: photo.split(',')[1] } }] : prompt);
       const m = (typeof raw === 'string' ? raw : '').match(/\{[\s\S]*\}/);
       if (!m) throw new Error('no json');
       const obj = JSON.parse(m[0]);
-      const entry = {
-        id: 'f-' + Date.now(),
-        name: obj.name || (desc.trim().slice(0, 40)) || 'Meal',
-        photo: photo || null,
-        kcal: Math.round(obj.kcal || 0), p: Math.round(obj.p || 0), c: Math.round(obj.c || 0), f: Math.round(obj.f || 0),
-        confidence: ['low', 'medium', 'high'].includes(obj.confidence) ? obj.confidence : 'medium',
-        health: ['unhealthy', 'neutral', 'healthy'].includes(obj.health) ? obj.health : 'neutral',
-        info: obj.info || '',
-        questions: Array.isArray(obj.questions) ? obj.questions.slice(0, 2).map((q) => ({ q: q.q, options: q.options || [], answer: null })) : [],
-        nips: Math.max(0, +obj.nips || 0),
-        kind: 'food', servings: 1,
-        ts: Date.now(),
-      };
-      window.addFood(entry);
+      // New shape is {meals:[…]}; tolerate a model that answers with a bare
+      // single-meal object (the old format).
+      const meals = Array.isArray(obj.meals) ? obj.meals.slice(0, 6) : (obj.kcal != null || obj.name ? [obj] : []);
+      if (!meals.length) throw new Error('no meals');
+      let totalNips = 0;
+      meals.forEach((mObj, i) => {
+        const entry = {
+          id: 'f-' + Date.now() + '-' + i,
+          name: mObj.name || (desc.trim().slice(0, 40)) || 'Meal',
+          photo: i === 0 ? (photo || null) : null, // the photo belongs to one meal, not the whole day
+          kcal: Math.round(mObj.kcal || 0), p: Math.round(mObj.p || 0), c: Math.round(mObj.c || 0), f: Math.round(mObj.f || 0),
+          confidence: ['low', 'medium', 'high'].includes(mObj.confidence) ? mObj.confidence : 'medium',
+          health: ['unhealthy', 'neutral', 'healthy'].includes(mObj.health) ? mObj.health : 'neutral',
+          info: mObj.info || '',
+          questions: Array.isArray(mObj.questions) ? mObj.questions.slice(0, 2).map((q) => ({ q: q.q, options: q.options || [], answer: null })) : [],
+          nips: Math.max(0, +mObj.nips || 0),
+          kind: 'food', servings: 1,
+          ts: Date.now() + i, // keep log order stable
+        };
+        window.addFood(entry);
+        totalNips += entry.nips;
+      });
       // Alcohol logged as food still counts toward the weekly nips ring.
-      if (entry.nips > 0 && window.setNipsToday) {
-        window.setNipsToday((window.loadNipsToday ? window.loadNipsToday() : 0) + entry.nips);
+      if (totalNips > 0 && window.setNipsToday) {
+        window.setNipsToday((window.loadNipsToday ? window.loadNipsToday() : 0) + totalNips);
       }
       onChanged && onChanged();
       onClose();
@@ -592,7 +603,7 @@ Rules: protein/carbs/fat in grams. BRANDED / PACKAGED PRODUCTS — if the meal n
           </button>
         )}
 
-        <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={2} placeholder="e.g. Grilled chicken sub, extra chicken, max salad, no sauce" style={{ width: '100%', background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 12, padding: '12px 14px', color: C.text, fontFamily: 'Outfit, sans-serif', fontSize: 15, lineHeight: 1.4, outline: 0, resize: 'vertical', boxSizing: 'border-box' }} />
+        <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={3} placeholder="One meal — or your whole day: eggs on toast brekky, chicken wrap lunch, steak & veg dinner" style={{ width: '100%', background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 12, padding: '12px 14px', color: C.text, fontFamily: 'Outfit, sans-serif', fontSize: 15, lineHeight: 1.4, outline: 0, resize: 'vertical', boxSizing: 'border-box' }} />
 
         {err && <div style={{ marginTop: 10, fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: C.danger, lineHeight: 1.4 }}>{err}</div>}
 

@@ -155,7 +155,12 @@ function CheckinModal({ open, onClose, onComplete, gratitudeLibrary = [], user =
     if (answers.workoutToday === true) s.push('workoutGroups', 'workoutMinutes', 'workoutIntensity');
     s.push('steps', 'sleep', 'diet');
     if (alcoholOn(user)) { s.push('afd'); if (answers.afd === false) s.push('nips'); }
-    s.push('calm', 'gratitude', 'partner', 'spirit');
+    s.push('calm', 'gratitude');
+    // Quality-time question is for married members only. Legacy profiles
+    // (married undefined) keep it — everyone onboarded before the question
+    // existed is married.
+    if (user.married !== false) s.push('partner');
+    s.push('spirit');
     if (answers.spirit === true) s.push('spiritDetail');
     if (isSunday) s.push('weekPlan');
     return s;
@@ -393,8 +398,8 @@ function CheckinModal({ open, onClose, onComplete, gratitudeLibrary = [], user =
           <CIQuestion
             tag="LOVE · 8 / 9"
             title="QUALITY TIME"
-            accent="WITH SOMEONE YOU LOVE?"
-            sub="A Yes means at least one moment of undivided attention — family, partner, kids, mates, anyone close. Being in the same house doesn't count."
+            accent="WITH YOUR WIFE?"
+            sub="A Yes means at least one moment of undivided attention — just the two of you, or with the kids. Being in the same house doesn't count."
           >
             <YesNo value={answers.partnerTime} onChange={(v) => set({ partnerTime: v })} />
             <div style={{ marginTop: 18 }}>

@@ -1200,6 +1200,37 @@ function ScreenAlcohol({ data, set, ctx, onNext, onBack }) {
   );
 }
 
+// ── 14b MARRIED? ───────────────────────────────────────────────────────────
+// One structural answer: married members get the nightly "quality time with
+// your wife" check-in question; everyone else never sees it (and the
+// Relationships radar axis is dropped so it can't sit at zero forever).
+function ScreenMarried({ data, set, ctx, onNext, onBack }) {
+  const chosen = data.married === true || data.married === false;
+  return (
+    <FormShell
+      {...ctx}
+      footer={<FooterNav onBack={onBack} onNext={onNext} nextDisabled={!chosen} nextLabel="Continue" />}
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <SelectCard
+          active={data.married === true}
+          onClick={() => set({ married: true })}
+          title="YES — MARRIED"
+          subtitle="The nightly check-in includes a quality-time-with-your-wife question."
+          glyph={<span style={{ fontSize: 20 }}>💍</span>}
+        />
+        <SelectCard
+          active={data.married === false}
+          onClick={() => set({ married: false })}
+          title="NO — NOT YET"
+          subtitle="No quality-time question in your check-in. Flip it in Settings if that changes."
+          glyph={<span style={{ fontSize: 20 }}>🤙</span>}
+        />
+      </div>
+    </FormShell>
+  );
+}
+
 // ── 13 COMPLETION ──────────────────────────────────────────────────────────
 function ScreenComplete({ data, onFinish }) {
   const stats = [
@@ -1425,8 +1456,8 @@ Object.assign(window, {
   ScreenWelcome, ScreenName, ScreenAge, ScreenWeight, ScreenTrainingDays,
   ScreenStepsSleep, ScreenEquipment, ScreenCheckInTime, ScreenWeighInTime,
   ScreenGratitudeIntro, ScreenGratitudeBuilder, ScreenFitnessLevel,
-  Screen1RM, ScreenTrackFood, ScreenAlcohol, ScreenComplete, SaveExitModal, ExitedScreen, FormShell, FooterNav,
+  Screen1RM, ScreenTrackFood, ScreenAlcohol, ScreenMarried, ScreenComplete, SaveExitModal, ExitedScreen, FormShell, FooterNav,
   GRATITUDE_CATEGORIES, LIFTS,
 });
 
-export { BellHint, DeltaCard, ExitedScreen, FooterNav, FormShell, GRATITUDE_CATEGORIES, IconGym, IconHome, LIFTS, LiftRow, PerDayTimes, SaveExitModal, Screen1RM, ScreenAge, ScreenAlcohol, ScreenCheckInTime, ScreenComplete, ScreenEquipment, ScreenFitnessLevel, ScreenGratitudeBuilder, ScreenGratitudeIntro, ScreenName, ScreenStepsSleep, ScreenTrackFood, ScreenTrainingDays, ScreenWeighInTime, ScreenWeight, ScreenWelcome };
+export { BellHint, DeltaCard, ExitedScreen, FooterNav, FormShell, GRATITUDE_CATEGORIES, IconGym, IconHome, LIFTS, LiftRow, PerDayTimes, SaveExitModal, Screen1RM, ScreenAge, ScreenAlcohol, ScreenCheckInTime, ScreenComplete, ScreenEquipment, ScreenFitnessLevel, ScreenGratitudeBuilder, ScreenGratitudeIntro, ScreenMarried, ScreenName, ScreenStepsSleep, ScreenTrackFood, ScreenTrainingDays, ScreenWeighInTime, ScreenWeight, ScreenWelcome };

@@ -524,11 +524,22 @@ function SettingsProfileEdit({ user, set, onBack }) {
                 <DateWheel value={user.dob || '1992-04-15'} onChange={(v) => set({ dob: v })} />
               </div>
             </div>
+            <div style={{ marginTop: 24 }}>
+              <FieldLabel>Married</FieldLabel>
+              <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: C.textMid, lineHeight: 1.45, margin: '8px 0 10px' }}>
+                Married members get the nightly quality-time-with-your-wife question; otherwise the check-in skips it.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <SelectCard active={user.married !== false} onClick={() => set({ married: true })} title="YES — MARRIED" subtitle="Quality-time question in the nightly check-in" meta="9 Qs" />
+                <SelectCard active={user.married === false} onClick={() => set({ married: false })} title="NO — NOT YET" subtitle="Check-in skips the quality-time question" meta="8 Qs" />
+              </div>
+            </div>
           </>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
             <ReadField label="Name" value={user.name || '—'} />
             <ReadField label="Date of birth" value={user.dob ? `${user.dob}${age ? ` · ${age} yrs` : ''}` : '—'} />
+            <ReadField label="Married" value={user.married === false ? 'No — check-in skips the quality-time question' : 'Yes — nightly quality-time question on'} />
           </div>
         )}
       </div>

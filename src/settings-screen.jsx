@@ -857,7 +857,8 @@ function SettingsNotifications({ onBack }) {
     urgency:    { label: 'Workout urgency',        hint: 'Midday nudge when 2 days & 2 workouts remain' },
     streaks:    { label: 'Streak milestones',      hint: 'Every interval reached' },
     pbs:        { label: 'Personal records',       hint: 'When you hit an estimated PR' },
-    comeback:   { label: 'Comeback nudge',         hint: 'After 3+ missed days' },
+    comeback:   { label: 'Rewarming nudges',       hint: 'Day 3, day 7, then every few days until you\u2019re back' },
+    meals:      { label: 'Meal logging nudges',    hint: '10am / 3pm / 8pm \u2014 only if that meal isn\u2019t logged' },
     report:     { label: 'Monthly report ready',   hint: 'First of every month' },
     deload:     { label: 'Deload recommendation',  hint: 'Every 4 weeks' },
   };

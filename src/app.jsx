@@ -9,7 +9,7 @@ import { checkinEffectiveDate, deriveLiveState, isoDate, loadCheckins, recordChe
 import { MacroCalculator } from './macro-calc-screen.jsx';
 import { InstallPrompt, ResponsiveFrame, useIsMobile } from './mobile-shell.jsx';
 import { NutritionTab } from './nutrition-tab.jsx';
-import { ExitedScreen, SaveExitModal, Screen1RM, ScreenAge, ScreenAlcohol, ScreenCheckInTime, ScreenComplete, ScreenEquipment, ScreenFitnessLevel, ScreenGratitudeBuilder, ScreenGratitudeIntro, ScreenName, ScreenStepsSleep, ScreenTrackFood, ScreenTrainingDays, ScreenWeighInTime, ScreenWeight, ScreenWelcome } from './onboarding-screens.jsx';
+import { ExitedScreen, SaveExitModal, Screen1RM, ScreenAge, ScreenAlcohol, ScreenCheckInTime, ScreenComplete, ScreenEquipment, ScreenFitnessLevel, ScreenGratitudeBuilder, ScreenGratitudeIntro, ScreenMarried, ScreenName, ScreenStepsSleep, ScreenTrackFood, ScreenTrainingDays, ScreenWeighInTime, ScreenWeight, ScreenWelcome } from './onboarding-screens.jsx';
 import { alcoholOn } from './alcohol.js';
 import { ReportsScreen } from './reports-screen.jsx';
 import { SettingsScreen } from './settings-screen.jsx';
@@ -47,6 +47,7 @@ const TONE_HEADLINES = {
     rm: { t: 'CURRENT', a: 'ESTIMATES.', s: "Roughly what you'd grind out for one rep, today, fresh. Skip if you're not sure — we'll learn it from session 1." },
     tf: { t: 'WANT TO TRACK', a: 'FOOD & CALORIES?', s: "Optional. If yes, we'll calculate your targets and you can log meals. If no, we still track weight." },
     al: { t: 'DO YOU WANT TO', a: 'TRACK ALCOHOL?', s: 'Optional. If yes, set a weekly nip limit — Home shows the week, Nutrition shows each day, and you build alcohol-free-day streaks. If no, we hide all of it.' },
+    ma: { t: 'ARE YOU', a: 'MARRIED?', s: 'If yes, the nightly check-in asks about quality time with your wife. If not, we leave that question out entirely.' },
   },
   quiet: {
     name: { t: 'YOUR', a: 'NAME.', s: 'First name.' },
@@ -62,6 +63,7 @@ const TONE_HEADLINES = {
     rm: { t: '1RM', a: 'ESTIMATES.', s: 'Optional. Skippable.' },
     tf: { t: 'TRACK', a: 'FOOD?', s: 'Optional. Sets your targets.' },
     al: { t: 'TRACK', a: 'ALCOHOL?', s: 'Optional. Weekly nip limit.' },
+    ma: { t: 'ARE YOU', a: 'MARRIED?', s: 'Shapes one check-in question.' },
   },
   editorial: {
     name: { t: 'INTRODUCTIONS', a: 'FIRST.', s: 'Tell us who is doing the work. We use names sparingly, only where they matter.' },
@@ -77,6 +79,7 @@ const TONE_HEADLINES = {
     rm: { t: 'STRENGTH', a: 'POSITIONS.', s: "Best estimates only. If you don't know yet, the first session will write them for us." },
     tf: { t: 'CALORIE', a: 'TRACKING?', s: 'Optional. Choose yes to set calorie and protein targets; no keeps weight tracking only.' },
     al: { t: 'ALCOHOL', a: 'TRACKING?', s: 'Optional. A weekly nip ceiling, daily detail, and alcohol-free-day streaks — or hide it entirely.' },
+    ma: { t: 'ARE YOU', a: 'MARRIED?', s: 'One answer, one consequence: the nightly quality-time question appears only for married members.' },
   },
 };
 
@@ -120,6 +123,7 @@ function App() {
       weighInTime: '06:00',
       weighInEveryDays: 1, // 1 = daily … 7 = weekly
       gratitude: [],
+      married: null, // asked in onboarding; gates the quality-time check-in question
       fitnessLevel: null,
       lifts: {},
     };
@@ -162,7 +166,7 @@ function App() {
   const setDemoFlag = (k, v) => setDemoFlags((f) => ({ ...f, [k]: v }));
 
   // ── Onboarding step machine ──────────────────────────────────────────────
-  const TOTAL_STEPS = 14;
+  const TOTAL_STEPS = 15;
   const [step, setStep] = React.useState(() => {
     const s = Number(localStorage.getItem('compound:step') || 0);
     return Number.isFinite(s) ? s : 0;
@@ -361,6 +365,7 @@ function App() {
           />
         );
       case 14: return <ScreenAlcohol data={data} set={set} ctx={ctxFor(14, 'al')} onNext={next} onBack={back} />;
+      case 15: return <ScreenMarried data={data} set={set} ctx={ctxFor(15, 'ma')} onNext={next} onBack={back} />;
       default: return <ScreenComplete data={data} onFinish={finishOnboarding} />;
     }
   };

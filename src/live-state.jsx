@@ -161,7 +161,9 @@ function deriveLiveState(user, history) {
   const radar = {
     Health: avg(metrics.workouts, metrics.sleep, metrics.steps, metrics.diet),
     Mental: metrics.calm,
-    Relationships: metrics.partner,
+    // No quality-time question for unmarried members -> no Relationships axis
+    // (better than an axis pinned at zero by a question they never see).
+    ...(user.married !== false ? { Relationships: metrics.partner } : {}),
     Spiritual: metrics.spirit,
     Consistency: Math.min(1, streaks.checkin.current / 7),
   };

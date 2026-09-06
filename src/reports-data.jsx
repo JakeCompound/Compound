@@ -45,7 +45,7 @@ function computeReports(history, user, days) {
   const radar = {
     Health: _avg([m('workouts'), m('sleep'), m('steps'), m('diet')]),
     Mental: m('calm'),
-    Relationships: m('partner'),
+    ...(user.married !== false ? { Relationships: m('partner') } : {}),
     Spiritual: m('spirit'),
     Consistency: Math.min(1, checkinDays / days),
   };

@@ -217,3 +217,11 @@ create policy coach_read on todo_state   for select using (is_coach());
 
 -- Enrol a coach by uid:
 -- insert into coaches (user_id) values ('<auth uid>') on conflict do nothing;
+
+-- ============================================================================
+-- Family ladder (applied to prod 7 Sep 2026): month-to-date counts per member,
+-- callable by any signed-in member. Names + counts only — never raw entries.
+-- ============================================================================
+-- create or replace function monthly_ladder() ... see migration
+-- 'monthly_ladder_function' in Supabase; returns (user_id, name, checkins,
+-- workouts, afds, tracks_alcohol) for the current Sydney month.

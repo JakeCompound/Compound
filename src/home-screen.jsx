@@ -9,6 +9,7 @@ import { isFirstWeekPostJoin } from './mid-week-join.js';
 import { alcoholOn } from './alcohol.js';
 import { useBackClose } from './back-button.js';
 import { ReminderNudge } from './push-nudge.jsx';
+import { LadderCard } from './ladder.jsx';
 
 // home-screen.jsx — The Home tab — assembles all the components
 
@@ -176,6 +177,9 @@ function HomeScreen({ user, set, state, checkins, onOpenCheckin, onOpenCheckinFo
         <WeekStrip days={state.weekDays} />
         <WeekLegend />
       </div>
+
+      {/* Family accountability ladder — month-to-date, everyone visible to everyone */}
+      <LadderCard />
 
       {weighOpen && (
         <WeighInModal

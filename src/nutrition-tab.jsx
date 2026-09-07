@@ -78,6 +78,13 @@ function NutritionToday({ user, onChanged, onSetupTargets }) {
   // Browsing a past day is temporary — always snap back to today on leaving,
   // so other screens (check-in, Home rings) never read a browsed day.
   React.useEffect(() => () => { window.setLogDate && window.setLogDate(null); }, []);
+  // A "Skipped it" tapped on the notification while this screen is open lands
+  // as a window event — re-render so the slot flips immediately.
+  React.useEffect(() => {
+    const h = () => force();
+    window.addEventListener('compound:meal-skip', h);
+    return () => window.removeEventListener('compound:meal-skip', h);
+  }, []);
   const day = window.logDate ? window.logDate() : null;
   const onToday = window.isLogToday ? window.isLogToday() : true;
   const stepDay = (n) => {
@@ -204,9 +211,24 @@ function NutritionToday({ user, onChanged, onSetupTargets }) {
                   {rows.length > 0 && <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9.5, color: C.textLow, fontVariantNumeric: 'tabular-nums' }}>{kcal} KCAL</span>}
                 </div>
                 {rows.length === 0 ? (
-                  <div style={{ background: 'transparent', border: `1px dashed ${C.line}`, borderRadius: 12, padding: '11px 14px', fontFamily: 'Outfit, sans-serif', fontSize: 12, color: C.textLow }}>
-                    {onToday ? <>Not logged yet — tap <span style={{ color: C.accent }}>+</span> when you eat.</> : 'Nothing logged.'}
-                  </div>
+                  window.isMealSkipped && window.isMealSkipped(slot, day) ? (
+                    <button
+                      onClick={() => { window.clearMealSkip(slot, day); refresh(); }}
+                      style={{ width: '100%', textAlign: 'left', background: 'transparent', border: `1px dashed ${C.line}`, borderRadius: 12, padding: '11px 14px', fontFamily: 'Outfit, sans-serif', fontSize: 12, color: C.textLow, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                    >
+                      <span>Skipped — no {slot}.</span>
+                      <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 8.5, letterSpacing: 1.4, color: C.textLow }}>UNDO</span>
+                    </button>
+                  ) : (
+                    <div style={{ background: 'transparent', border: `1px dashed ${C.line}`, borderRadius: 12, padding: '11px 14px', fontFamily: 'Outfit, sans-serif', fontSize: 12, color: C.textLow, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+                      <span>{onToday ? <>Not logged yet — tap <span style={{ color: C.accent }}>+</span> when you eat.</> : 'Nothing logged.'}</span>
+                      {onToday && (
+                        <button onClick={() => { window.markMealSkipped(slot, day); refresh(); }} style={{ background: 'transparent', border: 0, cursor: 'pointer', padding: 2, fontFamily: 'JetBrains Mono, monospace', fontSize: 8.5, letterSpacing: 1.4, color: C.textLow, flexShrink: 0 }}>
+                          SKIPPED IT
+                        </button>
+                      )}
+                    </div>
+                  )
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {rows.map((f) => (

@@ -110,10 +110,17 @@ function comebackMsg(gap) {
 // lunch, after = dinner. No reminders for members gone cold 3+ days — the
 // rewarming sequence owns them; three meal nags a day would bury it.
 const MEAL_TIME = { breakfast: '10:00', lunch: '15:00', dinner: '20:00' };
+// Meal payloads carry action buttons (Android shows them; iOS shows a plain
+// notification whose tap opens the app): "Log it" deep-links into the food
+// sheet ready to type, "Skipped it" records the skip without opening the app.
+const MEAL_ACTIONS = [
+  { action: 'log', title: 'Log it' },
+  { action: 'skip', title: 'Skipped it' },
+];
 const MEAL_MSG = {
-  breakfast: { title: 'COMPOUND', body: "Breakfast isn't logged. Type it or snap it — 20 seconds.", tag: 'meal', url: '/' },
-  lunch: { title: 'COMPOUND', body: 'No lunch on the log yet. Get it in while you still remember it.', tag: 'meal', url: '/' },
-  dinner: { title: 'COMPOUND', body: "Dinner's not logged. Close out the day's food.", tag: 'meal', url: '/' },
+  breakfast: { title: 'COMPOUND', body: "Breakfast isn't logged. Type it or snap it — 20 seconds.", tag: 'meal', url: '/', slot: 'breakfast', actions: MEAL_ACTIONS },
+  lunch: { title: 'COMPOUND', body: 'No lunch on the log yet. Get it in while you still remember it.', tag: 'meal', url: '/', slot: 'lunch', actions: MEAL_ACTIONS },
+  dinner: { title: 'COMPOUND', body: "Dinner's not logged. Close out the day's food.", tag: 'meal', url: '/', slot: 'dinner', actions: MEAL_ACTIONS },
 };
 function slotForHour(h) { return h < 11 ? 'breakfast' : h < 16 ? 'lunch' : 'dinner'; }
 // Local hour + date of a timestamp in the subscriber's timezone.

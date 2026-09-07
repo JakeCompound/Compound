@@ -51,7 +51,9 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// A push arrived. Payload is JSON: { title, body, tag, url }.
+// A push arrived. Payload is JSON: { title, body, tag, url, slot?, actions? }.
+// `actions` become notification buttons where the platform supports them
+// (Android); iOS shows a plain notification and a tap opens the app.
 self.addEventListener('push', (event) => {
   let data = {};
   try { data = event.data ? event.data.json() : {}; } catch (e) { data = { body: event.data && event.data.text() }; }
@@ -62,19 +64,62 @@ self.addEventListener('push', (event) => {
     renotify: true,
     icon: '/icon-180.png',   // full-colour COMPOUND logo (shown in the notification body)
     badge: '/badge-96.png',  // monochrome ring mark (Android status bar — must be white/transparent)
-    data: { url: data.url || '/' },
+    data: { url: data.url || '/', slot: data.slot || null },
     vibrate: [80, 40, 80],
   };
+  if (Array.isArray(data.actions) && data.actions.length) options.actions = data.actions.slice(0, 2);
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
-// Tapping the notification focuses an open tab or opens the app.
+// Actions decided from the notification can land while the app is closed —
+// the page owns localStorage, not us — so they queue in a tiny IndexedDB
+// store that push.js drains on the next app open (or via postMessage now).
+function swDb() {
+  return new Promise((resolve, reject) => {
+    const r = indexedDB.open('compound-sw', 1);
+    r.onupgradeneeded = () => { r.result.createObjectStore('pending', { autoIncrement: true }); };
+    r.onsuccess = () => resolve(r.result);
+    r.onerror = () => reject(r.error);
+  });
+}
+async function queueAction(action) {
+  const db = await swDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('pending', 'readwrite');
+    tx.objectStore('pending').add(action);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+// Notification interactions:
+//   • "Skipped it" on a meal reminder → record the skip, app stays closed.
+//   • "Log it" → open the app straight into the food sheet for typing.
+//   • plain tap → focus/open the app.
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const url = (event.notification.data && event.notification.data.url) || '/';
+  const d = event.notification.data || {};
+  const slot = d.slot || null;
+
+  if (event.action === 'skip' && slot) {
+    event.waitUntil((async () => {
+      const list = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      if (list.length) list.forEach((c) => c.postMessage({ type: 'meal-skip', slot, ts: Date.now() }));
+      else await queueAction({ type: 'meal-skip', slot, ts: Date.now() }).catch(() => {});
+    })());
+    return;
+  }
+
+  const wantsLog = event.action === 'log' && slot;
+  const url = wantsLog ? '/?logmeal=' + slot : (d.url || '/');
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
-      for (const c of list) { if ('focus' in c) return c.focus(); }
+      for (const c of list) {
+        if ('focus' in c) {
+          if (wantsLog) c.postMessage({ type: 'open-food-add', slot });
+          return c.focus();
+        }
+      }
       if (self.clients.openWindow) return self.clients.openWindow(url);
     }),
   );

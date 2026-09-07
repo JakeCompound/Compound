@@ -323,6 +323,24 @@ function App() {
     setTodayCompleted(false);
   }, [tweak.demoState]);
 
+  // "Log it" tapped on a meal reminder opens the app at /?logmeal=<slot> —
+  // land on Home (the + button lives there) and pop the food sheet ready to
+  // type. The param is stripped so a refresh doesn't reopen it.
+  React.useEffect(() => {
+    if (view !== 'app') return;
+    let slot = null;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      slot = params.get('logmeal');
+      if (slot) window.history.replaceState(null, '', window.location.pathname);
+    } catch (e) {}
+    if (!slot) return;
+    setTab('home');
+    const t = setTimeout(() => { try { window.dispatchEvent(new CustomEvent('compound:open-food-add', { detail: { slot } })); } catch (e) {} }, 450);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view]);
+
   // ── Finish onboarding handler ────────────────────────────────────────────
   const finishOnboarding = () => {
     markJoined(); // record join date (once) for the mid-week-join grace period

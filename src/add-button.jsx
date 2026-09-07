@@ -9,9 +9,17 @@ import { useBackClose } from './back-button.js';
 function AddButton({ dietTracking, alcohol = true, onChanged, onGoNutrition }) {
   const [menu, setMenu] = React.useState(false);
   const [sheet, setSheet] = React.useState(null); // 'drink' | 'food'
+  const [focusFood, setFocusFood] = React.useState(false); // notification "Log it" wants the keyboard up
   // Hardware back closes these (hooks must run before the early return below).
   useBackClose(menu, () => setMenu(false));
   useBackClose(!!sheet, () => setSheet(null));
+  // A meal reminder's "Log it" button (via sw.js → push.js) opens the food
+  // sheet directly, textarea focused so they can just start typing.
+  React.useEffect(() => {
+    const h = () => { setMenu(false); setFocusFood(true); setSheet('food'); };
+    window.addEventListener('compound:open-food-add', h);
+    return () => window.removeEventListener('compound:open-food-add', h);
+  }, []);
   if (!alcohol && !dietTracking) return null; // nothing to add
   return (
     <>
@@ -43,7 +51,7 @@ function AddButton({ dietTracking, alcohol = true, onChanged, onGoNutrition }) {
       )}
 
       {sheet === 'drink' && <DrinkChooser onClose={() => setSheet(null)} onChanged={onChanged} />}
-      {sheet === 'food' && <FoodAdd onClose={() => setSheet(null)} onChanged={onChanged} onGoNutrition={onGoNutrition} />}
+      {sheet === 'food' && <FoodAdd autoFocus={focusFood} onClose={() => { setSheet(null); setFocusFood(false); }} onChanged={onChanged} onGoNutrition={onGoNutrition} />}
     </>
   );
 }
@@ -469,7 +477,7 @@ function SoftDrinkQuickAdd({ onClose, onChanged }) {
 }
 
 // ── Food add (photo + text → AI estimate) ───────────────────────────────────
-function FoodAdd({ onClose, onChanged, onGoNutrition }) {
+function FoodAdd({ onClose, onChanged, onGoNutrition, autoFocus = false }) {
   const [desc, setDesc] = React.useState('');
   const [again, setAgain] = React.useState(null); // note after repeating a past meal
   const [photo, setPhoto] = React.useState(null); // dataURL
@@ -603,7 +611,7 @@ Rules: protein/carbs/fat in grams. BRANDED / PACKAGED PRODUCTS — if the meal n
           </button>
         )}
 
-        <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={3} placeholder="One meal — or your whole day: eggs on toast brekky, chicken wrap lunch, steak & veg dinner" style={{ width: '100%', background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 12, padding: '12px 14px', color: C.text, fontFamily: 'Outfit, sans-serif', fontSize: 15, lineHeight: 1.4, outline: 0, resize: 'vertical', boxSizing: 'border-box' }} />
+        <textarea value={desc} autoFocus={autoFocus} onChange={(e) => setDesc(e.target.value)} rows={3} placeholder="One meal — or your whole day: eggs on toast brekky, chicken wrap lunch, steak & veg dinner" style={{ width: '100%', background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 12, padding: '12px 14px', color: C.text, fontFamily: 'Outfit, sans-serif', fontSize: 15, lineHeight: 1.4, outline: 0, resize: 'vertical', boxSizing: 'border-box' }} />
 
         {err && <div style={{ marginTop: 10, fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: C.danger, lineHeight: 1.4 }}>{err}</div>}
 

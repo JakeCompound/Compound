@@ -194,6 +194,21 @@ function foodForDay(date) { const all = loadFood(); return all[date || logDate()
 // with no stored field. Boundaries sit an hour past each reminder time
 // (10am / 3pm / 8pm): before 11am = breakfast, before 4pm = lunch, then dinner.
 const MEAL_SLOTS = ['breakfast', 'lunch', 'dinner'];
+// Deliberately-skipped meals — from the reminder notification's "Skipped it"
+// button or the section row itself. Display-only state ({ [date]: { slot: true } },
+// local to the device): a slot with real entries ignores its skip flag.
+const MEAL_SKIP_KEY = 'compound:mealSkips';
+function loadMealSkips() { try { return JSON.parse(localStorage.getItem(MEAL_SKIP_KEY) || '{}'); } catch (e) { return {}; } }
+function isMealSkipped(slot, date) { const all = loadMealSkips(); return !!(all[date || logDate()] && all[date || logDate()][slot]); }
+function markMealSkipped(slot, date) {
+  const all = loadMealSkips(); const k = date || logDate();
+  all[k] = { ...(all[k] || {}), [slot]: true };
+  try { localStorage.setItem(MEAL_SKIP_KEY, JSON.stringify(all)); } catch (e) {}
+}
+function clearMealSkip(slot, date) {
+  const all = loadMealSkips(); const k = date || logDate();
+  if (all[k]) { delete all[k][slot]; try { localStorage.setItem(MEAL_SKIP_KEY, JSON.stringify(all)); } catch (e) {} }
+}
 function mealSlot(f) {
   const h = new Date(f && f.ts ? f.ts : Date.now()).getHours();
   return h < 11 ? 'breakfast' : h < 16 ? 'lunch' : 'dinner';
@@ -415,7 +430,7 @@ function setNipsToday(n, date) {
 
 Object.assign(window, {
   GOALS, CUT_RATES, GAIN_RATES, LIFESTYLES, calcTargets,
-  loadTargets, saveTargets, loadFood, saveFood, foodForDay, mealSlot, MEAL_SLOTS, addFood, updateFood, removeFood,
+  loadTargets, saveTargets, loadFood, saveFood, foodForDay, mealSlot, MEAL_SLOTS, isMealSkipped, markMealSkipped, clearMealSkip, addFood, updateFood, removeFood,
   dayTotals, openMealQuestions, todayKey: todayKey,
   loadNipsToday, setNipsToday,
   loadAlcoholKcal, setAlcoholKcal, addAlcoholKcal,
@@ -426,4 +441,4 @@ Object.assign(window, {
   loadSoftPresets, saveSoftPresets, pinSoftPreset, unpinSoftPreset, DEFAULT_SOFT_PRESETS,
 });
 
-export { ALC_KCAL_KEY, MEAL_SLOTS, mealSlot, CUT_RATES, DEFAULT_MINUTES, DEFAULT_SESSIONS, DEFAULT_SOFT_PRESETS, DEFAULT_STEPS, FOOD_KEY, GAIN_RATES, GOALS, KCAL_PER_LB, LB_PER_KG, LIFESTYLES, LIFTING_MET, MAINTENANCE_MULT, NIPS_KEY, SOFT_KEY, STEPLOG_KEY, STEPS_KCAL_FACTOR, TARGETS_KEY, addAlcoholKcal, addFood, addServing, addStepEntry, calcTargets, dayEarnedKcal, dayStepTotal, dayTotals, estimateCardioKcal, foodForDay, isLogToday, loadAlcoholKcal, loadFood, loadNipsToday, loadSoftPresets, loadStepLog, loadTargets, logDate, openMealQuestions, pinSoftPreset, prettyDay, quickLogFood, recentEntries, removeFood, removeServing, removeStepEntry, saveFood, saveSoftPresets, saveTargets, servingsOf, setAlcoholKcal, setLogDate, setNipsToday, setServings, shiftDay, stepEntriesForDay, todayKey, unpinSoftPreset, updateFood };
+export { ALC_KCAL_KEY, MEAL_SLOTS, mealSlot, isMealSkipped, markMealSkipped, clearMealSkip, CUT_RATES, DEFAULT_MINUTES, DEFAULT_SESSIONS, DEFAULT_SOFT_PRESETS, DEFAULT_STEPS, FOOD_KEY, GAIN_RATES, GOALS, KCAL_PER_LB, LB_PER_KG, LIFESTYLES, LIFTING_MET, MAINTENANCE_MULT, NIPS_KEY, SOFT_KEY, STEPLOG_KEY, STEPS_KCAL_FACTOR, TARGETS_KEY, addAlcoholKcal, addFood, addServing, addStepEntry, calcTargets, dayEarnedKcal, dayStepTotal, dayTotals, estimateCardioKcal, foodForDay, isLogToday, loadAlcoholKcal, loadFood, loadNipsToday, loadSoftPresets, loadStepLog, loadTargets, logDate, openMealQuestions, pinSoftPreset, prettyDay, quickLogFood, recentEntries, removeFood, removeServing, removeStepEntry, saveFood, saveSoftPresets, saveTargets, servingsOf, setAlcoholKcal, setLogDate, setNipsToday, setServings, shiftDay, stepEntriesForDay, todayKey, unpinSoftPreset, updateFood };

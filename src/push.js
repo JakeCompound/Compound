@@ -24,6 +24,41 @@ function urlBase64ToUint8Array(base64String) {
   return out;
 }
 
+// ── Notification-action plumbing ────────────────────────────────────────────
+// The SW queues actions taken on a notification while the app was closed
+// (IndexedDB 'compound-sw'/'pending') and posts them live when it's open.
+// Both paths land here.
+const dateKeyOf = (ts) => { const d = new Date(ts || Date.now()); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+function applySwAction(a) {
+  if (!a || typeof a !== 'object') return;
+  if (a.type === 'meal-skip' && a.slot) {
+    if (window.markMealSkipped) window.markMealSkipped(a.slot, dateKeyOf(a.ts));
+    try { window.dispatchEvent(new CustomEvent('compound:meal-skip')); } catch (e) {}
+  } else if (a.type === 'open-food-add') {
+    try { window.dispatchEvent(new CustomEvent('compound:open-food-add', { detail: { slot: a.slot } })); } catch (e) {}
+  }
+}
+function drainPendingSwActions() {
+  try {
+    const r = indexedDB.open('compound-sw', 1);
+    r.onupgradeneeded = () => { r.result.createObjectStore('pending', { autoIncrement: true }); };
+    r.onsuccess = () => {
+      const db = r.result;
+      try {
+        const tx = db.transaction('pending', 'readwrite');
+        const store = tx.objectStore('pending');
+        const all = store.getAll();
+        all.onsuccess = () => { (all.result || []).forEach(applySwAction); store.clear(); };
+      } catch (e) {}
+    };
+  } catch (e) {}
+}
+if (pushSupported) {
+  try { navigator.serviceWorker.addEventListener('message', (e) => applySwAction(e.data)); } catch (e) {}
+  // Drain after the modules that define markMealSkipped have loaded.
+  setTimeout(drainPendingSwActions, 800);
+}
+
 let swReg = null;
 export async function registerSW() {
   if (!pushSupported) return null;

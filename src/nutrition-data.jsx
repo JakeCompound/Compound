@@ -195,19 +195,43 @@ function foodForDay(date) { const all = loadFood(); return all[date || logDate()
 // (10am / 3pm / 8pm): before 11am = breakfast, before 4pm = lunch, then dinner.
 const MEAL_SLOTS = ['breakfast', 'lunch', 'dinner'];
 // Deliberately-skipped meals — from the reminder notification's "Skipped it"
-// button or the section row itself. Display-only state ({ [date]: { slot: true } },
-// local to the device): a slot with real entries ignores its skip flag.
-const MEAL_SKIP_KEY = 'compound:mealSkips';
-function loadMealSkips() { try { return JSON.parse(localStorage.getItem(MEAL_SKIP_KEY) || '{}'); } catch (e) { return {}; } }
-function isMealSkipped(slot, date) { const all = loadMealSkips(); return !!(all[date || logDate()] && all[date || logDate()][slot]); }
+// button or the section row itself. A skip is stored as a real food entry
+// (kind 'skipped', 0 kcal, timestamped inside its slot) so it rides the normal
+// cloud sync — which is what lets the SERVER see the slot as handled and hold
+// that meal's reminder. A purely local flag can't stop a push (learned the
+// hard way: skip breakfast on the phone, still pinged at 10am).
+const SLOT_TS_HOUR = { breakfast: 8, lunch: 12, dinner: 18 }; // representative local hour per slot
+function skipEntryFor(slot, date) {
+  return foodForDay(date).find((f) => f && f.kind === 'skipped' && mealSlot(f) === slot);
+}
+function isMealSkipped(slot, date) {
+  if (skipEntryFor(slot, date)) return true;
+  // Legacy display-only flags from the first version (device-local) — read so
+  // an already-marked day still shows, never written again.
+  try { const all = JSON.parse(localStorage.getItem('compound:mealSkips') || '{}'); const k = date || logDate(); return !!(all[k] && all[k][slot]); } catch (e) { return false; }
+}
 function markMealSkipped(slot, date) {
-  const all = loadMealSkips(); const k = date || logDate();
-  all[k] = { ...(all[k] || {}), [slot]: true };
-  try { localStorage.setItem(MEAL_SKIP_KEY, JSON.stringify(all)); } catch (e) {}
+  const k = date || logDate();
+  if (skipEntryFor(slot, k)) return;
+  const [y, m, d] = k.split('-').map(Number);
+  const ts = new Date(y, m - 1, d, SLOT_TS_HOUR[slot] ?? 12).getTime();
+  const all = loadFood();
+  (all[k] = all[k] || []).push({
+    id: 'skip-' + slot + '-' + k, name: 'Skipped', photo: null,
+    kcal: 0, p: 0, c: 0, f: 0, confidence: null, health: null, info: null,
+    questions: [], servings: 1, nips: 0, kind: 'skipped', ts,
+  });
+  saveFood(all);
 }
 function clearMealSkip(slot, date) {
-  const all = loadMealSkips(); const k = date || logDate();
-  if (all[k]) { delete all[k][slot]; try { localStorage.setItem(MEAL_SKIP_KEY, JSON.stringify(all)); } catch (e) {} }
+  const k = date || logDate();
+  const all = loadFood();
+  all[k] = (all[k] || []).filter((f) => !(f && f.kind === 'skipped' && mealSlot(f) === slot));
+  saveFood(all);
+  try { // clear any legacy local flag too, so undo sticks
+    const legacy = JSON.parse(localStorage.getItem('compound:mealSkips') || '{}');
+    if (legacy[k]) { delete legacy[k][slot]; localStorage.setItem('compound:mealSkips', JSON.stringify(legacy)); }
+  } catch (e) {}
 }
 function mealSlot(f) {
   const h = new Date(f && f.ts ? f.ts : Date.now()).getHours();
@@ -276,7 +300,7 @@ function recentEntries(opts) {
   days.forEach((day) => {
     (all[day] || []).slice().sort((a, b) => (b.ts || 0) - (a.ts || 0)).forEach((e) => {
       const key = (e.name || '').toLowerCase();
-      if (!key || (o.kind && (e.kind || 'food') !== o.kind)) return;
+      if (!key || e.kind === 'skipped' || (o.kind && (e.kind || 'food') !== o.kind)) return;
       if (seen[key]) { seen[key].count += servingsOf(e); return; }
       seen[key] = { name: e.name, photo: e.photo || null, kcal: e.kcal || 0, p: e.p || 0, c: e.c || 0, f: e.f || 0,
         health: e.health || 'neutral', info: e.info || '', kind: e.kind || 'food', day, count: servingsOf(e) };

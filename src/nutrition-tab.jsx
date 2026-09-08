@@ -187,7 +187,7 @@ function NutritionToday({ user, onChanged, onSetupTargets }) {
 
       {/* Food log */}
       <div style={{ marginTop: 18 }}>
-        <SectionLabel meta={`${foods.length} ${foods.length === 1 ? 'MEAL' : 'MEALS'} · ${totals.kcal} KCAL`}>{onToday ? "TODAY'S LOG" : `${window.prettyDay(day)} · LOG`}</SectionLabel>
+        <SectionLabel meta={(() => { const n = foods.filter((f) => f.kind !== 'skipped').length; return `${n} ${n === 1 ? 'MEAL' : 'MEALS'} · ${totals.kcal} KCAL`; })()}>{onToday ? "TODAY'S LOG" : `${window.prettyDay(day)} · LOG`}</SectionLabel>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {(() => {
             const nips = window.loadNipsToday ? window.loadNipsToday() : 0;
@@ -202,7 +202,7 @@ function NutritionToday({ user, onChanged, onSetupTargets }) {
           {/* Breakfast / Lunch / Dinner — slot inferred from log time, and the
               10am / 3pm / 8pm reminders fire off whichever section is empty. */}
           {['breakfast', 'lunch', 'dinner'].map((slot) => {
-            const rows = foods.filter((f) => window.mealSlot(f) === slot);
+            const rows = foods.filter((f) => window.mealSlot(f) === slot && f.kind !== 'skipped');
             const kcal = Math.round(rows.reduce((t, f) => t + (f.kcal || 0) * (window.servingsOf ? window.servingsOf(f) : 1), 0));
             return (
               <div key={slot}>

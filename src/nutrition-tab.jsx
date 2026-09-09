@@ -234,13 +234,29 @@ function NutritionToday({ user, onChanged, onSetupTargets }) {
                       <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 8.5, letterSpacing: 1.4, color: C.textLow }}>UNDO</span>
                     </button>
                   ) : (
-                    <div style={{ background: 'transparent', border: `1px dashed ${C.line}`, borderRadius: 12, padding: '11px 14px', fontFamily: 'Outfit, sans-serif', fontSize: 12, color: C.textLow, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
-                      <span>{onToday ? <>Not logged yet — tap <span style={{ color: C.accent }}>+</span> when you eat.</> : 'Nothing logged.'}</span>
-                      {onToday && (
-                        <button onClick={() => { window.markMealSkipped(slot, day); refresh(); }} style={{ background: 'transparent', border: 0, cursor: 'pointer', padding: 2, fontFamily: 'JetBrains Mono, monospace', fontSize: 8.5, letterSpacing: 1.4, color: C.textLow, flexShrink: 0 }}>
-                          SKIPPED IT
-                        </button>
-                      )}
+                    <div style={{ background: 'transparent', border: `1px dashed ${C.line}`, borderRadius: 12, padding: '11px 14px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+                        <span style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12, color: C.textLow }}>{onToday ? <>Not logged yet — tap <span style={{ color: C.accent }}>+</span> when you eat.</> : 'Nothing logged.'}</span>
+                        {onToday && (
+                          <button onClick={() => { window.markMealSkipped(slot, day); refresh(); }} style={{ background: 'transparent', border: 0, cursor: 'pointer', padding: 2, fontFamily: 'JetBrains Mono, monospace', fontSize: 8.5, letterSpacing: 1.4, color: C.textLow, flexShrink: 0 }}>
+                            SKIPPED IT
+                          </button>
+                        )}
+                      </div>
+                      {onToday && (() => {
+                        const usual = window.usualMealFor && window.usualMealFor(slot);
+                        if (!usual) return null;
+                        return (
+                          <button
+                            onClick={() => { window.logUsualMeal(slot); refresh(); }}
+                            style={{ marginTop: 8, background: C.accentSoft, border: `1px solid ${C.accentDim}`, borderRadius: 999, cursor: 'pointer', padding: '7px 13px', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                          >
+                            <span style={{ fontSize: 12 }}>↻</span>
+                            <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 13, letterSpacing: 0.6, color: C.accent, textTransform: 'uppercase' }}>{usual.name} — again</span>
+                            <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: C.textLow }}>{usual.kcal} kcal</span>
+                          </button>
+                        );
+                      })()}
                     </div>
                   )
                 ) : (

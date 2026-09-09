@@ -259,6 +259,48 @@ function lastNDayKeys(n) {
 }
 function bigDaysInLastWeek() { const all = loadFood(); return lastNDayKeys(7).filter((k) => (all[k] || []).some((f) => f && f.kind === 'bigday')).length; }
 
+// The member's "usual" for a slot — the meal name logged most often in that
+// slot over the last 3 weeks (2+ different days to qualify). Powers the
+// one-tap "again" chip on an empty slot row: the most common daily action
+// (same breakfast as always) becomes one touch.
+function usualMealFor(slot) {
+  const all = loadFood();
+  const counts = {};
+  lastNDayKeys(21).forEach((k) => {
+    const seenToday = new Set();
+    (all[k] || []).forEach((f) => {
+      if (!f || (f.kind || 'food') !== 'food' || mealSlot(f) !== slot) return;
+      const name = (f.name || '').trim();
+      if (!name) return;
+      const key2 = name.toLowerCase();
+      if (seenToday.has(key2)) return;
+      seenToday.add(key2);
+      if (!counts[key2]) counts[key2] = { n: 0, f };
+      counts[key2].n += 1;
+    });
+  });
+  const best = Object.values(counts).sort((a, b) => b.n - a.n)[0];
+  return best && best.n >= 2 ? best.f : null;
+}
+function logUsualMeal(slot) {
+  const u = usualMealFor(slot);
+  if (!u) return null;
+  const k = logDate();
+  const [y, m, d] = k.split('-').map(Number);
+  const now = new Date();
+  const liveNow = k === todayKey() && mealSlot({ ts: now.getTime() }) === slot;
+  const ts = liveNow ? now.getTime() : new Date(y, m - 1, d, SLOT_TS_HOUR[slot] ?? 12).getTime();
+  const all = loadFood();
+  (all[k] = all[k] || []).push({
+    id: 'f-usual-' + Date.now(), name: u.name, photo: null,
+    kcal: u.kcal || 0, p: u.p || 0, c: u.c || 0, f: u.f || 0,
+    confidence: u.confidence || 'medium', health: u.health || null, info: u.info || null,
+    questions: [], servings: 1, nips: 0, kind: 'food', ts,
+  });
+  saveFood(all);
+  return u.name;
+}
+
 function clearMealSkip(slot, date) {
   const k = date || logDate();
   const all = loadFood();
@@ -490,7 +532,7 @@ function setNipsToday(n, date) {
 
 Object.assign(window, {
   GOALS, CUT_RATES, GAIN_RATES, LIFESTYLES, calcTargets,
-  loadTargets, saveTargets, loadFood, saveFood, foodForDay, mealSlot, MEAL_SLOTS, isMealSkipped, markMealSkipped, clearMealSkip, bigDayEntry, bigDayOver, markBigDay, clearBigDay, bigDaysInLastWeek, addFood, updateFood, removeFood,
+  loadTargets, saveTargets, loadFood, saveFood, foodForDay, mealSlot, MEAL_SLOTS, isMealSkipped, markMealSkipped, clearMealSkip, bigDayEntry, bigDayOver, markBigDay, clearBigDay, bigDaysInLastWeek, usualMealFor, logUsualMeal, addFood, updateFood, removeFood,
   dayTotals, openMealQuestions, todayKey: todayKey,
   loadNipsToday, setNipsToday,
   loadAlcoholKcal, setAlcoholKcal, addAlcoholKcal,
@@ -501,4 +543,4 @@ Object.assign(window, {
   loadSoftPresets, saveSoftPresets, pinSoftPreset, unpinSoftPreset, DEFAULT_SOFT_PRESETS,
 });
 
-export { ALC_KCAL_KEY, MEAL_SLOTS, mealSlot, isMealSkipped, markMealSkipped, clearMealSkip, bigDayEntry, bigDayOver, markBigDay, clearBigDay, bigDaysInLastWeek, CUT_RATES, DEFAULT_MINUTES, DEFAULT_SESSIONS, DEFAULT_SOFT_PRESETS, DEFAULT_STEPS, FOOD_KEY, GAIN_RATES, GOALS, KCAL_PER_LB, LB_PER_KG, LIFESTYLES, LIFTING_MET, MAINTENANCE_MULT, NIPS_KEY, SOFT_KEY, STEPLOG_KEY, STEPS_KCAL_FACTOR, TARGETS_KEY, addAlcoholKcal, addFood, addServing, addStepEntry, calcTargets, dayEarnedKcal, dayStepTotal, dayTotals, estimateCardioKcal, foodForDay, isLogToday, loadAlcoholKcal, loadFood, loadNipsToday, loadSoftPresets, loadStepLog, loadTargets, logDate, openMealQuestions, pinSoftPreset, prettyDay, quickLogFood, recentEntries, removeFood, removeServing, removeStepEntry, saveFood, saveSoftPresets, saveTargets, servingsOf, setAlcoholKcal, setLogDate, setNipsToday, setServings, shiftDay, stepEntriesForDay, todayKey, unpinSoftPreset, updateFood };
+export { ALC_KCAL_KEY, MEAL_SLOTS, mealSlot, isMealSkipped, markMealSkipped, clearMealSkip, bigDayEntry, bigDayOver, markBigDay, clearBigDay, bigDaysInLastWeek, usualMealFor, logUsualMeal, CUT_RATES, DEFAULT_MINUTES, DEFAULT_SESSIONS, DEFAULT_SOFT_PRESETS, DEFAULT_STEPS, FOOD_KEY, GAIN_RATES, GOALS, KCAL_PER_LB, LB_PER_KG, LIFESTYLES, LIFTING_MET, MAINTENANCE_MULT, NIPS_KEY, SOFT_KEY, STEPLOG_KEY, STEPS_KCAL_FACTOR, TARGETS_KEY, addAlcoholKcal, addFood, addServing, addStepEntry, calcTargets, dayEarnedKcal, dayStepTotal, dayTotals, estimateCardioKcal, foodForDay, isLogToday, loadAlcoholKcal, loadFood, loadNipsToday, loadSoftPresets, loadStepLog, loadTargets, logDate, openMealQuestions, pinSoftPreset, prettyDay, quickLogFood, recentEntries, removeFood, removeServing, removeStepEntry, saveFood, saveSoftPresets, saveTargets, servingsOf, setAlcoholKcal, setLogDate, setNipsToday, setServings, shiftDay, stepEntriesForDay, todayKey, unpinSoftPreset, updateFood };

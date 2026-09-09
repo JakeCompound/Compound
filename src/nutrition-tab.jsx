@@ -187,7 +187,7 @@ function NutritionToday({ user, onChanged, onSetupTargets }) {
 
       {/* Food log */}
       <div style={{ marginTop: 18 }}>
-        <SectionLabel meta={(() => { const n = foods.filter((f) => f.kind !== 'skipped').length; return `${n} ${n === 1 ? 'MEAL' : 'MEALS'} · ${totals.kcal} KCAL`; })()}>{onToday ? "TODAY'S LOG" : `${window.prettyDay(day)} · LOG`}</SectionLabel>
+        <SectionLabel meta={(() => { const n = foods.filter((f) => f.kind !== 'skipped' && f.kind !== 'bigday').length; return `${n} ${n === 1 ? 'MEAL' : 'MEALS'} · ${totals.kcal} KCAL`; })()}>{onToday ? "TODAY'S LOG" : `${window.prettyDay(day)} · LOG`}</SectionLabel>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {(() => {
             const nips = window.loadNipsToday ? window.loadNipsToday() : 0;
@@ -199,10 +199,24 @@ function NutritionToday({ user, onChanged, onSetupTargets }) {
               </SwipeRow>
             );
           })()}
+          {(() => {
+            const bd = window.bigDayEntry && window.bigDayEntry(day);
+            if (!bd) return null;
+            return (
+              <div style={{ padding: '13px 15px', background: C.accentSoft, border: `1px solid ${C.accentDim}`, borderRadius: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 18 }}>🤙</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 15, letterSpacing: 0.8, color: C.text, textTransform: 'uppercase' }}>Big day — written off</div>
+                  <div style={{ fontFamily: 'Outfit, sans-serif', fontSize: 11.5, color: C.textMid, marginTop: 2 }}>~+{window.bigDayOver(bd)} kcal over · logged is what counts. Tomorrow starts clean.</div>
+                </div>
+                <button onClick={() => { window.clearBigDay(day); refresh(); }} style={{ background: 'transparent', border: 0, cursor: 'pointer', padding: 2, fontFamily: 'JetBrains Mono, monospace', fontSize: 8.5, letterSpacing: 1.4, color: C.textLow, flexShrink: 0 }}>UNDO</button>
+              </div>
+            );
+          })()}
           {/* Breakfast / Lunch / Dinner — slot inferred from log time, and the
               10am / 3pm / 8pm reminders fire off whichever section is empty. */}
           {['breakfast', 'lunch', 'dinner'].map((slot) => {
-            const rows = foods.filter((f) => window.mealSlot(f) === slot && f.kind !== 'skipped');
+            const rows = foods.filter((f) => window.mealSlot(f) === slot && f.kind !== 'skipped' && f.kind !== 'bigday');
             const kcal = Math.round(rows.reduce((t, f) => t + (f.kcal || 0) * (window.servingsOf ? window.servingsOf(f) : 1), 0));
             return (
               <div key={slot}>

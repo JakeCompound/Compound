@@ -153,7 +153,11 @@ function CheckinModal({ open, onClose, onComplete, gratitudeLibrary = [], user =
   const seq = (() => {
     const s = ['workout'];
     if (answers.workoutToday === true) s.push('workoutGroups', 'workoutMinutes', 'workoutIntensity');
-    s.push('steps', 'sleep', 'diet');
+    s.push('steps', 'sleep');
+    // A day written off as a Big Day already told the truth about food — no
+    // need to make them tap the 1-star and relive it. Rating auto-set low.
+    const bigDay = (window.foodForDay ? window.foodForDay(ciToday(targetDate)) : []).some((f) => f && f.kind === 'bigday');
+    if (!bigDay) s.push('diet');
     if (alcoholOn(user)) { s.push('afd'); if (answers.afd === false) s.push('nips'); }
     s.push('calm', 'gratitude');
     // Quality-time question is for married members only. Legacy profiles
@@ -172,7 +176,9 @@ function CheckinModal({ open, onClose, onComplete, gratitudeLibrary = [], user =
   const advance = () => {
     if (step >= total - 1) {
       clearCheckinDraft();
-      onComplete && onComplete(answers, targetDate);
+      const bigDay = (window.foodForDay ? window.foodForDay(ciToday(targetDate)) : []).some((f) => f && f.kind === 'bigday');
+      const final = bigDay && !answers.dietRating ? { ...answers, dietRating: 1 } : answers;
+      onComplete && onComplete(final, targetDate);
     } else {
       setStep(step + 1);
     }

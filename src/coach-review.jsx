@@ -59,7 +59,10 @@ function crunch({ weighins, checkins, food, nips, workouts, steps }, days) {
 
   // Food — daily totals (kcal × servings) on the days they logged.
   const byDay = {};
+  // Big Days are counted for the coach conversation only — never the ladder.
+  const bigDays = new Set((food || []).filter((r) => r.kind === 'bigday').map((r) => r.date)).size;
   (food || []).forEach((r) => {
+    if (r.kind === 'skipped') return; // a skip is a record, not a meal
     const servings = r.servings || 1;
     const d = (byDay[r.date] = byDay[r.date] || { kcal: 0, protein: 0, entries: 0 });
     d.kcal += (Number(r.kcal) || 0) * servings;
@@ -68,6 +71,7 @@ function crunch({ weighins, checkins, food, nips, workouts, steps }, days) {
   });
   const foodDays = Object.keys(byDay).sort();
   const foodStats = {
+    bigDays,
     entries: (food || []).length,
     daysLogged: foodDays.length,
     rate: Math.round((foodDays.length / days) * 100),
@@ -286,6 +290,11 @@ export function CoachReviewScreen({ onBack }) {
                     <Stat label="AVG PROTEIN" value={stats.food.avgProtein} unit="g" />
                     <Stat label="DAYS LOGGED" value={`${stats.food.daysLogged} · ${stats.food.rate}%`} />
                   </div>
+                  {stats.food.bigDays > 0 && (
+                    <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, letterSpacing: 1.2, color: C.textLow, marginTop: 8 }}>
+                      {stats.food.bigDays} BIG DAY{stats.food.bigDays === 1 ? '' : 'S'} LOGGED — HONESTY, NOT FAILURE
+                    </div>
+                  )}
                   <Spark series={stats.food.series} />
                 </>
               ) : <Empty what="meals" />}

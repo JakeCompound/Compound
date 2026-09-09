@@ -639,7 +639,7 @@ Object.assign(window, { AddButton, NipQuickAdd, DrinkChooser, SoftDrinkQuickAdd 
 // reminders. Undo lives on the banner in the Nutrition tab.
 function BigDaySheet({ onClose, onChanged }) {
   const SIZES = [
-    { over: 600, title: 'A BIT OVER', sub: 'Bigger dinner, a few extras — roughly +600 kcal' },
+    { over: 750, title: 'A BIT OVER', sub: 'Bigger dinner, a few extras — roughly +750 kcal' },
     { over: 1500, title: 'WELL OVER', sub: 'Takeaway, beers, the lot — roughly +1,500 kcal' },
     { over: 2500, title: 'WRITE-OFF', sub: "Don't ask — roughly +2,500 kcal" },
   ];

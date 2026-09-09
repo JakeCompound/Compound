@@ -300,9 +300,10 @@ function CheckinModal({ open, onClose, onComplete, gratitudeLibrary = [], user =
         return (
           <CIQuestion tag="HEALTH · 5 / 9" title="ALCOHOL-FREE" accent="DAY?">
             {/* Automation: a drinking day with nothing logged is assumed to be
-                ~10 nips (the family baseline) — pre-filled on the next step,
+                a weekday-weighted share of the member's weekly limit (light
+                Monday, heavy weekend) — pre-filled on the next step,
                 adjustable, so the honest answer is one tap not a tally. */}
-            <YesNo value={answers.afd} onChange={(v) => auto(v === false && !answers.nips ? { afd: false, nips: 10 } : { afd: v })} yesLabel="Yes — AFD" noLabel="No — drank" />
+            <YesNo value={answers.afd} onChange={(v) => auto(v === false && !answers.nips ? { afd: false, nips: (window.assumedNips ? window.assumedNips(ciToday(targetDate)) : 10) } : { afd: v })} yesLabel="Yes — AFD" noLabel="No — drank" />
           </CIQuestion>
         );
       case 'nips':
@@ -315,7 +316,7 @@ function CheckinModal({ open, onClose, onComplete, gratitudeLibrary = [], user =
               <Stepper value={answers.nips} onChange={(v) => set({ nips: v })} min={0} max={30} step={1} unit="nips" large />
             </div>
             <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12, color: C.textLow, lineHeight: 1.45, margin: '10px 0 0' }}>
-              Drinking days start at an assumed 10 — bump it up or down if the night was different.
+              No drinks logged, so this starts at a share of your weekly limit — light early in the week, bigger Friday and the weekend. Bump it if the night was different.
             </p>
           </CIQuestion>
         );

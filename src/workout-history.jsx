@@ -30,6 +30,34 @@ function sessionBest1RM(entry) {
 
 // Persist a finished session. Computes volume, muscles worked, and PRs
 // (vs all prior history). Returns { list, prs:[{lift,value}] }.
+// A 20+ minute walk or run counts as a workout — on the ladder's WKT column,
+// weekly counts, streaks and the coach review — via a lightweight entry in the
+// same store, so nothing downstream needs to know cardio is special. aiKcal is
+// 0 because the walk's calories are already earned through the step ledger;
+// without that, dayEarnedKcal's duration-based formula would double-count.
+function recordCardioWorkout({ kind, durationMin }) {
+  const entry = {
+    id: 'w-' + Date.now(),
+    date: window.isoDate(new Date()),
+    ts: Date.now(),
+    durationMin: Math.round(durationMin || 0),
+    location: 'outdoors',
+    feeling: 0,
+    custom: true,
+    cardio: true,
+    name: kind === 'run' ? 'Run' : 'Walk',
+    aiKcal: 0,
+    aiInsights: null,
+    muscles: ['Cardio'],
+    volume: 0,
+    completedSets: 0,
+    exercises: [],
+  };
+  const list = [...loadWorkouts(), entry];
+  saveWorkouts(list);
+  return entry;
+}
+
 function recordWorkout(exercises, config) {
   const prior = loadWorkouts();
   const priorBest = {};
@@ -202,9 +230,9 @@ function sessionsThisWeek(history) {
 }
 
 Object.assign(window, {
-  loadWorkouts, saveWorkouts, recordWorkout, updateWorkout, allTimeBest1RM, lift1RMSeries,
+  loadWorkouts, saveWorkouts, recordWorkout, recordCardioWorkout, updateWorkout, allTimeBest1RM, lift1RMSeries,
   pbWall, lastSetsFor, recoveryHeatmap, volumeSeries, relativeDay, dayAbbrev,
   sessionsThisWeek, sessionBest1RM,
 });
 
-export { WORKOUTS_KEY, allTimeBest1RM, dayAbbrev, lastSetsFor, lift1RMSeries, loadWorkouts, pbWall, recordWorkout, recoveryHeatmap, relativeDay, saveWorkouts, sessionBest1RM, sessionsThisWeek, updateWorkout, volumeSeries };
+export { WORKOUTS_KEY, allTimeBest1RM, dayAbbrev, lastSetsFor, lift1RMSeries, loadWorkouts, pbWall, recordCardioWorkout, recordWorkout, recoveryHeatmap, relativeDay, saveWorkouts, sessionBest1RM, sessionsThisWeek, updateWorkout, volumeSeries };

@@ -823,6 +823,7 @@ function CardioSheet({ user, onClose, onChanged }) {
   const [path, setPath] = React.useState(null); // 'watch' | 'estimate'
   const [watchKcal, setWatchKcal] = React.useState('');
   const [watchSteps, setWatchSteps] = React.useState('');
+  const [watchMins, setWatchMins] = React.useState('');
   const [km, setKm] = React.useState('');
   const [mins, setMins] = React.useState('');
   const [chips, setChips] = React.useState({});
@@ -834,11 +835,16 @@ function CardioSheet({ user, onClose, onChanged }) {
   const canSaveEst = +km > 0 && +mins > 0;
 
   const save = () => {
+    let dur = 0;
     if (path === 'watch' && canSaveWatch) {
-      window.addStepEntry({ kind, steps: Math.round(+watchSteps || 0), kcal: Math.round(+watchKcal), source: 'watch' });
+      dur = Math.round(+watchMins || 0);
+      window.addStepEntry({ kind, steps: Math.round(+watchSteps || 0), kcal: Math.round(+watchKcal), durationMin: dur || undefined, source: 'watch' });
     } else if (path === 'estimate' && canSaveEst) {
-      window.addStepEntry({ kind, steps: est.steps, kcal: est.kcal, distanceKm: +km, durationMin: Math.round(+mins), source: 'estimate' });
+      dur = Math.round(+mins);
+      window.addStepEntry({ kind, steps: est.steps, kcal: est.kcal, distanceKm: +km, durationMin: dur, source: 'estimate' });
     } else return;
+    // 20+ minutes of cardio is a workout — it scores on the ladder and streaks.
+    if (dur >= 20 && window.recordCardioWorkout) window.recordCardioWorkout({ kind, durationMin: dur });
     onChanged && onChanged();
     onClose();
   };
@@ -878,6 +884,11 @@ function CardioSheet({ user, onClose, onChanged }) {
             <div>
               <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: C.textLow, letterSpacing: 1.6, marginBottom: 6 }}>STEPS (OPTIONAL)</div>
               <input type="number" inputMode="numeric" value={watchSteps} onChange={(e) => setWatchSteps(e.target.value)} placeholder="e.g. 5200" style={inputStyle} />
+            </div>
+            <div>
+              <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: C.textLow, letterSpacing: 1.6, marginBottom: 6 }}>TIME (MIN, OPTIONAL)</div>
+              <input type="number" inputMode="numeric" value={watchMins} onChange={(e) => setWatchMins(e.target.value)} placeholder="e.g. 35" style={inputStyle} />
+              <div style={{ fontFamily: 'Outfit, sans-serif', fontSize: 11.5, color: C.textLow, marginTop: 5 }}>20+ minutes counts as a workout on the ladder.</div>
             </div>
           </div>
         ) : (

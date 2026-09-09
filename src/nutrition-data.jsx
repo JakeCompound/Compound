@@ -223,6 +223,42 @@ function markMealSkipped(slot, date) {
   });
   saveFood(all);
 }
+// Big Day — the amnesty valve. One tap writes the day off honestly: a single
+// entry (kind 'bigday') estimated so the day's total reads target + overshoot,
+// instead of a silent empty day. It scores like any logged day, suppresses the
+// rest of the day's meal reminders (the server sees the kind), and the morning
+// card does the week maths from the +over amount encoded in info.
+function bigDayEntry(date) { return foodForDay(date).find((f) => f && f.kind === 'bigday') || null; }
+function bigDayOver(f) { const m = /\+(\d+)/.exec((f && f.info) || ''); return m ? parseInt(m[1], 10) : 0; }
+function markBigDay(over, date) {
+  const k = date || logDate();
+  if (bigDayEntry(k)) return;
+  const t = loadTargets();
+  const target = (t && t.calories) || 2200;
+  const logged = foodForDay(k).reduce((s2, f) => s2 + (f.kcal || 0) * servingsOf(f), 0);
+  const all = loadFood();
+  (all[k] = all[k] || []).push({
+    id: 'bigday-' + k, name: 'Big day', photo: null,
+    kcal: Math.max(0, Math.round(target + over - logged)), p: 0, c: 0, f: 0,
+    confidence: 'low', health: null, info: `Written off — estimated ~+${over} kcal over target`,
+    questions: [], servings: 1, nips: 0, kind: 'bigday', ts: Date.now(),
+  });
+  saveFood(all);
+}
+function clearBigDay(date) {
+  const k = date || logDate();
+  const all = loadFood();
+  all[k] = (all[k] || []).filter((f) => !(f && f.kind === 'bigday'));
+  saveFood(all);
+}
+// 'YYYY-MM-DD' keys for the last n days ending today (local).
+function lastNDayKeys(n) {
+  const out = [];
+  for (let i = 0; i < n; i++) { const d = new Date(Date.now() - i * 86400000); out.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')); }
+  return out;
+}
+function bigDaysInLastWeek() { const all = loadFood(); return lastNDayKeys(7).filter((k) => (all[k] || []).some((f) => f && f.kind === 'bigday')).length; }
+
 function clearMealSkip(slot, date) {
   const k = date || logDate();
   const all = loadFood();
@@ -300,7 +336,7 @@ function recentEntries(opts) {
   days.forEach((day) => {
     (all[day] || []).slice().sort((a, b) => (b.ts || 0) - (a.ts || 0)).forEach((e) => {
       const key = (e.name || '').toLowerCase();
-      if (!key || e.kind === 'skipped' || (o.kind && (e.kind || 'food') !== o.kind)) return;
+      if (!key || e.kind === 'skipped' || e.kind === 'bigday' || (o.kind && (e.kind || 'food') !== o.kind)) return;
       if (seen[key]) { seen[key].count += servingsOf(e); return; }
       seen[key] = { name: e.name, photo: e.photo || null, kcal: e.kcal || 0, p: e.p || 0, c: e.c || 0, f: e.f || 0,
         health: e.health || 'neutral', info: e.info || '', kind: e.kind || 'food', day, count: servingsOf(e) };
@@ -454,7 +490,7 @@ function setNipsToday(n, date) {
 
 Object.assign(window, {
   GOALS, CUT_RATES, GAIN_RATES, LIFESTYLES, calcTargets,
-  loadTargets, saveTargets, loadFood, saveFood, foodForDay, mealSlot, MEAL_SLOTS, isMealSkipped, markMealSkipped, clearMealSkip, addFood, updateFood, removeFood,
+  loadTargets, saveTargets, loadFood, saveFood, foodForDay, mealSlot, MEAL_SLOTS, isMealSkipped, markMealSkipped, clearMealSkip, bigDayEntry, bigDayOver, markBigDay, clearBigDay, bigDaysInLastWeek, addFood, updateFood, removeFood,
   dayTotals, openMealQuestions, todayKey: todayKey,
   loadNipsToday, setNipsToday,
   loadAlcoholKcal, setAlcoholKcal, addAlcoholKcal,
@@ -465,4 +501,4 @@ Object.assign(window, {
   loadSoftPresets, saveSoftPresets, pinSoftPreset, unpinSoftPreset, DEFAULT_SOFT_PRESETS,
 });
 
-export { ALC_KCAL_KEY, MEAL_SLOTS, mealSlot, isMealSkipped, markMealSkipped, clearMealSkip, CUT_RATES, DEFAULT_MINUTES, DEFAULT_SESSIONS, DEFAULT_SOFT_PRESETS, DEFAULT_STEPS, FOOD_KEY, GAIN_RATES, GOALS, KCAL_PER_LB, LB_PER_KG, LIFESTYLES, LIFTING_MET, MAINTENANCE_MULT, NIPS_KEY, SOFT_KEY, STEPLOG_KEY, STEPS_KCAL_FACTOR, TARGETS_KEY, addAlcoholKcal, addFood, addServing, addStepEntry, calcTargets, dayEarnedKcal, dayStepTotal, dayTotals, estimateCardioKcal, foodForDay, isLogToday, loadAlcoholKcal, loadFood, loadNipsToday, loadSoftPresets, loadStepLog, loadTargets, logDate, openMealQuestions, pinSoftPreset, prettyDay, quickLogFood, recentEntries, removeFood, removeServing, removeStepEntry, saveFood, saveSoftPresets, saveTargets, servingsOf, setAlcoholKcal, setLogDate, setNipsToday, setServings, shiftDay, stepEntriesForDay, todayKey, unpinSoftPreset, updateFood };
+export { ALC_KCAL_KEY, MEAL_SLOTS, mealSlot, isMealSkipped, markMealSkipped, clearMealSkip, bigDayEntry, bigDayOver, markBigDay, clearBigDay, bigDaysInLastWeek, CUT_RATES, DEFAULT_MINUTES, DEFAULT_SESSIONS, DEFAULT_SOFT_PRESETS, DEFAULT_STEPS, FOOD_KEY, GAIN_RATES, GOALS, KCAL_PER_LB, LB_PER_KG, LIFESTYLES, LIFTING_MET, MAINTENANCE_MULT, NIPS_KEY, SOFT_KEY, STEPLOG_KEY, STEPS_KCAL_FACTOR, TARGETS_KEY, addAlcoholKcal, addFood, addServing, addStepEntry, calcTargets, dayEarnedKcal, dayStepTotal, dayTotals, estimateCardioKcal, foodForDay, isLogToday, loadAlcoholKcal, loadFood, loadNipsToday, loadSoftPresets, loadStepLog, loadTargets, logDate, openMealQuestions, pinSoftPreset, prettyDay, quickLogFood, recentEntries, removeFood, removeServing, removeStepEntry, saveFood, saveSoftPresets, saveTargets, servingsOf, setAlcoholKcal, setLogDate, setNipsToday, setServings, shiftDay, stepEntriesForDay, todayKey, unpinSoftPreset, updateFood };

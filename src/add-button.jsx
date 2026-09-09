@@ -45,6 +45,9 @@ function AddButton({ dietTracking, alcohol = true, onChanged, onGoNutrition }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <AddRow label="Drink" sub={alcohol ? 'Coffee, juice, energy — or a beer' : 'Coffee, juice, energy, soft drink'} glyph={alcohol ? '🥤' : '☕'} onClick={() => { setMenu(false); setSheet('drink'); }} />
               {dietTracking && <AddRow label="Food" sub="Photo or describe — AI does the macros" glyph="🍽️" onClick={() => { setMenu(false); setSheet('food'); }} />}
+              {dietTracking && !(window.bigDayEntry && window.bigDayEntry()) && (
+                <AddRow label="Big day" sub="Went big — write the day off in one tap, no itemising" glyph="🤙" onClick={() => { setMenu(false); setSheet('bigday'); }} />
+              )}
             </div>
           </div>
         </div>
@@ -52,6 +55,7 @@ function AddButton({ dietTracking, alcohol = true, onChanged, onGoNutrition }) {
 
       {sheet === 'drink' && <DrinkChooser onClose={() => setSheet(null)} onChanged={onChanged} />}
       {sheet === 'food' && <FoodAdd autoFocus={focusFood} onClose={() => { setSheet(null); setFocusFood(false); }} onChanged={onChanged} onGoNutrition={onGoNutrition} />}
+      {sheet === 'bigday' && <BigDaySheet onClose={() => setSheet(null)} onChanged={onChanged} />}
     </>
   );
 }
@@ -628,4 +632,41 @@ Rules: protein/carbs/fat in grams. BRANDED / PACKAGED PRODUCTS — if the meal n
 
 Object.assign(window, { AddButton, NipQuickAdd, DrinkChooser, SoftDrinkQuickAdd });
 
-export { AddButton, AddRow, DrinkChooser, FoodAdd, NipQuickAdd, PourChip, SoftDrinkQuickAdd, stepBtn };
+// Big Day — one honest tap instead of itemising a blowout at 11pm. Three
+// rough sizes; the entry makes the day's total read target + overshoot. The
+// habit being scored is telling the truth, so this counts as a logged day
+// everywhere (streaks, ladder, coach review) and holds the remaining meal
+// reminders. Undo lives on the banner in the Nutrition tab.
+function BigDaySheet({ onClose, onChanged }) {
+  const SIZES = [
+    { over: 600, title: 'A BIT OVER', sub: 'Bigger dinner, a few extras — roughly +600 kcal' },
+    { over: 1500, title: 'WELL OVER', sub: 'Takeaway, beers, the lot — roughly +1,500 kcal' },
+    { over: 2500, title: 'WRITE-OFF', sub: "Don't ask — roughly +2,500 kcal" },
+  ];
+  const pick = (over) => {
+    window.markBigDay(over);
+    onChanged && onChanged();
+    onClose();
+  };
+  return (
+    <div onClick={onClose} style={{ position: 'absolute', inset: 0, zIndex: 220, background: 'rgba(0,0,0,.6)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'flex-end' }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', background: C.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: '20px 22px 28px' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 3, borderRadius: 2, background: C.ink(.18) }} /></div>
+        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.accent, letterSpacing: 2.4, marginBottom: 6 }}>BIG DAY</div>
+        <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 13, color: C.textMid, lineHeight: 1.5, margin: '0 0 14px' }}>
+          It happened. Logging it honestly beats a blank day — this still counts as showing up, and tomorrow starts clean. How big are we talking?
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {SIZES.map((sz) => (
+            <button key={sz.over} onClick={() => pick(sz.over)} style={{ width: '100%', textAlign: 'left', padding: '14px 16px', background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 12, cursor: 'pointer' }}>
+              <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 17, letterSpacing: 0.8, color: C.text }}>{sz.title}</div>
+              <div style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12, color: C.textMid, marginTop: 2 }}>{sz.sub}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export { AddButton, AddRow, BigDaySheet, DrinkChooser, FoodAdd, NipQuickAdd, PourChip, SoftDrinkQuickAdd, stepBtn };

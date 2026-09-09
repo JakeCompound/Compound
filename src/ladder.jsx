@@ -86,6 +86,9 @@ function LadderCard() {
       <div style={{ ...mono, fontSize: 8.5, letterSpacing: 1.4, color: C.textLow, marginTop: 8, textAlign: 'center' }}>
         PTS = CHECK-INS + WORKOUTS + AFDS · RESETS ON THE 1ST
       </div>
+      <div style={{ ...mono, fontSize: 8.5, letterSpacing: 1.4, color: C.textLow, marginTop: 4, textAlign: 'center' }}>
+        POINTS COME FROM SHOWING UP — A LOGGED BIG DAY STILL SCORES
+      </div>
     </div>
   );
 }

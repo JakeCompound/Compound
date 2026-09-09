@@ -10,6 +10,7 @@ import { alcoholOn } from './alcohol.js';
 import { useBackClose } from './back-button.js';
 import { ReminderNudge } from './push-nudge.jsx';
 import { LadderCard } from './ladder.jsx';
+import { AdaptCard, MorningResetCard } from './bigday.jsx';
 
 // home-screen.jsx — The Home tab — assembles all the components
 
@@ -109,6 +110,8 @@ function HomeScreen({ user, set, state, checkins, onOpenCheckin, onOpenCheckinFo
       {/* Notifications never granted → the reminder times set in onboarding
           silently do nothing. Nudge until fixed (dismiss snoozes 7 days). */}
       <ReminderNudge variant="home" checkInTime={user.checkInTime} />
+      <MorningResetCard />
+      <AdaptCard onRecalc={onRecalc} />
 
       {/* Birthday takeover (above everything) */}
       {demoFlags?.birthday && (

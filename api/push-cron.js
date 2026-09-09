@@ -110,6 +110,17 @@ function comebackMsg(gap) {
 // lunch, after = dinner. No reminders for members gone cold 3+ days — the
 // rewarming sequence owns them; three meal nags a day would bury it.
 const MEAL_TIME = { breakfast: '10:00', lunch: '15:00', dinner: '20:00' };
+// Morning reset — 8am the day after a logged Big Day. Flat tone: the week
+// maths while it's a one-off; on a frequent week the maths reads as spin, so
+// it becomes "one anchor day". Never a verdict, never fires twice for one day.
+const RESET_TIME = '08:00';
+function resetMsg(over, freq) {
+  const perDay = Math.max(10, Math.round(over / 7 / 10) * 10);
+  const body = freq >= 3
+    ? "Yesterday's logged and closed. The week just needs one anchor day — normal meals, a walk. Today's a good one."
+    : `Yesterday's done — about +${over} kcal. Across the week that's ~${perDay} a day. One normal day puts you back on trend.`;
+  return { title: 'COMPOUND', body, tag: 'reset', url: '/' };
+}
 // Meal payloads carry action buttons (Android shows them; iOS shows a plain
 // notification whose tap opens the app): "Log it" deep-links into the food
 // sheet ready to type, "Skipped it" records the skip without opening the app.
@@ -184,17 +195,37 @@ function eventKinds(prof, now, ud, ignoreTime, tz) {
     if (due) out.push({ kind: 'comeback', msg: comebackMsg(gap) });
   }
 
-  // Meal-slot reminders — only for active members with food tracking on.
+  // Normalize food rows: strings (older samples) or {ts, kind, info} objects.
+  const foodLocal = ((ud && ud.foodTs) || []).map((t) => {
+    const e = typeof t === 'string' ? { ts: t, kind: 'food', info: '' } : t;
+    return { ...localHourDate(e.ts, tz), kind: e.kind || 'food', info: e.info || '' };
+  });
+
+  // Meal-slot reminders — only for active members with food tracking on, and
+  // never on a day already written off as a Big Day.
   if (on('meals') && onb.dietTracking) {
-    const foodLocal = ((ud && ud.foodTs) || []).map((t) => localHourDate(t, tz));
     const recentFood = foodLocal.some((f) => daysBetween(f.date, now.date) <= 2);
     const cold = (lastCi ? gap >= 3 : true) && !recentFood;
-    if (!cold) {
+    const bigDayToday = foodLocal.some((f) => f.date === now.date && f.kind === 'bigday');
+    if (!cold && !bigDayToday) {
       const todaysHours = foodLocal.filter((f) => f.date === now.date).map((f) => f.hour);
       for (const slot of ['breakfast', 'lunch', 'dinner']) {
         if (!(ignoreTime || now.hhmm === MEAL_TIME[slot])) continue;
         if (!todaysHours.some((h) => slotForHour(h) === slot)) out.push({ kind: `meal-${slot}`, msg: MEAL_MSG[slot] });
       }
+    }
+  }
+
+  // Morning reset — the day after a Big Day.
+  if (on('reset') && (ignoreTime || now.hhmm === RESET_TIME)) {
+    const yesterday = isoFromUTC(dnum(now.date) - 86400000);
+    const bd = foodLocal.find((f) => f.date === yesterday && f.kind === 'bigday');
+    if (bd) {
+      const m = /\+(\d+)/.exec(bd.info || '');
+      const over = m ? parseInt(m[1], 10) : 1000;
+      const weekAgo = isoFromUTC(dnum(now.date) - 7 * 86400000);
+      const freq = new Set(foodLocal.filter((f) => f.kind === 'bigday' && f.date > weekAgo && f.date <= now.date).map((f) => f.date)).size;
+      out.push({ kind: 'reset', msg: resetMsg(over, freq) });
     }
   }
   if (on('urgency') && at('urgency')) {
@@ -257,8 +288,8 @@ export default async function handler(req, res) {
     (wwRows || []).forEach((r) => { ensure(r.user_id).weekOverride[r.week_start] = r.data; });
     // Recent food entries feed the meal-slot reminders (a 4-day window covers
     // "today" in any timezone plus the 3-day activity gate).
-    const { data: fRows } = await supa.from('food_entries').select('user_id,ts').gte('ts', new Date(Date.now() - 4 * 86400000).toISOString());
-    (fRows || []).forEach((r) => ensure(r.user_id).foodTs.push(r.ts));
+    const { data: fRows } = await supa.from('food_entries').select('user_id,ts,kind,info').gte('ts', new Date(Date.now() - 8 * 86400000).toISOString());
+    (fRows || []).forEach((r) => ensure(r.user_id).foodTs.push({ ts: r.ts, kind: r.kind || 'food', info: r.info || '' }));
   }
 
   if (isDry) {

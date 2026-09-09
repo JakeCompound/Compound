@@ -281,7 +281,11 @@ function App() {
       // a catch-up entry belongs to whichever past night it targets. Either
       // way, only sync live nips/steps when the entry is genuinely for today —
       // never overwrite today's real tallies with an old night's numbers.
-      if (isToday && window.setNipsToday) window.setNipsToday(answers.afd ? 0 : (answers.nips || 0));
+      // The check-in's alcohol answer is the source of truth for that night's
+      // tally — written against the TARGET date, so a catch-up night updates
+      // its own day and the weekly nips ring stays honest without any drink
+      // ever being logged individually.
+      if (window.setNipsToday) window.setNipsToday(answers.afd ? 0 : (answers.nips || 0), targetKey);
       // If the user raised the steps number at check-in, top the ledger up so
       // the rings + earned kcal agree with what they reported.
       try {

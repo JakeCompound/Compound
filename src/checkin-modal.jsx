@@ -299,7 +299,10 @@ function CheckinModal({ open, onClose, onComplete, gratitudeLibrary = [], user =
       case 'afd':
         return (
           <CIQuestion tag="HEALTH · 5 / 9" title="ALCOHOL-FREE" accent="DAY?">
-            <YesNo value={answers.afd} onChange={(v) => auto({ afd: v })} yesLabel="Yes — AFD" noLabel="No — drank" />
+            {/* Automation: a drinking day with nothing logged is assumed to be
+                ~10 nips (the family baseline) — pre-filled on the next step,
+                adjustable, so the honest answer is one tap not a tally. */}
+            <YesNo value={answers.afd} onChange={(v) => auto(v === false && !answers.nips ? { afd: false, nips: 10 } : { afd: v })} yesLabel="Yes — AFD" noLabel="No — drank" />
           </CIQuestion>
         );
       case 'nips':
@@ -311,6 +314,9 @@ function CheckinModal({ open, onClose, onComplete, gratitudeLibrary = [], user =
             <div style={{ marginTop: 12 }}>
               <Stepper value={answers.nips} onChange={(v) => set({ nips: v })} min={0} max={30} step={1} unit="nips" large />
             </div>
+            <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12, color: C.textLow, lineHeight: 1.45, margin: '10px 0 0' }}>
+              Drinking days start at an assumed 10 — bump it up or down if the night was different.
+            </p>
           </CIQuestion>
         );
       case 'calm':

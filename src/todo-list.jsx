@@ -210,10 +210,12 @@ function TodayTodos({ user, set, state, history, weighins, onOpenCheckin, onCatc
       time: user.weighInTime || '06:30',
       done: !!weighDoneToday,
       editable: true,
-      // No countdown, no red "missed" state, no "why did you miss it" nag —
-      // a long-term habit like this shouldn't feel like a deadline.
+      // No ticking countdown — but the morning number has a hard cutoff
+      // (8am weekdays, 11am weekends): past it the row simply reads MISSED.
+      // No reason asked, no drama; a late entry is still allowed (done wins).
       timerless: true,
-      dueLabel: weighWeekday != null ? `DUE ${DAY_LABELS[weighWeekday]}` : 'DUE',
+      missAt: [0, 6].includes(new Date().getDay()) ? '11:00' : '08:00',
+      dueLabel: `BY ${[0, 6].includes(new Date().getDay()) ? '11AM' : '8AM'}`,
       onDo: onWeighIn,
       glyph: (
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -413,6 +415,8 @@ function TodoRow({ todo, now, dateKey, onReasonSaved }) {
   const overdue = late && !todo.softDeadline && !todo.timerless; // soft deadline / timerless never turn red
   const missedMs = -diff;
   const missed = overdue && missedMs > MISS_GRACE_MS;
+  // Hard-cutoff timerless rows (weigh-in): calm until the cutoff, MISSED after.
+  const hardMissed = !todo.done && todo.timerless && todo.missAt && now >= dueToday(todo.missAt).getTime();
 
   const [reason, setReason] = React.useState(() => getTodoReason(dateKey, todo.id));
   const [askReason, setAskReason] = React.useState(false);
@@ -434,11 +438,18 @@ function TodoRow({ todo, now, dateKey, onReasonSaved }) {
     timerText = '✓';
     timerColor = C.success;
   } else if (todo.timerless) {
-    // Calm, non-urgent presence — no ticking clock, never turns red.
-    accent = C.accent;
-    statusText = todo.dueLabel || 'DUE';
-    timerText = '·';
-    timerColor = C.textMid;
+    if (hardMissed) {
+      accent = C.danger;
+      statusText = 'MISSED';
+      timerText = '·';
+      timerColor = C.danger;
+    } else {
+      // Calm, non-urgent presence — no ticking clock before the cutoff.
+      accent = C.accent;
+      statusText = todo.dueLabel || 'DUE';
+      timerText = '·';
+      timerColor = C.textMid;
+    }
   } else if (!late) {
     accent = C.accent;
     statusText = `DUE ${todo.time}`;
@@ -457,8 +468,8 @@ function TodoRow({ todo, now, dateKey, onReasonSaved }) {
     timerColor = C.danger;
   }
 
-  const borderCol = todo.done ? C.accentDim : overdue ? 'rgba(229,86,75,.4)' : C.line;
-  const bg = todo.done ? C.surf1 : overdue ? 'rgba(229,86,75,.06)' : C.surf2;
+  const borderCol = todo.done ? C.accentDim : (overdue || hardMissed) ? 'rgba(229,86,75,.4)' : C.line;
+  const bg = todo.done ? C.surf1 : (overdue || hardMissed) ? 'rgba(229,86,75,.06)' : C.surf2;
 
   return (
     <div

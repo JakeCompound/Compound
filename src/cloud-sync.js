@@ -201,6 +201,15 @@ const DOMAINS = [
     },
   },
   {
+    name: 'week_three', keys: ['compound:weekThree'],
+    async push() { const o = J('compound:weekThree') || {}; await replaceRows('week_threes', Object.entries(o).map(([week_start, d]) => ({ user_id: uid, week_start, data: d }))); },
+    async pull() {
+      const { data, error } = await supabase.from('week_threes').select('*').eq('user_id', uid);
+      if (error) throw error; // missing table must not wipe the local copy
+      const o = {}; (data || []).forEach((r) => { o[r.week_start] = r.data; }); setJSON('compound:weekThree', o);
+    },
+  },
+  {
     name: 'todo_state', keys: ['compound:todostate'],
     async push() { const o = J('compound:todostate') || {}; await replaceRows('todo_state', Object.entries(o).map(([date, d]) => ({ user_id: uid, date, data: d }))); },
     async pull() { const { data } = await supabase.from('todo_state').select('*').eq('user_id', uid); const o = {}; (data || []).forEach((r) => { o[r.date] = r.data; }); setJSON('compound:todostate', o); },
@@ -301,7 +310,7 @@ export async function clearAllCloudData(userId) {
   const userKeyed = [
     'weighins', 'checkins', 'workouts', 'saved_workouts', 'workout_week',
     'food_entries', 'nip_days', 'measurements', 'todo_state', 'nutrition_messages',
-    'push_subscriptions',
+    'week_threes', 'push_subscriptions',
   ];
   for (const t of userKeyed) {
     const { error } = await supabase.from(t).delete().eq('user_id', userId);

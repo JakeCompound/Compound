@@ -133,6 +133,21 @@ const MEAL_MSG = {
   lunch: { title: 'COMPOUND', body: 'No lunch on the log yet. Get it in while you still remember it.', tag: 'meal', url: '/', slot: 'lunch', actions: MEAL_ACTIONS },
   dinner: { title: 'COMPOUND', body: "Dinner's not logged. Close out the day's food.", tag: 'meal', url: '/', slot: 'dinner', actions: MEAL_ACTIONS },
 };
+// The week's three — Sunday 7pm, prompt to set this week's commitments. Only
+// for members who've ever used the card (any saved week), and only while this
+// week's three are unset. Last week's tally rides along when there is one.
+const THREE_TIME = '19:00';
+function threeMsg(prev) {
+  let body = "New week. Write down your three — two minutes, done by Sunday.";
+  if (prev) {
+    const dc = (a) => (a || []).filter((i) => i && i.done).length;
+    const you = `You ${dc(prev.mine)}/${(prev.mine || []).length}`;
+    const them = (prev.theirs || []).length ? ` · ${prev.partner || 'Partner'} ${dc(prev.theirs)}/${prev.theirs.length}` : '';
+    body = `Last week: ${you}${them}. Set this week's three.`;
+  }
+  return { title: 'COMPOUND', body, tag: 'three', url: '/' };
+}
+
 function slotForHour(h) { return h < 11 ? 'breakfast' : h < 16 ? 'lunch' : 'dinner'; }
 // Local hour + date of a timestamp in the subscriber's timezone.
 function localHourDate(ts, tz) {
@@ -228,6 +243,15 @@ function eventKinds(prof, now, ud, ignoreTime, tz) {
       out.push({ kind: 'reset', msg: resetMsg(over, freq) });
     }
   }
+  // The week's three — the app's weeks run Sun → Sat, so Sunday evening is
+  // both last week's verdict and this week's blank page.
+  if (on('three') && now.dow === 0 && (ignoreTime || now.hhmm === THREE_TIME)) {
+    const weeks = (ud && ud.threeWeeks) || {};
+    if (Object.keys(weeks).length) {
+      const wkStart = isoFromUTC(dnum(now.date) - now.dow * 86400000);
+      if (!weeks[wkStart]) out.push({ kind: 'three', msg: threeMsg(weeks[isoFromUTC(dnum(wkStart) - 7 * 86400000)]) });
+    }
+  }
   if (on('urgency') && at('urgency')) {
     const days = effectiveWorkoutDays(onb, ud, now);
     const target = days.length ? days.length : (onb.trainingDays || 3);
@@ -254,7 +278,7 @@ export default async function handler(req, res) {
   if (req.body && req.body.eventsDryRun === true && req.body.sample) {
     const s = req.body.sample;
     const prof = { onboarding: s.onboarding || {}, notif_prefs: s.notif_prefs || {} };
-    const ud = { checkins: new Set(s.checkins || []), workouts: new Set(s.workouts || []), foodTs: s.foodTs || [] };
+    const ud = { checkins: new Set(s.checkins || []), workouts: new Set(s.workouts || []), foodTs: s.foodTs || [], threeWeeks: s.threeWeeks || {} };
     const now = s.now || localNow(s.timezone);
     return res.status(200).json({ dryRun: true, sample: true, now, events: eventKinds(prof, now, ud, true, s.timezone).map((e) => e.kind) });
   }
@@ -279,7 +303,7 @@ export default async function handler(req, res) {
     (profs || []).forEach((p) => { profMap[p.id] = p; });
     // Event reminders need the user's check-in + workout dates, plus any
     // in-week postpone/cancel override so a handled day doesn't get nagged.
-    const ensure = (u) => (udByUser[u] = udByUser[u] || { checkins: new Set(), workouts: new Set(), weekOverride: {}, foodTs: [] });
+    const ensure = (u) => (udByUser[u] = udByUser[u] || { checkins: new Set(), workouts: new Set(), weekOverride: {}, foodTs: [], threeWeeks: {} });
     const { data: cRows } = await supa.from('checkins').select('user_id,date');
     const { data: wRows } = await supa.from('workouts').select('user_id,date');
     const { data: wwRows } = await supa.from('workout_week').select('user_id,week_start,data');
@@ -290,6 +314,10 @@ export default async function handler(req, res) {
     // "today" in any timezone plus the 3-day activity gate).
     const { data: fRows } = await supa.from('food_entries').select('user_id,ts,kind,info').gte('ts', new Date(Date.now() - 8 * 86400000).toISOString());
     (fRows || []).forEach((r) => ensure(r.user_id).foodTs.push({ ts: r.ts, kind: r.kind || 'food', info: r.info || '' }));
+    // The week's three — recent weeks only (the Sunday prompt needs this week
+    // + last week; a missing table just means nobody gets the prompt).
+    const { data: twRows } = await supa.from('week_threes').select('user_id,week_start,data').gte('week_start', new Date(Date.now() - 21 * 86400000).toISOString().slice(0, 10));
+    (twRows || []).forEach((r) => { ensure(r.user_id).threeWeeks[r.week_start] = r.data; });
   }
 
   if (isDry) {
@@ -297,7 +325,7 @@ export default async function handler(req, res) {
     if (req.body.sample) {
       const s = req.body.sample;
       const prof = { onboarding: s.onboarding || {}, notif_prefs: s.notif_prefs || {} };
-      const ud = { checkins: new Set(s.checkins || []), workouts: new Set(s.workouts || []), foodTs: s.foodTs || [] };
+      const ud = { checkins: new Set(s.checkins || []), workouts: new Set(s.workouts || []), foodTs: s.foodTs || [], threeWeeks: s.threeWeeks || {} };
       const now = s.now || localNow(s.timezone);
       return res.status(200).json({ dryRun: true, sample: true, now, events: eventKinds(prof, now, ud, true, s.timezone).map((e) => e.kind) });
     }

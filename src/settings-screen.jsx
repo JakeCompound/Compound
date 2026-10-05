@@ -860,6 +860,7 @@ function SettingsNotifications({ onBack }) {
     comeback:   { label: 'Rewarming nudges',       hint: 'Day 3, day 7, then every few days until you\u2019re back' },
     meals:      { label: 'Meal logging nudges',    hint: '10am / 3pm / 8pm \u2014 only if that meal isn\u2019t logged' },
     reset:      { label: 'Morning reset',          hint: '8am after a big day — the maths, no judgement' },
+    three:      { label: 'The week’s three',       hint: 'Sunday 7pm — set the week’s commitments (once you’ve used it)' },
     report:     { label: 'Monthly report ready',   hint: 'First of every month' },
     deload:     { label: 'Deload recommendation',  hint: 'Every 4 weeks' },
   };

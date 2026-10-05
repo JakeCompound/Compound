@@ -225,3 +225,24 @@ create policy coach_read on todo_state   for select using (is_coach());
 -- create or replace function monthly_ladder() ... see migration
 -- 'monthly_ladder_function' in Supabase; returns (user_id, name, checkins,
 -- workouts, afds, tracks_alcohol) for the current Sydney month.
+
+-- ============================================================================
+-- THE WEEK'S THREE (added Oct 2026) — private weekly commitments
+-- ============================================================================
+-- Replaces: compound:weekThree  (keyed by Sunday week start, like workout_week)
+-- data = { partner: 'Brooke', mine: [{t, done}...], theirs: [{t, done}...] }
+-- The partner has no account — their three live inside the user's own row.
+-- Own-rows RLS only; deliberately NO coach_read policy (stays between the
+-- user and their partner) and never feeds the family ladder.
+create table if not exists week_threes (
+  user_id    uuid not null references auth.users(id) on delete cascade,
+  week_start date not null,
+  data       jsonb not null,
+  updated_at timestamptz not null default now(),
+  primary key (user_id, week_start)
+);
+alter table week_threes enable row level security;
+create policy "own_rows" on week_threes
+  for all to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);

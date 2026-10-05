@@ -10,6 +10,7 @@ import { alcoholOn } from './alcohol.js';
 import { useBackClose } from './back-button.js';
 import { ReminderNudge } from './push-nudge.jsx';
 import { LadderCard } from './ladder.jsx';
+import { WeekThreeCard } from './week-three.jsx';
 import { AdaptCard, MorningResetCard } from './bigday.jsx';
 
 // home-screen.jsx — The Home tab — assembles all the components
@@ -180,6 +181,10 @@ function HomeScreen({ user, set, state, checkins, onOpenCheckin, onOpenCheckinFo
         <WeekStrip days={state.weekDays} />
         <WeekLegend />
       </div>
+
+      {/* The week's three — private commitments (yours + optionally a partner's,
+          entered on this phone). Never shared with the family or the ladder. */}
+      <WeekThreeCard />
 
       {/* Family accountability ladder — month-to-date, everyone visible to everyone */}
       <LadderCard />

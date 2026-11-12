@@ -246,3 +246,21 @@ create policy "own_rows" on week_threes
   for all to authenticated
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
+
+-- ============================================================================
+-- WORKOUT DRAFTS (added Nov 2026) — live-session persistence
+-- ============================================================================
+-- Replaces: compound:activeWorkout (the in-progress guided session: config,
+-- exercises with every logged set, currentIdx, startedAt). One row per user,
+-- replaced on every change, deleted when the workout finishes or is discarded
+-- (the client writes 'null' to the key, which pushes an empty row set).
+create table if not exists workout_drafts (
+  user_id    uuid primary key references auth.users(id) on delete cascade,
+  data       jsonb not null,
+  updated_at timestamptz not null default now()
+);
+alter table workout_drafts enable row level security;
+create policy "own_rows" on workout_drafts
+  for all to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);

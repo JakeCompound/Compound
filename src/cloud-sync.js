@@ -201,6 +201,21 @@ const DOMAINS = [
     },
   },
   {
+    // In-progress workout draft — one row, replaced on every change, deleted
+    // when the draft is cleared (the app writes 'null' to the key for that).
+    name: 'workout_draft', keys: ['compound:activeWorkout'],
+    async push() {
+      const d = J('compound:activeWorkout');
+      const live = d && Array.isArray(d.exercises) && d.exercises.length;
+      await replaceRows('workout_drafts', live ? [{ user_id: uid, data: d, updated_at: new Date().toISOString() }] : []);
+    },
+    async pull() {
+      const { data, error } = await supabase.from('workout_drafts').select('*').eq('user_id', uid).maybeSingle();
+      if (error) throw error; // missing table must not wipe a local draft
+      setJSON('compound:activeWorkout', data ? data.data : null);
+    },
+  },
+  {
     name: 'week_three', keys: ['compound:weekThree'],
     async push() { const o = J('compound:weekThree') || {}; await replaceRows('week_threes', Object.entries(o).map(([week_start, d]) => ({ user_id: uid, week_start, data: d }))); },
     async pull() {
@@ -310,7 +325,7 @@ export async function clearAllCloudData(userId) {
   const userKeyed = [
     'weighins', 'checkins', 'workouts', 'saved_workouts', 'workout_week',
     'food_entries', 'nip_days', 'measurements', 'todo_state', 'nutrition_messages',
-    'week_threes', 'push_subscriptions',
+    'week_threes', 'workout_drafts', 'push_subscriptions',
   ];
   for (const t of userKeyed) {
     const { error } = await supabase.from(t).delete().eq('user_id', userId);

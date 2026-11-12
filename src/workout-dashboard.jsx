@@ -222,16 +222,16 @@ function Trend1RM({ data }) {
 
 // ── Volume chart (per-session bars) ─────────────────────────────────────
 function VolumeChart({ sessions }) {
-  const max = Math.max(...sessions.map((s) => s.volume));
+  const max = Math.max(1, ...sessions.map((s) => Number(s.volume) || 0));
   return (
     <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', height: 110, gap: 6 }}>
       {sessions.map((s) => {
-        const height = Math.max(8, (s.volume / max) * 100);
+        const height = Math.max(8, ((Number(s.volume) || 0) / max) * 100);
         const isPR = s.prs && s.prs.length > 0;
         return (
           <div key={s.id} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
             <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: isPR ? C.accent : C.textLow, fontWeight: 500 }}>
-              {Math.round(s.volume / 100) / 10}k
+              {Math.round((Number(s.volume) || 0) / 100) / 10}k
             </span>
             <div
               style={{
@@ -439,8 +439,8 @@ function PastWorkouts({ onBack }) {
                   day: window.dayAbbrev(s.date),
                   date: window.relativeDay(s.date),
                   groups: s.muscles && s.muscles.length ? s.muscles.slice(0, 2) : ['SESSION'],
-                  duration: s.durationMin,
-                  exercises: s.exercises.length,
+                  duration: s.durationMin, // may be null on manual rows
+                  exercises: (s.exercises || []).length,
                   volume: s.volume,
                   feeling: s.feeling,
                   prs: s.prs || [],
@@ -486,11 +486,11 @@ function HistoryRow({ session }) {
           )}
         </div>
         <div style={{ display: 'flex', gap: 10, marginTop: 4, fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.textLow, letterSpacing: 1 }}>
-          <span>{session.duration}M</span>
+          <span>{session.duration != null ? `${session.duration}M` : '\u2013'}</span>
           <span>·</span>
           <span>{session.exercises} EX</span>
           <span>·</span>
-          <span>{(session.volume / 1000).toFixed(1)}T VOL</span>
+          <span>{session.volume != null ? `${(session.volume / 1000).toFixed(1)}T VOL` : '\u2013 VOL'}</span>
         </div>
       </div>
       <div style={{ display: 'flex', gap: 1, flexShrink: 0 }}>

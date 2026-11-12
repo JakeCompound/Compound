@@ -12,12 +12,14 @@ function saveWorkouts(list) {
 }
 
 // Best estimated 1RM achieved within a single session, per tracked lift.
+// Null-safe: manual or partial rows (null reps/weights, missing exercises)
+// simply contribute nothing.
 function sessionBest1RM(entry) {
   const out = {};
-  entry.exercises.forEach((ex) => {
+  (entry.exercises || []).forEach((ex) => {
     if (!ex.tracked1RM) return;
     let best = 0;
-    ex.sets.forEach((s) => {
+    (ex.sets || []).forEach((s) => {
       if (s.complete && !s.isWarmup && s.weight && s.reps) {
         const e1 = window.calc1RM(s.weight, s.reps, s.rir || 0);
         if (e1 > best) best = e1;
@@ -70,10 +72,12 @@ function recordWorkout(exercises, config) {
     sum + ex.sets.filter((s) => s.complete && !s.isWarmup && s.weight && s.reps)
       .reduce((s2, s) => s2 + s.weight * s.reps, 0), 0);
 
-  // Muscles worked — union of exercise groups (via library lookup)
+  // Muscles worked — union of exercise groups (via library lookup, including
+  // custom exercises; unknown exIds fall back to the entry's own groups)
   const muscles = new Set();
   exercises.forEach((ex) => {
-    const lib = (window.EXERCISES || []).find((e) => e.id === ex.exId);
+    const all = window.allExercises ? window.allExercises() : (window.EXERCISES || []);
+    const lib = all.find((e) => e.id === ex.exId);
     (lib ? lib.groups : ex.groups || []).forEach((g) => muscles.add(g));
   });
 
@@ -169,12 +173,13 @@ function pbWall(history) {
   return rows.sort((a, b) => b.weight - a.weight);
 }
 
-// Most recent prior session's working sets for an exercise.
+// Most recent prior session's working sets for an exercise. Null-safe against
+// manual rows (missing exercises array, null weight/reps).
 function lastSetsFor(history, exId) {
   for (let i = history.length - 1; i >= 0; i--) {
-    const ex = history[i].exercises.find((e) => e.exId === exId);
+    const ex = (history[i].exercises || []).find((e) => e.exId === exId);
     if (ex) {
-      const working = ex.sets.filter((s) => s.complete && !s.isWarmup && s.weight && s.reps);
+      const working = (ex.sets || []).filter((s) => s.complete && !s.isWarmup && s.weight && s.reps);
       if (working.length) return working.map((s) => ({ w: s.weight, r: s.reps }));
     }
   }
@@ -202,7 +207,7 @@ function recoveryHeatmap(history) {
 
 function volumeSeries(history, n) {
   return history.slice(-n).map((e) => ({
-    id: e.id, day: dayAbbrev(e.date), volume: e.volume, prs: e.prs || [],
+    id: e.id, day: dayAbbrev(e.date), volume: Number(e.volume) || 0, prs: e.prs || [],
   }));
 }
 

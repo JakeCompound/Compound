@@ -1,6 +1,6 @@
 import React from 'react';
 import { C } from './compound-ui.jsx';
-import { EXERCISES, buildSessionItem } from './workout-data.jsx';
+import { MUSCLE_GROUP_OPTIONS, addCustomExercise, allExercises, buildSessionItem, searchExercises } from './workout-data.jsx';
 
 // custom-workout.jsx — Build-your-own workout, spreadsheet-style. One scrolling
 // page: every exercise you've added stays visible with plain kg × reps rows —
@@ -24,15 +24,24 @@ function clearDraft() {
 }
 
 // ── Type-to-search picker (bottom sheet) ────────────────────────────────────
+// Word-by-word matching (searchExercises) so "tricep cable pushdown" finds
+// Tricep Pushdown, with an "Add custom exercise" escape hatch so a missing
+// movement never dead-ends the user mid-workout.
 function ExercisePickerSheet({ excludeIds = [], onPick, onClose }) {
   const [query, setQuery] = React.useState('');
+  const [custom, setCustom] = React.useState(false); // adding a custom exercise
+  const [customGroups, setCustomGroups] = React.useState([]);
+  const [customBW, setCustomBW] = React.useState(false);
   const q = query.trim().toLowerCase();
-  const results = q
-    ? EXERCISES.filter((e) =>
-        !excludeIds.includes(e.id) &&
-        (e.name.toLowerCase().includes(q) || e.groups.some((g) => g.toLowerCase().includes(q))))
-      .slice(0, 8)
-    : [];
+  const results = q ? searchExercises(query, { excludeIds }).slice(0, 8) : [];
+
+  const saveCustom = () => {
+    const ex = addCustomExercise({ name: query.trim(), groups: customGroups, type: customBW ? 'bodyweight' : 'weighted' });
+    if (ex) onPick(ex);
+  };
+
+  const GROUP_OPTS = MUSCLE_GROUP_OPTIONS.filter((g) => g !== 'Cardio' && g !== 'Full Body');
+
   return (
     <div onClick={onClose} style={{ position: 'absolute', inset: 0, zIndex: 220, background: 'rgba(0,0,0,.72)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'flex-end' }}>
       <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxHeight: '80vh', overflowY: 'auto', background: C.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: '20px 22px 24px' }}>
@@ -41,19 +50,14 @@ function ExercisePickerSheet({ excludeIds = [], onPick, onClose }) {
         <input
           autoFocus
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search — bench, row, curl, legs…"
+          onChange={(e) => { setQuery(e.target.value); setCustom(false); }}
+          placeholder="Search — bench, rope pushdown, curl…"
           style={{ width: '100%', boxSizing: 'border-box', background: C.surf1, border: `1px solid ${q ? C.accentDim : C.line}`, borderRadius: 12, color: C.text, fontFamily: 'Outfit, sans-serif', fontSize: 15, padding: '13px 14px', outline: 'none' }}
         />
         <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6, minHeight: 60 }}>
-          {q && results.length === 0 && (
-            <div style={{ background: C.surf1, border: `1px dashed ${C.line}`, borderRadius: 10, padding: '12px 14px', fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: C.textMid }}>
-              Nothing matches "{query}" — try a muscle group (chest, back, legs…) or a shorter word.
-            </div>
-          )}
           {!q && (
             <div style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: C.textMid, padding: '8px 2px' }}>
-              Type to search the library — it lands on the sheet with 3 empty rows.
+              Type to search the library — every word counts, so "rope pushdown" or "incline smith" both work.
             </div>
           )}
           {results.map((e) => (
@@ -65,12 +69,47 @@ function ExercisePickerSheet({ excludeIds = [], onPick, onClose }) {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 15.5, letterSpacing: 0.6, color: C.text, textTransform: 'uppercase' }}>{e.name}</div>
                 <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: C.textLow, letterSpacing: 1, marginTop: 2 }}>
-                  {e.groups.join(' · ').toUpperCase()}{e.type === 'bodyweight' ? ' · BODYWEIGHT' : ''}
+                  {e.groups.join(' · ').toUpperCase()}{e.type === 'bodyweight' ? ' · BODYWEIGHT' : ''}{e.custom ? ' · CUSTOM' : ''}
                 </div>
               </div>
               <span style={{ flexShrink: 0, width: 26, height: 26, borderRadius: 13, background: C.accent + '1f', border: `1px solid ${C.accent}66`, color: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'JetBrains Mono, monospace', fontSize: 15 }}>+</span>
             </button>
           ))}
+          {q && !custom && (
+            <button
+              onClick={() => setCustom(true)}
+              style={{ width: '100%', textAlign: 'left', padding: '12px 13px', background: 'transparent', border: `1px dashed ${C.accentDim}`, borderRadius: 10, cursor: 'pointer', color: C.accent, fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 14, letterSpacing: 1, textTransform: 'uppercase' }}
+            >
+              ＋ Add "{query.trim()}" as a custom exercise
+            </button>
+          )}
+          {q && custom && (
+            <div style={{ background: C.surf1, border: `1px solid ${C.accentDim}`, borderRadius: 12, padding: '12px 13px' }}>
+              <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: C.textLow, letterSpacing: 1.6, marginBottom: 8 }}>WHICH MUSCLES? (PICK AT LEAST ONE)</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {GROUP_OPTS.map((g) => {
+                  const on = customGroups.includes(g);
+                  return (
+                    <button key={g} onClick={() => setCustomGroups((s) => (on ? s.filter((x) => x !== g) : [...s, g]))}
+                      style={{ padding: '7px 11px', borderRadius: 999, cursor: 'pointer', background: on ? C.accentDim : C.surf2, border: on ? `1px solid ${C.accent}` : `1px solid ${C.line}`, color: on ? C.accent : C.text, fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 600, fontSize: 12, letterSpacing: 1, textTransform: 'uppercase' }}>
+                      {g}
+                    </button>
+                  );
+                })}
+              </div>
+              <button onClick={() => setCustomBW((v) => !v)}
+                style={{ marginTop: 8, padding: '7px 11px', borderRadius: 999, cursor: 'pointer', background: customBW ? C.accentDim : C.surf2, border: customBW ? `1px solid ${C.accent}` : `1px solid ${C.line}`, color: customBW ? C.accent : C.textMid, fontFamily: 'JetBrains Mono, monospace', fontSize: 9, letterSpacing: 1.2 }}>
+                {customBW ? '✓ BODYWEIGHT' : 'BODYWEIGHT? (NO WEIGHT FIELD)'}
+              </button>
+              <button
+                onClick={saveCustom}
+                disabled={!customGroups.length}
+                style={{ marginTop: 10, width: '100%', height: 46, borderRadius: 11, border: 0, cursor: customGroups.length ? 'pointer' : 'default', background: customGroups.length ? C.accent : C.surf2, color: customGroups.length ? C.onAccent : C.textLow, fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 14, letterSpacing: 1.2, textTransform: 'uppercase' }}
+              >
+                Add "{query.trim()}"
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

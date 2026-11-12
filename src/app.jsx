@@ -20,7 +20,7 @@ import { PastWorkouts, WeeklyPlan, WorkoutDashboard } from './workout-dashboard.
 import { SavedWorkoutsScreen } from './workout-enhancements.jsx';
 import { NewWorkoutFlow, WorkoutHome } from './workout-screens.jsx';
 import { CustomWorkoutLog } from './custom-workout.jsx';
-import { WorkoutSession } from './workout-session.jsx';
+import { WorkoutSession, loadActiveDraft } from './workout-session.jsx';
 
 // app.jsx — COMPOUND root: state, step machine, persistence, frame, tweaks
 
@@ -144,7 +144,13 @@ function App() {
   const [tab, setTab] = React.useState('home');
   // Workout tab internal nav: 'home' | 'new' | 'session' | 'past' | 'plan' | 'dashboard'
   const [workoutView, setWorkoutView] = React.useState('home');
-  const [activeSession, setActiveSession] = React.useState(null);
+  // The live session is backed by the compound:activeWorkout draft (written on
+  // every change, synced to workout_drafts) — so a reload, tab switch or the
+  // PWA being reclaimed resumes with every logged set intact.
+  const [activeSession, setActiveSession] = React.useState(() => {
+    const d = loadActiveDraft();
+    return d ? { config: d.config, session: d.exercises, currentIdx: d.currentIdx || 0, startedAt: d.startedAt } : null;
+  });
   // Settings overlay
   const [showSettings, setShowSettings] = React.useState(false);
   const [showCalc, setShowCalc] = React.useState(false);
@@ -423,10 +429,16 @@ function App() {
           <WorkoutHome
             user={data}
             onNav={(v) => {
-              if (v === 'session' && !activeSession) return;
+              if (v === 'session' && !activeSession) {
+                // Cloud-hydrated draft that landed after boot (or another
+                // device's session) — pick it up on demand.
+                const d = loadActiveDraft();
+                if (!d) return;
+                setActiveSession({ config: d.config, session: d.exercises, currentIdx: d.currentIdx || 0, startedAt: d.startedAt });
+              }
               setWorkoutView(v);
             }}
-            hasInProgress={!!activeSession}
+            hasInProgress={!!activeSession || !!(loadActiveDraft())}
             onChanged={() => setNutTick((x) => x + 1)}
           />
         );
@@ -437,7 +449,7 @@ function App() {
             user={data}
             onBack={() => setWorkoutView('home')}
             onStart={({ config, session }) => {
-              setActiveSession({ config, session });
+              setActiveSession({ config, session, currentIdx: 0, startedAt: Date.now() });
               setWorkoutView('session');
             }}
           />
@@ -460,9 +472,11 @@ function App() {
           <WorkoutSession
             session={activeSession.session}
             config={activeSession.config}
+            startedAt={activeSession.startedAt}
+            initialIdx={activeSession.currentIdx || 0}
             onExit={(result) => {
               if (result.resume) {
-                setActiveSession((a) => ({ ...a, session: result.exercises }));
+                setActiveSession((a) => ({ ...a, session: result.exercises, currentIdx: result.currentIdx || 0 }));
               } else {
                 setActiveSession(null);
               }
@@ -486,7 +500,7 @@ function App() {
             onStart={(r) => {
               const cfg = r.config || { location: data.equipment || 'gym', duration: r.duration || 30, groups: r.groups || [], preFeel: 0 };
               const session = (window.generateSession ? window.generateSession(cfg) : []);
-              setActiveSession({ config: cfg, session });
+              setActiveSession({ config: cfg, session, currentIdx: 0, startedAt: Date.now() });
               setWorkoutView('session');
             }}
           />

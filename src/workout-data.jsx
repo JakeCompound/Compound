@@ -16,6 +16,7 @@ const EXERCISES = [
   { id: 'lowhighfly',  name: 'Low-to-High Cable Fly',  type: 'weighted',   primary: ['Chest'],     groups: ['Chest','Shoulders'],   equip: 'gym' },
   { id: 'dbfly',       name: 'Dumbbell Fly',           type: 'weighted',   primary: ['Chest'],     groups: ['Chest'],               equip: 'gym' },
   { id: 'dbpullover',  name: 'Dumbbell Pullover',      type: 'weighted',   primary: ['Chest'],     groups: ['Chest','Back'],        equip: 'gym' },
+  { id: 'smithincl',   name: 'Smith Incline Press',    type: 'weighted',   primary: ['Chest'],     groups: ['Chest','Shoulders'],   equip: 'gym',  compound: true, aliases: ['incline', 'bench'] },
   { id: 'pushup',      name: 'Push-ups',               type: 'bodyweight', primary: ['Chest'],     groups: ['Chest','Triceps','Core'], equip: 'home', compound: true },
 
   // ── BACK ──
@@ -27,7 +28,8 @@ const EXERCISES = [
   { id: 'smithrow',    name: 'Smith Machine Row',      type: 'weighted',   primary: ['Back'],      groups: ['Back','Biceps'],       equip: 'gym',  compound: true },
   { id: 'dbrow',       name: 'Single-arm DB Row',      type: 'weighted',   primary: ['Back'],      groups: ['Back','Biceps'],       equip: 'gym',  compound: true },
   { id: 'straightarm', name: 'Straight-arm Pulldown',  type: 'weighted',   primary: ['Back'],      groups: ['Back'],                equip: 'gym' },
-  { id: 'facepull',    name: 'Face Pull',              type: 'weighted',   primary: ['Back'],      groups: ['Back','Shoulders'],    equip: 'gym' },
+  { id: 'facepull',    name: 'Face Pull',              type: 'weighted',   primary: ['Back'],      groups: ['Back','Shoulders'],    equip: 'gym',  aliases: ['cable', 'rope'] },
+  { id: 'rackpull',    name: 'Rack Pull',              type: 'weighted',   primary: ['Back'],      groups: ['Back','Legs'],         equip: 'gym',  compound: true, aliases: ['barbell', 'deadlift'] },
   { id: 'pullup',      name: 'Pull-ups',               type: 'bodyweight', primary: ['Back'],      groups: ['Back','Biceps'],       equip: 'home', compound: true },
 
   // ── SHOULDERS ──
@@ -37,7 +39,10 @@ const EXERCISES = [
   { id: 'arnold',      name: 'Arnold Press',           type: 'weighted',   primary: ['Shoulders'], groups: ['Shoulders','Triceps'], equip: 'gym' },
   { id: 'lateral',     name: 'DB Lateral Raise',       type: 'weighted',   primary: ['Shoulders'], groups: ['Shoulders'],           equip: 'gym' },
   { id: 'cablelat',    name: 'Cable Lateral Raise',    type: 'weighted',   primary: ['Shoulders'], groups: ['Shoulders'],           equip: 'gym' },
-  { id: 'reardelt',    name: 'Rear-delt Fly',          type: 'weighted',   primary: ['Shoulders'], groups: ['Shoulders','Back'],    equip: 'gym' },
+  { id: 'reardelt',    name: 'Rear-delt Fly',          type: 'weighted',   primary: ['Shoulders'], groups: ['Shoulders','Back'],    equip: 'gym',  aliases: ['dumbbell'] },
+  { id: 'cablerear',   name: 'Cable Rear-delt Fly',    type: 'weighted',   primary: ['Shoulders'], groups: ['Shoulders','Back'],    equip: 'gym',  aliases: ['reverse fly'] },
+  { id: 'uprightrow',  name: 'Upright Row',            type: 'weighted',   primary: ['Shoulders'], groups: ['Shoulders','Back'],    equip: 'gym',  aliases: ['barbell', 'cable'] },
+  { id: 'frontraise',  name: 'DB Front Raise',         type: 'weighted',   primary: ['Shoulders'], groups: ['Shoulders'],           equip: 'gym',  aliases: ['dumbbell'] },
   { id: 'shrug',       name: 'Dumbbell Shrug',         type: 'weighted',   primary: ['Shoulders'], groups: ['Shoulders','Back'],    equip: 'gym' },
   { id: 'pikepu',      name: 'Pike Push-ups',          type: 'bodyweight', primary: ['Shoulders'], groups: ['Shoulders','Triceps'], equip: 'home' },
 
@@ -49,20 +54,28 @@ const EXERCISES = [
   { id: 'inclcurl',    name: 'Incline DB Curl',        type: 'weighted',   primary: ['Biceps'],    groups: ['Biceps'],              equip: 'gym' },
   { id: 'bayesian',    name: 'Bayesian Cable Curl',    type: 'weighted',   primary: ['Biceps'],    groups: ['Biceps'],              equip: 'gym' },
   { id: 'concentr',    name: 'Concentration Curl',     type: 'weighted',   primary: ['Biceps'],    groups: ['Biceps'],              equip: 'gym' },
+  { id: 'spider',      name: 'Spider Curl',            type: 'weighted',   primary: ['Biceps'],    groups: ['Biceps'],              equip: 'gym',  aliases: ['dumbbell', 'incline bench'] },
+  { id: 'revcurl',     name: 'Reverse Curl',           type: 'weighted',   primary: ['Biceps'],    groups: ['Biceps'],              equip: 'gym',  aliases: ['barbell', 'forearm'] },
   { id: 'chinup',      name: 'Chin-ups',               type: 'bodyweight', primary: ['Biceps','Back'], groups: ['Biceps','Back'],   equip: 'home', compound: true },
 
   // ── TRICEPS ──
-  { id: 'tripress',    name: 'Tricep Pushdown',        type: 'weighted',   primary: ['Triceps'],   groups: ['Triceps'],             equip: 'gym' },
-  { id: 'ohtri',       name: 'Overhead Cable Extension', type: 'weighted', primary: ['Triceps'],   groups: ['Triceps'],             equip: 'gym' },
-  { id: 'ohdbtri',     name: 'Overhead DB Extension',  type: 'weighted',   primary: ['Triceps'],   groups: ['Triceps'],             equip: 'gym' },
-  { id: 'skull',       name: 'Skull Crushers',         type: 'weighted',   primary: ['Triceps'],   groups: ['Triceps'],             equip: 'gym' },
-  { id: 'cgbench',     name: 'Close-grip Smith Press', type: 'weighted',   primary: ['Triceps'],   groups: ['Triceps','Chest'],     equip: 'gym',  compound: true },
-  { id: 'kickback',    name: 'Cable Kickback',         type: 'weighted',   primary: ['Triceps'],   groups: ['Triceps'],             equip: 'gym' },
+  { id: 'tripress',    name: 'Tricep Pushdown',        type: 'weighted',   primary: ['Triceps'],   groups: ['Triceps'],             equip: 'gym',  aliases: ['cable', 'pressdown', 'bar', 'straight bar'] },
+  { id: 'ropepush',    name: 'Rope Pushdown',          type: 'weighted',   primary: ['Triceps'],   groups: ['Triceps'],             equip: 'gym',  aliases: ['cable', 'tricep', 'pressdown'] },
+  { id: 'singlepush',  name: 'Single-arm Pushdown',    type: 'weighted',   primary: ['Triceps'],   groups: ['Triceps'],             equip: 'gym',  aliases: ['cable', 'tricep', 'pressdown'] },
+  { id: 'ohtri',       name: 'Overhead Cable Extension', type: 'weighted', primary: ['Triceps'],   groups: ['Triceps'],             equip: 'gym',  aliases: ['tricep', 'rope'] },
+  { id: 'ohdbtri',     name: 'Overhead DB Extension',  type: 'weighted',   primary: ['Triceps'],   groups: ['Triceps'],             equip: 'gym',  aliases: ['tricep', 'dumbbell'] },
+  { id: 'skull',       name: 'Skull Crushers',         type: 'weighted',   primary: ['Triceps'],   groups: ['Triceps'],             equip: 'gym',  aliases: ['tricep', 'lying extension', 'barbell'] },
+  { id: 'cgbench',     name: 'Close-grip Smith Press', type: 'weighted',   primary: ['Triceps'],   groups: ['Triceps','Chest'],     equip: 'gym',  compound: true, aliases: ['bench', 'tricep'] },
+  { id: 'kickback',    name: 'Cable Kickback',         type: 'weighted',   primary: ['Triceps'],   groups: ['Triceps'],             equip: 'gym',  aliases: ['tricep'] },
   { id: 'dip',         name: 'Dips',                   type: 'bodyweight', primary: ['Triceps'],   groups: ['Triceps','Chest'],     equip: 'home' },
+  { id: 'benchdip',    name: 'Bench Dips',             type: 'bodyweight', primary: ['Triceps'],   groups: ['Triceps'],             equip: 'gym',  aliases: ['tricep', 'dip'] },
   { id: 'diamondpu',   name: 'Diamond Push-ups',       type: 'bodyweight', primary: ['Triceps'],   groups: ['Triceps','Chest'],     equip: 'home' },
 
   // ── LEGS ──
   { id: 'squat',       name: 'Back Squat',             type: 'weighted',   primary: ['Legs'],      groups: ['Legs','Core'],         equip: 'gym',  tracked1RM: 'squat', compound: true },
+  { id: 'frontsquat',  name: 'Front Squat',            type: 'weighted',   primary: ['Legs'],      groups: ['Legs','Core'],         equip: 'gym',  compound: true, aliases: ['barbell'] },
+  { id: 'hipthrust',   name: 'Barbell Hip Thrust',     type: 'weighted',   primary: ['Legs'],      groups: ['Legs'],                equip: 'gym',  compound: true, aliases: ['glute', 'bridge'] },
+  { id: 'goodmorning', name: 'Good Morning',           type: 'weighted',   primary: ['Legs'],      groups: ['Legs','Back'],         equip: 'gym',  compound: true, aliases: ['barbell', 'hamstring', 'hinge'] },
   { id: 'smithsquat',  name: 'Smith Squat',            type: 'weighted',   primary: ['Legs'],      groups: ['Legs','Core'],         equip: 'gym',  compound: true },
   { id: 'rdl',         name: 'Romanian Deadlift',      type: 'weighted',   primary: ['Legs'],      groups: ['Legs','Back'],         equip: 'gym',  compound: true },
   { id: 'goblet',      name: 'Goblet Squat',           type: 'weighted',   primary: ['Legs'],      groups: ['Legs','Core'],         equip: 'gym',  compound: true },
@@ -89,6 +102,51 @@ const EXERCISES = [
 ];
 
 const MUSCLE_GROUP_OPTIONS = ['Chest', 'Triceps', 'Biceps', 'Back', 'Legs', 'Core', 'Shoulders', 'Cardio', 'Full Body'];
+
+// ── Custom exercises — user-added movements the library doesn't have ──────
+// Stored inside compound:onboarding (customExercises array) so they ride the
+// existing profile sync with no new table. Stable 'custom-' ids keep history,
+// "last time" lookups and PRs working exactly like library movements.
+function customExercises() {
+  try {
+    const onb = JSON.parse(localStorage.getItem('compound:onboarding') || '{}');
+    return Array.isArray(onb.customExercises) ? onb.customExercises : [];
+  } catch (e) { return []; }
+}
+function addCustomExercise({ name, groups, type }) {
+  const clean = String(name || '').trim().slice(0, 60);
+  if (!clean) return null;
+  const slug = clean.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const gs = (groups && groups.length ? groups : ['Full Body']).filter((g) => MUSCLE_GROUP_OPTIONS.includes(g));
+  const ex = { id: 'custom-' + slug, name: clean, type: type === 'bodyweight' ? 'bodyweight' : 'weighted', primary: gs.length ? gs : ['Full Body'], groups: gs.length ? gs : ['Full Body'], equip: 'gym', custom: true };
+  try {
+    const onb = JSON.parse(localStorage.getItem('compound:onboarding') || '{}');
+    const list = Array.isArray(onb.customExercises) ? onb.customExercises : [];
+    if (!list.find((e) => e.id === ex.id)) {
+      onb.customExercises = [...list, ex];
+      localStorage.setItem('compound:onboarding', JSON.stringify(onb)); // profile domain syncs it
+    }
+  } catch (e) {}
+  return ex;
+}
+// The full searchable library: built-ins + the user's custom movements.
+function allExercises() { return [...EXERCISES, ...customExercises()]; }
+
+// Word-by-word search: EVERY word of the query must hit the exercise's name,
+// muscle groups or aliases ("tricep cable pushdown" finds Tricep Pushdown —
+// the old whole-phrase substring match returned nothing for it).
+function searchExercises(query, { excludeIds = [] } = {}) {
+  const norm = (s) => String(s).toLowerCase().replace(/db\b/g, 'dumbbell');
+  const tokens = norm(query).split(/[^a-z0-9.]+/).filter(Boolean)
+    .map((t) => (t === 'tri' || t === 'tris' || t === 'triceps' ? 'tricep' : t === 'bi' || t === 'bis' || t === 'biceps' ? 'bicep' : t));
+  if (!tokens.length) return [];
+  return allExercises().filter((e) => {
+    if (excludeIds.includes(e.id)) return false;
+    const hay = norm([e.name, ...(e.groups || []), ...(e.aliases || [])].join(' '))
+      .replace(/triceps/g, 'tricep').replace(/biceps/g, 'bicep');
+    return tokens.every((t) => hay.includes(t));
+  });
+}
 
 // Mapping the 6 tracked lifts ↔ display
 const TRACKED_LIFTS = [
@@ -123,7 +181,7 @@ function generateSession({ location, durationMin, groups, preFeel }) {
     (equipPref(b) - equipPref(a)) ||
     ((b.compound ? 1 : 0) - (a.compound ? 1 : 0));
 
-  const pool = EXERCISES.filter(equipOk);
+  const pool = allExercises().filter(equipOk);
   const primaryCands = pool.filter((e) => primaryCount(e) > 0).sort(rank);
   const secondaryCands = pool
     .filter((e) => primaryCount(e) === 0 && secondaryCount(e) > 0)
@@ -159,10 +217,21 @@ function generateSession({ location, durationMin, groups, preFeel }) {
     const best = primaryCands.find((e) => e.primary.includes(group) && !picked.includes(e));
     if (best) pushEx(best);
   }
-  // Pass 2: fill remaining slots with more primary work (variety by id)
-  for (const e of primaryCands) {
-    if (picked.length >= exerciseCount) break;
-    pushEx(e);
+  // Pass 2: round-robin the remaining slots across the wanted groups so two
+  // groups split 2/2, not 3/1 (the old fill just took the best-ranked
+  // leftovers, and library order made that all one muscle). An exercise
+  // counts against its FIRST wanted primary mover — compound lifts count
+  // against their primary muscle only, never their assists.
+  const attrib = (e) => wantedGroups.find((g) => e.primary.includes(g));
+  const countFor = (g) => picked.filter((e) => attrib(e) === g).length;
+  while (picked.length < exerciseCount) {
+    const order = [...wantedGroups].sort((a, b) => countFor(a) - countFor(b));
+    let added = false;
+    for (const g of order) {
+      const best = primaryCands.find((e) => attrib(e) === g && !picked.includes(e));
+      if (best) { pushEx(best); added = true; break; }
+    }
+    if (!added) break;
   }
   // Pass 3: only if we still couldn't fill, allow secondary-mover exercises
   for (const e of secondaryCands) {
@@ -255,10 +324,11 @@ function buildSessionItem(e, { durationMin = 30, preFeel = 0, idx = 0, setsPerEx
 
 // Exercises that train the same primary mover & fit the location — for swapping.
 function similarExercises(exId, location) {
-  const cur = EXERCISES.find((e) => e.id === exId);
+  const all = allExercises();
+  const cur = all.find((e) => e.id === exId);
   if (!cur) return [];
   const equipOk = (e) => location === 'gym' ? true : (e.equip === 'home' || e.equip === 'both');
-  return EXERCISES.filter((e) =>
+  return all.filter((e) =>
     e.id !== exId && equipOk(e) &&
     e.primary.some((p) => cur.primary.includes(p))
   ).sort((a, b) => ((b.compound ? 1 : 0) - (a.compound ? 1 : 0)));
@@ -359,7 +429,8 @@ function makeWeeklyPlan(trainingDays) {
 Object.assign(window, {
   EXERCISES, MUSCLE_GROUP_OPTIONS, TRACKED_LIFTS,
   calc1RM, generateSession, roundTo, buildSessionItem, similarExercises,
+  customExercises, addCustomExercise, allExercises, searchExercises,
   DEMO_HISTORY, DEMO_1RM_HISTORY, DEMO_PBS, DEMO_HEATMAP, makeWeeklyPlan,
 });
 
-export { DEMO_1RM_HISTORY, DEMO_HEATMAP, DEMO_HISTORY, DEMO_PBS, EXERCISES, MUSCLE_GROUP_OPTIONS, TRACKED_LIFTS, buildSessionItem, calc1RM, generateSession, makeWeeklyPlan, roundTo, similarExercises };
+export { DEMO_1RM_HISTORY, DEMO_HEATMAP, DEMO_HISTORY, DEMO_PBS, EXERCISES, MUSCLE_GROUP_OPTIONS, TRACKED_LIFTS, addCustomExercise, allExercises, buildSessionItem, calc1RM, customExercises, generateSession, makeWeeklyPlan, roundTo, searchExercises, similarExercises };

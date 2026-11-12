@@ -1,25 +1,62 @@
 import React from 'react';
 import { C, PrimaryButton } from './compound-ui.jsx';
-import { SectionLabel } from './home-components.jsx';
 import { QuickLogButton } from './quick-log.jsx';
 import { buildSessionItem, calc1RM } from './workout-data.jsx';
 import { ExercisePickerSheet } from './custom-workout.jsx';
 import { ExerciseNote, PlateCalc, PrevPerfStrip, SaveAsRoutineCard, SessionNotesField } from './workout-enhancements.jsx';
 
-// workout-session.jsx — Live workout session, set logging, rest timer, completion
+// workout-session.jsx — Live workout session, "focus mode": one exercise and
+// one set front and centre, big steppers, one-tap confirm, auto rest timer.
+//
+// The in-progress session persists to compound:activeWorkout on EVERY change
+// (and again on visibilitychange/pagehide), and cloud-sync mirrors that key to
+// the workout_drafts table — so backing out, switching tabs, or Android
+// reclaiming the PWA never loses a logged set. The draft clears only when the
+// workout is finished or explicitly discarded.
 
-function WorkoutSession({ session, config, onExit, onComplete }) {
-  // Local mutable state for the session
+const DRAFT_KEY = 'compound:activeWorkout';
+function loadActiveDraft() {
+  try {
+    const d = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
+    return d && Array.isArray(d.exercises) && d.exercises.length ? d : null;
+  } catch (e) { return null; }
+}
+function saveActiveDraft(d) { try { localStorage.setItem(DRAFT_KEY, JSON.stringify(d)); } catch (e) {} }
+// Write 'null' instead of removing the key: the cloud mirror only hooks
+// setItem, so this is what deletes the draft row server-side too.
+function clearActiveDraft() { try { localStorage.setItem(DRAFT_KEY, 'null'); } catch (e) {} }
+
+function WorkoutSession({ session, config, startedAt: startedAtProp, initialIdx = 0, onExit, onComplete }) {
   const [exercises, setExercises] = React.useState(session);
-  const [currentIdx, setCurrentIdx] = React.useState(0);
-  const [restEndAt, setRestEndAt] = React.useState(null); // timestamp ms or null
+  const [currentIdx, setCurrentIdx] = React.useState(Math.min(initialIdx, session.length - 1));
+  const [restEndAt, setRestEndAt] = React.useState(null);
   const [askRIR, setAskRIR] = React.useState(null); // { exIdx, setIdx } or null
   const [confirmExit, setConfirmExit] = React.useState(false);
   const [completed, setCompleted] = React.useState(false);
-  const [pickerOpen, setPickerOpen] = React.useState(false); // add-exercise search sheet
+  const [pickerOpen, setPickerOpen] = React.useState(false);
+  const [editOpen, setEditOpen] = React.useState(false);
+  const [swapIdx, setSwapIdx] = React.useState(null); // which exercise the picker replaces
+  const startedAt = React.useRef(startedAtProp || Date.now()).current;
 
   const exercise = exercises[currentIdx];
   const totalExercises = exercises.length;
+  const doneCount = (ex) => ex.sets.filter((s) => s.complete).length;
+  const isExerciseComplete = (ex) => ex.sets.every((s) => s.complete);
+
+  // ── Persistence — every change lands in localStorage (cloud-sync mirrors it)
+  const draftRef = React.useRef(null);
+  React.useEffect(() => {
+    if (completed) return;
+    const d = { config, exercises, currentIdx, startedAt, updatedAt: Date.now() };
+    draftRef.current = d;
+    saveActiveDraft(d);
+  }, [exercises, currentIdx, completed]);
+  React.useEffect(() => {
+    const flush = () => { if (draftRef.current && !completed) saveActiveDraft(draftRef.current); };
+    document.addEventListener('visibilitychange', flush);
+    window.addEventListener('pagehide', flush);
+    return () => { document.removeEventListener('visibilitychange', flush); window.removeEventListener('pagehide', flush); };
+  }, [completed]);
 
   // ── Helpers ─────────────────────────────────────────────────────────────
   const updateSet = (exIdx, setIdx, patch) => {
@@ -42,18 +79,23 @@ function WorkoutSession({ session, config, onExit, onComplete }) {
     });
   };
 
-  // Make it up as you go: append a searched exercise to the running session.
   const addExercise = (libEx) => {
+    if (swapIdx != null) {
+      // Swapping: replace in place, keep position. Logged sets on the old
+      // exercise are let go — it's a mid-session change of mind.
+      const item = buildSessionItem(libEx, { durationMin: config.duration || 30, preFeel: 0, idx: swapIdx, setsPerExercise: 3 });
+      setExercises((all) => all.map((e, i) => (i === swapIdx ? item : e)));
+      setSwapIdx(null);
+      setPickerOpen(false);
+      return;
+    }
     const item = buildSessionItem(libEx, { durationMin: config.duration || 30, preFeel: 0, idx: exercises.length, setsPerExercise: 3 });
     const newIdx = exercises.length;
     setExercises((all) => [...all, item]);
-    // Jump to it only when the current exercise is already done (the usual
-    // "finished — now what?" moment); otherwise it queues in NEXT UP.
     if (exercise && isExerciseComplete(exercise)) setCurrentIdx(newIdx);
     setPickerOpen(false);
   };
 
-  // One more set of the current exercise, mirroring its last set's targets.
   const addSet = () => {
     setExercises((all) => {
       const next = [...all];
@@ -69,86 +111,147 @@ function WorkoutSession({ session, config, onExit, onComplete }) {
     });
   };
 
-  // Closing the picker without adding: if everything is already done, the
-  // session is genuinely over — hand back to the completion screen.
+  // ── Off-plan: remove / reorder / superset (edit sheet) ──────────────────
+  const removeExercise = (idx) => {
+    setExercises((all) => {
+      const gone = all[idx];
+      const next = all.filter((_, i) => i !== idx)
+        .map((e) => (e.superset === gone.id ? { ...e, superset: null } : e));
+      return next;
+    });
+    setCurrentIdx((i) => Math.max(0, Math.min(i >= idx && i > 0 ? i - 1 : i, exercises.length - 2)));
+  };
+  const moveExercise = (idx, dir) => {
+    setExercises((all) => {
+      const j = idx + dir;
+      if (j < 0 || j >= all.length) return all;
+      const next = [...all];
+      [next[idx], next[j]] = [next[j], next[idx]];
+      return next;
+    });
+    setCurrentIdx((i) => (i === idx ? idx + dir : i === idx + dir ? idx : i));
+  };
+  // Link exercise idx with the one after it (A1/A2): sets alternate, no rest
+  // inside the pair, rest after each full round.
+  const toggleSuperset = (idx) => {
+    setExercises((all) => {
+      const a = all[idx], b = all[idx + 1];
+      if (!b) return all;
+      const linked = a.superset === b.id;
+      return all.map((e, i) => {
+        if (i === idx) return { ...e, superset: linked ? null : b.id };
+        if (i === idx + 1) return { ...e, superset: linked ? null : a.id };
+        return e;
+      });
+    });
+  };
+
   const closePicker = () => {
     setPickerOpen(false);
+    setSwapIdx(null);
     if (exercises.every(isExerciseComplete)) setCompleted(true);
   };
 
-  // Total progress: completed sets / all sets
   const totalSets = exercises.reduce((n, e) => n + e.sets.length, 0);
   const doneSets = exercises.reduce((n, e) => n + e.sets.filter((s) => s.complete).length, 0);
   const overallPct = totalSets ? doneSets / totalSets : 0;
 
-  const isExerciseComplete = (ex) => ex.sets.every((s) => s.complete);
-
   const goToNextExercise = () => {
-    // Find next incomplete
     for (let i = 0; i < exercises.length; i++) {
       const idx = (currentIdx + 1 + i) % exercises.length;
-      if (!isExerciseComplete(exercises[idx])) {
-        setCurrentIdx(idx);
-        return;
-      }
+      if (!isExerciseComplete(exercises[idx])) { setCurrentIdx(idx); return; }
     }
-    // All complete
     setCompleted(true);
   };
 
   // ── Set completion flow ─────────────────────────────────────────────────
+  const startRest = (sec = 120) => setRestEndAt(Date.now() + sec * 1000);
+  const skipRest = () => setRestEndAt(null);
+
+  // Superset-aware advance after a set lands: chain to the partner with no
+  // rest while it is behind; once the round evens out, rest and swing back.
+  const afterSet = (updatedAll, exIdx) => {
+    const ex = updatedAll[exIdx];
+    const pIdx = ex.superset ? updatedAll.findIndex((e) => e.id === ex.superset) : -1;
+    const p = pIdx >= 0 ? updatedAll[pIdx] : null;
+    const dc = (e) => e.sets.filter((s) => s.complete).length;
+    if (p && p.sets.some((s) => !s.complete)) {
+      if (dc(p) < dc(ex)) { setCurrentIdx(pIdx); return; } // no rest inside the pair
+      startRest();
+      setCurrentIdx(pIdx);
+      return;
+    }
+    startRest();
+  };
+
+  const applyComplete = (setIdx, extra = {}) => {
+    const next = exercises.map((e, i) => {
+      if (i !== currentIdx) return e;
+      const done = { ...e.sets[setIdx], ...extra, complete: true };
+      return {
+        ...e,
+        sets: e.sets.map((s, j) => (j === setIdx ? done
+          : j > setIdx && !s.complete && s.weight == null && done.weight != null
+            ? { ...s, weight: done.weight, suggested: done.weight } : s)),
+      };
+    });
+    setExercises(next);
+    afterSet(next, currentIdx);
+  };
+
   const completeSet = (setIdx) => {
     const s = exercise.sets[setIdx];
-    // For weighted, ask RIR if reps were logged
     if (exercise.type === 'weighted' && !s.isWarmup) {
       setAskRIR({ exIdx: currentIdx, setIdx });
       return;
     }
-    // Bodyweight or warmup — just complete
-    updateSet(currentIdx, setIdx, { complete: true });
-    startRest();
+    applyComplete(setIdx);
   };
 
   const submitRIR = (rir) => {
     if (!askRIR) return;
-    updateSet(askRIR.exIdx, askRIR.setIdx, { rir, complete: true });
+    applyComplete(askRIR.setIdx, { rir });
     setAskRIR(null);
-    startRest();
   };
 
-  const startRest = (sec = 120) => {
-    setRestEndAt(Date.now() + sec * 1000);
-  };
-  const skipRest = () => setRestEndAt(null);
-
-  // After all sets of current exercise are done → auto-advance
+  // All sets of the current exercise done (and no superset partner pulled us
+  // away) → move on after a beat.
   React.useEffect(() => {
     if (exercise && isExerciseComplete(exercise)) {
-      const allDone = exercises.every(isExerciseComplete);
-      if (allDone) {
+      if (exercises.every(isExerciseComplete)) {
         setCompleted(true);
       } else {
         const t = setTimeout(goToNextExercise, 700);
         return () => clearTimeout(t);
       }
     }
-  }, [exercises]);
+  }, [exercises, currentIdx]);
 
   if (completed) {
-    return <SessionComplete exercises={exercises} config={config} onKeepGoing={() => { setCompleted(false); setPickerOpen(true); }} onDone={(analysis) => {
-      // Carry the AI kcal onto the stored entry so the day's earned-calorie
-      // ledger uses the session-specific figure over the flat MET formula.
+    // Actual time under the bar, not the planned block.
+    const actualMin = Math.max(1, Math.round((Date.now() - startedAt) / 60000));
+    const doneConfig = { ...config, duration: actualMin };
+    return <SessionComplete exercises={exercises} config={doneConfig} onKeepGoing={() => { setCompleted(false); setPickerOpen(true); }} onDone={(analysis) => {
       const cfg = analysis && analysis.kcal != null
-        ? { ...config, aiKcal: analysis.kcal, aiInsights: analysis.insights || [] }
-        : config;
+        ? { ...doneConfig, aiKcal: analysis.kcal, aiInsights: analysis.insights || [] }
+        : doneConfig;
       if (window.recordWorkout) { try { window.recordWorkout(exercises, cfg); } catch (e) {} }
+      clearActiveDraft();
       onComplete();
     }} />;
   }
 
+  const nextUp = (() => {
+    for (let i = 1; i < exercises.length; i++) {
+      const idx = (currentIdx + i) % exercises.length;
+      if (!isExerciseComplete(exercises[idx])) return exercises[idx];
+    }
+    return null;
+  })();
+
   return (
     <div style={{ height: '100%', background: C.bg, display: 'flex', flexDirection: 'column' }}>
-      {/* Top bar */}
+      {/* Top bar: exit · elapsed · saved + position */}
       <div style={{ padding: '14px 22px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${C.line}` }}>
         <button
           onClick={() => setConfirmExit(true)}
@@ -157,75 +260,63 @@ function WorkoutSession({ session, config, onExit, onComplete }) {
           <svg width="13" height="13" viewBox="0 0 13 13"><path d="M3 3 L10 10 M10 3 L3 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
           <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 2 }}>EXIT</span>
         </button>
-        <SessionTimer />
-        <div style={{ width: 60, textAlign: 'right', fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 1.5, color: C.textLow }}>
-          {currentIdx + 1}/{totalExercises}
-        </div>
+        <SessionTimer startedAt={startedAt} />
+        <SavedBadge />
       </div>
 
-      {/* Overall progress */}
       <div style={{ height: 3, background: C.surf2, position: 'relative' }}>
         <div style={{ position: 'absolute', inset: 0, width: `${overallPct * 100}%`, background: C.accent, transition: 'width .3s' }} />
       </div>
 
-      {/* Exercise content */}
       <div style={{ flex: 1, overflowY: 'auto' }}>
-        <CurrentExercise
+        <FocusExercise
           exercise={exercise}
+          exNumber={currentIdx + 1}
+          exTotal={totalExercises}
+          partner={exercise.superset ? exercises.find((e) => e.id === exercise.superset) : null}
           onUpdateSet={(setIdx, patch) => updateSet(currentIdx, setIdx, patch)}
-          onCompleteSet={completeSet}
+          onConfirmSet={completeSet}
           onUpdateNote={(note) => updateNote(currentIdx, note)}
           onAddSet={addSet}
         />
-
-        {/* Next-up preview */}
-        {currentIdx < exercises.length - 1 && (
-          <div style={{ padding: '6px 22px 8px' }}>
-            <SectionLabel>NEXT UP</SectionLabel>
-            <div style={{ display: 'flex', gap: 8, overflowX: 'auto', marginLeft: -22, marginRight: -22, paddingLeft: 22, paddingRight: 22 }}>
-              {exercises.slice(currentIdx + 1).map((e, i) => (
-                <div
-                  key={e.id}
-                  style={{
-                    minWidth: 160, flexShrink: 0,
-                    background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 10,
-                    padding: '10px 12px',
-                  }}
-                >
-                  <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: C.textLow, letterSpacing: 1.5 }}>
-                    {String(currentIdx + 2 + i).padStart(2, '0')} · {e.sets.length} SETS
-                  </div>
-                  <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 14, color: C.text, marginTop: 4, textTransform: 'uppercase', letterSpacing: 0.8 }}>
-                    {e.name}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Make it up as you go — search & append the next exercise mid-session */}
-        <div style={{ padding: '6px 22px 22px' }}>
-          <button
-            onClick={() => setPickerOpen(true)}
-            style={{ width: '100%', padding: '13px 14px', background: 'transparent', border: `1px dashed ${C.accentDim}`, borderRadius: 12, color: C.accent, cursor: 'pointer', fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 14, letterSpacing: 1.2, textTransform: 'uppercase' }}
-          >
-            ＋ Add exercise
-          </button>
-        </div>
       </div>
 
-      {/* Rest timer */}
+      {/* Bottom dock: next up + session controls */}
+      <div style={{ flexShrink: 0, padding: '10px 22px 14px', borderTop: `1px solid ${C.line}`, background: C.bg, display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, letterSpacing: 1.8, color: C.textLow }}>
+            EXERCISE {currentIdx + 1} OF {totalExercises} · NEXT UP
+          </div>
+          <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 15, letterSpacing: 0.6, color: C.text, textTransform: 'uppercase', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {nextUp ? `${nextUp.name} · ${nextUp.sets.length} sets` : 'Last one — bring it home'}
+          </div>
+        </div>
+        <button onClick={() => setPickerOpen(true)} style={{ flexShrink: 0, padding: '11px 12px', borderRadius: 10, background: C.surf1, border: `1px solid ${C.line}`, color: C.textMid, cursor: 'pointer', fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 1 }}>＋ ADD</button>
+        <button onClick={() => setEditOpen(true)} style={{ flexShrink: 0, padding: '11px 12px', borderRadius: 10, background: C.surf1, border: `1px solid ${C.line}`, color: C.textMid, cursor: 'pointer', fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 1 }}>⇅ EDIT</button>
+      </div>
+
       {restEndAt && (
         <RestTimer endsAt={restEndAt} onSkip={skipRest} onAdd={() => setRestEndAt(restEndAt + 15000)} />
       )}
 
-      {/* Add-exercise search sheet */}
       {pickerOpen && (
         <ExercisePickerSheet onPick={addExercise} onClose={closePicker} />
       )}
 
-      {/* RIR modal */}
+      {editOpen && (
+        <EditSessionSheet
+          exercises={exercises}
+          currentIdx={currentIdx}
+          onClose={() => setEditOpen(false)}
+          onJump={(i) => { setCurrentIdx(i); setEditOpen(false); }}
+          onMove={moveExercise}
+          onRemove={removeExercise}
+          onSwap={(i) => { setSwapIdx(i); setPickerOpen(true); setEditOpen(false); }}
+          onToggleSuperset={toggleSuperset}
+          onAdd={() => { setPickerOpen(true); setEditOpen(false); }}
+        />
+      )}
+
       {askRIR && (
         <RIRModal
           exercise={exercises[askRIR.exIdx]}
@@ -235,52 +326,182 @@ function WorkoutSession({ session, config, onExit, onComplete }) {
         />
       )}
 
-      {/* Exit confirm */}
       {confirmExit && (
         <ExitConfirmModal
           onResume={() => setConfirmExit(false)}
           onSave={() => { setConfirmExit(false); onExit({ resume: true, exercises, currentIdx }); }}
-          onDiscard={() => { setConfirmExit(false); onExit({ resume: false }); }}
+          onDiscard={() => { setConfirmExit(false); clearActiveDraft(); onExit({ resume: false }); }}
         />
       )}
     </div>
   );
 }
 
-// ── Current exercise ────────────────────────────────────────────────────
-function CurrentExercise({ exercise, onUpdateSet, onCompleteSet, onUpdateNote, onAddSet }) {
+// ── "Saved" indicator — the draft hits localStorage synchronously on every
+// change; this reflects the cloud mirror's state on top (SAVING… while a push
+// is in flight, SAVED otherwise).
+function SavedBadge() {
+  const [pending, setPending] = React.useState(() => (window.getSyncStatus ? window.getSyncStatus().pending : 0));
+  React.useEffect(() => {
+    const onStatus = (e) => setPending(e.detail ? e.detail.pending : 0);
+    window.addEventListener('compound:syncstatus', onStatus);
+    return () => window.removeEventListener('compound:syncstatus', onStatus);
+  }, []);
+  const saving = pending > 0;
   return (
-    <div style={{ padding: '20px 22px 14px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 2.4, color: C.accent }}>
-            {exercise.groups.join(' · ').toUpperCase()}
-          </div>
-          <h1
+    <div style={{ display: 'flex', alignItems: 'center', gap: 5, width: 72, justifyContent: 'flex-end' }}>
+      <span style={{ width: 7, height: 7, borderRadius: '50%', background: saving ? C.accent : C.success, flexShrink: 0 }} />
+      <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, letterSpacing: 1.2, color: saving ? C.accent : C.success }}>
+        {saving ? 'SAVING' : 'SAVED'}
+      </span>
+    </div>
+  );
+}
+
+// ── Big tap-target stepper ───────────────────────────────────────────────
+function BigStepper({ value, display, sub, step, min = 0, onChange }) {
+  // Hold-to-repeat: press and hold runs the step every 140ms.
+  const timer = React.useRef(null);
+  const start = (dir) => {
+    onChange(dir * step);
+    timer.current = setInterval(() => onChange(dir * step), 140);
+  };
+  const stop = () => { if (timer.current) { clearInterval(timer.current); timer.current = null; } };
+  React.useEffect(() => stop, []);
+  const btn = {
+    width: 68, height: 68, borderRadius: 16, border: 0, flexShrink: 0,
+    background: C.surf2, color: C.text, cursor: 'pointer',
+    fontFamily: 'JetBrains Mono, monospace', fontSize: 28, fontWeight: 600,
+    touchAction: 'manipulation',
+  };
+  return (
+    <div style={{ background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 18, padding: '12px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+      <button style={btn} onPointerDown={() => start(-1)} onPointerUp={stop} onPointerLeave={stop} onContextMenu={(e) => e.preventDefault()}>−</button>
+      <div style={{ textAlign: 'center', minWidth: 0 }}>
+        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 40, fontWeight: 600, color: C.text, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{display}</div>
+        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, letterSpacing: 2, color: C.textLow, marginTop: 4 }}>{sub}</div>
+      </div>
+      <button style={btn} onPointerDown={() => start(1)} onPointerUp={stop} onPointerLeave={stop} onContextMenu={(e) => e.preventDefault()}>＋</button>
+    </div>
+  );
+}
+
+// ── Focus mode: the current exercise, one set at a time ─────────────────
+function FocusExercise({ exercise, exNumber, exTotal, partner, onUpdateSet, onConfirmSet, onUpdateNote, onAddSet }) {
+  const curIdx = exercise.sets.findIndex((s) => !s.complete);
+  const cur = curIdx >= 0 ? exercise.sets[curIdx] : null;
+  const isWeighted = exercise.type === 'weighted';
+  const isHold = exercise.isHold;
+
+  // Prefill: logged value → AI suggestion (last session + bias) → sane floor.
+  const weightShown = cur ? (cur.weight ?? cur.suggested ?? 0) : 0;
+  const repsShown = cur ? (cur.reps ?? cur.target ?? 10) : 0;
+  const holdShown = cur ? (cur.targetHold ?? 30) : 0;
+
+  const bumpWeight = (d) => cur && onUpdateSet(curIdx, { weight: Math.max(0, Math.round(((cur.weight ?? cur.suggested ?? 0) + d) * 10) / 10) });
+  const bumpReps = (d) => cur && onUpdateSet(curIdx, { reps: Math.max(1, (cur.reps ?? cur.target ?? 10) + d) });
+  const bumpHold = (d) => cur && onUpdateSet(curIdx, { targetHold: Math.max(5, (cur.targetHold ?? 30) + d) });
+
+  const confirm = () => {
+    if (!cur) return;
+    // Lock the shown values onto the set so one tap = logged exactly as seen.
+    const patch = {};
+    if (isWeighted) patch.weight = weightShown;
+    if (!isHold) patch.reps = repsShown;
+    onUpdateSet(curIdx, patch);
+    // Defer a tick so the patch lands before the completion flow reads it.
+    setTimeout(() => onConfirmSet(curIdx), 0);
+  };
+
+  const confirmLabel = !cur ? 'ALL SETS DONE'
+    : isHold ? `✓  Done — ${holdShown}s hold`
+    : isWeighted ? `✓  Log set — ${weightShown}kg × ${repsShown}`
+    : `✓  Log set — ${repsShown} reps`;
+
+  return (
+    <div style={{ padding: '18px 22px 14px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 2.4, color: C.accent }}>
+          {partner ? `SUPERSET 🔗 ${partner.name.toUpperCase()}` : exercise.groups.join(' · ').toUpperCase()}
+        </div>
+        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 1.5, color: C.textLow }}>
+          EXERCISE {exNumber} OF {exTotal}
+        </span>
+      </div>
+      <h1 style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 34, lineHeight: 1, letterSpacing: 0.5, color: C.text, margin: '7px 0 0', textTransform: 'uppercase' }}>
+        {exercise.name}
+      </h1>
+
+      {/* Last session, Hevy-style */}
+      <PrevPerfStrip exId={exercise.exId} sets={exercise.sets} isHold={isHold} />
+
+      {/* Set position + last completed set */}
+      <div style={{ marginTop: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 1.8 }}>
+        <span style={{ color: C.textLow }}>
+          {cur ? <>SET <span style={{ color: C.accent, fontWeight: 600 }}>{curIdx + 1}</span> OF {exercise.sets.length}{cur.isWarmup ? ' · WARMUP' : ''}</> : 'COMPLETE'}
+        </span>
+        <DoneDots sets={exercise.sets} curIdx={curIdx} />
+      </div>
+
+      {cur && (
+        <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {isWeighted && !isHold && (
+            <BigStepper display={<>{Math.floor(weightShown)}<span style={{ fontSize: 16, color: C.textLow }}>{(weightShown % 1 ? '.' + Math.round((weightShown % 1) * 10) : '')}</span></>} sub="KG · ±2.5" step={2.5} onChange={bumpWeight} />
+          )}
+          {!isHold && (
+            <BigStepper display={repsShown} sub={`REPS · TARGET ${cur.target ?? '—'}`} step={1} onChange={bumpReps} />
+          )}
+          {isHold && (
+            <BigStepper display={holdShown} sub="SECONDS · ±5" step={5} onChange={bumpHold} />
+          )}
+
+          <button
+            onClick={confirm}
             style={{
-              fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 32,
-              lineHeight: 1, letterSpacing: 0.5, color: C.text, margin: '6px 0 4px', textTransform: 'uppercase',
+              width: '100%', height: 64, border: 0, borderRadius: 18, cursor: 'pointer',
+              background: C.accent, color: C.onAccent,
+              fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 19, letterSpacing: 1.4, textTransform: 'uppercase',
+              boxShadow: `0 10px 26px ${C.accentDim}`,
             }}
           >
-            {exercise.name}
-          </h1>
-          <div style={{ fontFamily: 'Outfit, sans-serif', fontSize: 13, color: C.textMid }}>
-            {exercise.sets.length} sets · {exercise.isHold ? 'timed hold' : 'reps to target'}
+            {confirmLabel}
+          </button>
+          <div style={{ textAlign: 'center', fontFamily: 'JetBrains Mono, monospace', fontSize: 8.5, letterSpacing: 1.6, color: C.textLow }}>
+            REST TIMER STARTS AUTOMATICALLY{partner ? ' · NO REST INSIDE THE SUPERSET' : ''}
           </div>
+
+          {isWeighted && weightShown >= 20 && (
+            <PlateCalc weight={weightShown} isWarmup={!!cur.isWarmup} />
+          )}
         </div>
-        {exercise.tracked1RM && (
-          <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: C.accent, background: C.accentSoft, padding: '4px 8px', borderRadius: 4, letterSpacing: 1.4 }}>
-            TRACKED 1RM
-          </span>
+      )}
+
+      {/* Completed sets recap + add set */}
+      <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 5 }}>
+        {exercise.sets.map((s, i) => s.complete ? (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: C.surf2, border: `1px solid ${C.line}`, borderRadius: 10, opacity: 0.72 }}>
+            <span style={{ width: 20, height: 20, borderRadius: '50%', background: C.accent, color: C.onAccent, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <svg width="10" height="10" viewBox="0 0 14 14"><path d="M3 7 L6 10 L11 4" stroke="currentColor" strokeWidth="2.4" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            </span>
+            <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12, fontWeight: 600, color: C.text }}>
+              {isHold ? `${s.targetHold ?? '—'}s hold` : isWeighted ? `${s.weight ?? '—'}kg × ${s.reps ?? '—'}` : `${s.reps ?? '—'} reps`}
+            </span>
+            {s.isWarmup && <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 8, letterSpacing: 1.2, color: C.textLow }}>WARMUP</span>}
+            {s.rir != null && <span style={{ marginLeft: 'auto', fontFamily: 'JetBrains Mono, monospace', fontSize: 9, letterSpacing: 1, color: C.textLow }}>RIR {s.rir}</span>}
+          </div>
+        ) : null)}
+        {onAddSet && (
+          <button onClick={onAddSet} style={{ padding: '10px 12px', background: 'transparent', border: `1px dashed ${C.lineStrong}`, borderRadius: 12, color: C.textMid, cursor: 'pointer', fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 1.6 }}>
+            ＋ ADD SET
+          </button>
         )}
       </div>
 
-      {/* Quick-log shortcut (text/voice-style logger powered by Claude) */}
-      <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+      {/* Quick log (text/voice) + note */}
+      <div style={{ marginTop: 12 }}>
         <QuickLogButton
           exercise={exercise}
           onLog={(parsed) => {
-            // Find first incomplete set and fill it
             const idx = exercise.sets.findIndex((s) => !s.complete);
             if (idx === -1) return;
             const patch = {};
@@ -292,162 +513,80 @@ function CurrentExercise({ exercise, onUpdateSet, onCompleteSet, onUpdateNote, o
           }}
         />
       </div>
-
-      {/* Previous performance — Hevy-style inline */}
-      <PrevPerfStrip exId={exercise.exId} sets={exercise.sets} isHold={exercise.isHold} />
-
-      {/* Sets list */}
-      <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {exercise.sets.map((s, i) => (
-          <SetRow
-            key={i}
-            n={i + 1}
-            exId={exercise.exId}
-            setIdx={i}
-            set={s}
-            isHold={exercise.isHold}
-            isWeighted={exercise.type === 'weighted'}
-            onChange={(patch) => onUpdateSet(i, patch)}
-            onComplete={() => onCompleteSet(i)}
-          />
-        ))}
-        {onAddSet && (
-          <button
-            onClick={onAddSet}
-            style={{ padding: '10px 12px', background: 'transparent', border: `1px dashed ${C.lineStrong}`, borderRadius: 12, color: C.textMid, cursor: 'pointer', fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 1.6 }}
-          >
-            ＋ ADD SET
-          </button>
-        )}
-      </div>
-
-      {/* Per-exercise note */}
       <ExerciseNote value={exercise.note || ''} onChange={(v) => onUpdateNote(v)} />
     </div>
   );
 }
 
-function SetRow({ n, exId, setIdx, set, isHold, isWeighted, onChange, onComplete }) {
-  const isWarmup = set.isWarmup;
+function DoneDots({ sets, curIdx }) {
   return (
-    <div
-      style={{
-        padding: '12px 14px',
-        background: set.complete ? C.surf2 : C.surf1,
-        border: `1px solid ${set.complete ? C.accentDim : C.line}`,
-        borderRadius: 12,
-        display: 'flex', alignItems: 'center', gap: 12,
-        opacity: set.complete ? 0.65 : 1,
-        flexWrap: 'wrap',
-      }}
-    >
-      <div
-        style={{
-          width: 28, height: 28, borderRadius: '50%',
-          background: set.complete ? C.accent : 'transparent',
-          border: set.complete ? `1px solid ${C.accent}` : `1.5px solid ${C.lineStrong}`,
-          color: set.complete ? C.onAccent : C.textMid,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          flexShrink: 0,
-          fontFamily: 'JetBrains Mono, monospace', fontSize: 11, fontWeight: 600,
-        }}
-      >
-        {set.complete ? (
-          <svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 7 L6 10 L11 4" stroke="#0A0A0C" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>
-        ) : (
-          isWarmup ? 'W' : n
-        )}
+    <span style={{ display: 'inline-flex', gap: 5 }}>
+      {sets.map((s, i) => (
+        <span key={i} style={{
+          width: 8, height: 8, borderRadius: '50%',
+          background: s.complete ? C.accent : i === curIdx ? C.accentDim : C.surf3,
+          border: i === curIdx && !s.complete ? `1.5px solid ${C.accent}` : '1px solid transparent',
+        }} />
+      ))}
+    </span>
+  );
+}
+
+// ── Edit session sheet — reorder, remove, swap, superset, add ────────────
+function EditSessionSheet({ exercises, currentIdx, onClose, onJump, onMove, onRemove, onSwap, onToggleSuperset, onAdd }) {
+  const dc = (e) => e.sets.filter((s) => s.complete).length;
+  const iconBtn = { width: 34, height: 34, borderRadius: 9, background: C.surf2, border: `1px solid ${C.line}`, color: C.textMid, cursor: 'pointer', fontFamily: 'JetBrains Mono, monospace', fontSize: 13, flexShrink: 0, padding: 0 };
+  return (
+    <div onClick={onClose} style={{ position: 'absolute', inset: 0, zIndex: 220, background: 'rgba(0,0,0,.72)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'flex-end' }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxHeight: '85%', overflowY: 'auto', background: C.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: '20px 22px 24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 3, borderRadius: 2, background: C.ink(.18) }} /></div>
+        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.accent, letterSpacing: 2.4, marginBottom: 4 }}>EDIT SESSION</div>
+        <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: C.textMid, lineHeight: 1.5, margin: '0 0 14px' }}>
+          Reorder, swap or drop exercises, or link two neighbours into a superset (sets alternate, no rest inside the pair).
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {exercises.map((e, i) => {
+            const linkedWithNext = exercises[i + 1] && e.superset === exercises[i + 1].id;
+            const complete = e.sets.every((s) => s.complete);
+            return (
+              <React.Fragment key={e.id}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: i === currentIdx ? C.accentSoft : C.surf1, border: `1px solid ${i === currentIdx ? C.accentDim : C.line}`, borderRadius: 12 }}>
+                  <button onClick={() => onJump(i)} style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'transparent', border: 0, cursor: 'pointer', padding: 0 }}>
+                    <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 15, letterSpacing: 0.6, color: complete ? C.textLow : C.text, textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {String(i + 1).padStart(2, '0')} · {e.name}{e.superset ? ' 🔗' : ''}
+                    </div>
+                    <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: complete ? C.success : C.textLow, letterSpacing: 1, marginTop: 2 }}>
+                      {dc(e)}/{e.sets.length} SETS{complete ? ' · DONE' : ''}
+                    </div>
+                  </button>
+                  <button onClick={() => onMove(i, -1)} disabled={i === 0} style={{ ...iconBtn, opacity: i === 0 ? 0.3 : 1 }}>↑</button>
+                  <button onClick={() => onMove(i, 1)} disabled={i === exercises.length - 1} style={{ ...iconBtn, opacity: i === exercises.length - 1 ? 0.3 : 1 }}>↓</button>
+                  <button onClick={() => onSwap(i)} style={iconBtn} title="Swap for another exercise">⇄</button>
+                  <button onClick={() => onRemove(i)} style={{ ...iconBtn, color: C.danger }} title="Remove">✕</button>
+                </div>
+                {exercises[i + 1] && (
+                  <button
+                    onClick={() => onToggleSuperset(i)}
+                    style={{ alignSelf: 'center', margin: '-2px 0', padding: '4px 12px', borderRadius: 999, background: linkedWithNext ? C.accentDim : 'transparent', border: `1px dashed ${linkedWithNext ? C.accent : C.line}`, color: linkedWithNext ? C.accent : C.textLow, cursor: 'pointer', fontFamily: 'JetBrains Mono, monospace', fontSize: 8.5, letterSpacing: 1.4, zIndex: 1 }}
+                  >
+                    {linkedWithNext ? '🔗 SUPERSET — TAP TO UNLINK' : '＋ LINK AS SUPERSET'}
+                  </button>
+                )}
+              </React.Fragment>
+            );
+          })}
+        </div>
+        <button onClick={onAdd} style={{ width: '100%', marginTop: 10, padding: '13px 14px', background: 'transparent', border: `1px dashed ${C.accentDim}`, borderRadius: 12, color: C.accent, cursor: 'pointer', fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 14, letterSpacing: 1.2, textTransform: 'uppercase' }}>
+          ＋ Add exercise
+        </button>
       </div>
-
-      {isWarmup && (
-        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: C.textLow, letterSpacing: 1.4 }}>
-          WARM
-        </span>
-      )}
-
-      {/* Weight input — a real, visible box: with no history the value starts
-          empty, and the old borderless style made it look like weight wasn't
-          tracked at all. */}
-      {isWeighted && (
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-          <input
-            type="number"
-            inputMode="decimal"
-            value={set.weight ?? ''}
-            onChange={(e) => onChange({ weight: e.target.value ? Number(e.target.value) : null })}
-            disabled={set.complete}
-            placeholder={set.suggested != null ? String(set.suggested) : '··'}
-            style={{
-              width: 56,
-              background: C.surf2, border: `1px solid ${set.weight ? C.accentDim : C.line}`, borderRadius: 6,
-              fontFamily: 'JetBrains Mono, monospace', fontSize: 18, fontWeight: 600,
-              color: set.complete ? C.textMid : (set.weight ? C.accent : C.text),
-              outline: 0, padding: '6px 8px', textAlign: 'center',
-            }}
-          />
-          <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: C.textLow, letterSpacing: 1.2 }}>
-            KG
-          </span>
-        </div>
-      )}
-
-      <span style={{ flex: 1, textAlign: 'right', fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.textLow, letterSpacing: 1.2 }}>
-        {isHold ? `${set.targetHold}s` : `target ${set.target}`}
-      </span>
-
-      {/* Reps input */}
-      {!isHold && (
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-          <input
-            type="number"
-            inputMode="numeric"
-            value={set.reps ?? ''}
-            onChange={(e) => onChange({ reps: e.target.value ? Number(e.target.value) : null })}
-            disabled={set.complete}
-            placeholder="··"
-            style={{
-              width: 44,
-              background: C.surf2, border: `1px solid ${set.reps ? C.accentDim : C.line}`, borderRadius: 6,
-              fontFamily: 'JetBrains Mono, monospace', fontSize: 18, fontWeight: 600,
-              color: set.complete ? C.textMid : (set.reps ? C.accent : C.text),
-              outline: 0, padding: '6px 8px', textAlign: 'center',
-            }}
-          />
-          <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: C.textLow, letterSpacing: 1.2 }}>
-            REPS
-          </span>
-        </div>
-      )}
-
-      <button
-        onClick={onComplete}
-        disabled={set.complete || (!isHold && set.reps === null)}
-        style={{
-          minWidth: 38, height: 36,
-          background: set.complete ? 'transparent' : (((!isHold && set.reps !== null) || isHold) ? C.accent : C.surf3),
-          border: 0, borderRadius: 8,
-          color: set.complete ? C.textLow : C.onAccent,
-          fontFamily: 'JetBrains Mono, monospace', fontSize: 11, letterSpacing: 1.4, fontWeight: 600,
-          cursor: set.complete ? 'default' : 'pointer',
-          opacity: (!set.complete && !isHold && set.reps === null) ? 0.4 : 1,
-        }}
-      >
-        {set.complete ? '—' : '✓'}
-      </button>
-
-      {/* Plate calculator strip — full width below */}
-      {isWeighted && !set.complete && set.weight >= 20 && (
-        <div style={{ width: '100%', marginTop: 2 }}>
-          <PlateCalc weight={set.weight} isWarmup={isWarmup} />
-        </div>
-      )}
     </div>
   );
 }
 
 // ── Session timer (counts up since start) ────────────────────────────────
-function SessionTimer() {
-  const [start] = React.useState(Date.now());
+function SessionTimer({ startedAt }) {
+  const [start] = React.useState(startedAt || Date.now());
   const [now, setNow] = React.useState(Date.now());
   React.useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
@@ -902,7 +1041,7 @@ function CompleteStat({ label, value }) {
 }
 
 Object.assign(window, {
-  WorkoutSession, SessionComplete,
+  WorkoutSession, SessionComplete, loadActiveDraft, clearActiveDraft,
 });
 
-export { CompleteStat, CurrentExercise, ExitConfirmModal, RIRModal, RestTimer, SessionComplete, SessionTimer, SetRow, WorkoutSession };
+export { BigStepper, CompleteStat, EditSessionSheet, ExitConfirmModal, FocusExercise, RIRModal, RestTimer, SessionComplete, SessionTimer, WorkoutSession, clearActiveDraft, loadActiveDraft };

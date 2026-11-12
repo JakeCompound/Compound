@@ -137,11 +137,19 @@ function ReportsScreen({ user = {} }) {
             </div>
           )}
 
-          {/* Radar */}
+          {/* Radar — with only a handful of check-ins in the window, "30D AVG"
+              reads as a month of data when it's really one night's yes/no
+              answers averaging to 100. Until there's enough to call an
+              average, say exactly what it's based on. */}
           <div style={{ marginTop: 22 }}>
-            <SectionLabel meta={`${tf.toUpperCase()} AVG · ${R.logged} LOGGED`}>LIFE BALANCE</SectionLabel>
+            <SectionLabel meta={R.logged < 5 ? `LAST ${R.logged} CHECK-IN${R.logged === 1 ? '' : 'S'}` : `${tf.toUpperCase()} AVG · ${R.logged} LOGGED`}>LIFE BALANCE</SectionLabel>
             <div style={{ background: C.surf1, border: `1px solid ${C.line}`, borderRadius: 14, padding: '18px 10px' }}>
               <LifeBalanceRadar values={R.radar} size={250} />
+              {R.logged < 5 && (
+                <div style={{ textAlign: 'center', marginTop: 4, fontFamily: 'JetBrains Mono, monospace', fontSize: 8.5, letterSpacing: 1.3, color: C.textLow, padding: '0 12px' }}>
+                  BASED ON {R.logged} CHECK-IN{R.logged === 1 ? '' : 'S'} — THE {days}-DAY PICTURE FILLS IN AS YOU LOG
+                </div>
+              )}
             </div>
           </div>
 

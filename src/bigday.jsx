@@ -46,24 +46,52 @@ function MorningResetCard() {
 
 const ADAPT_SNOOZE_KEY = 'compound:adaptSnooze';
 
-function AdaptCard({ onRecalc }) {
+function AdaptCard({ onRecalc, onChanged }) {
   const [snoozed, setSnoozed] = React.useState(() => {
     try { return Date.now() - (+localStorage.getItem(ADAPT_SNOOZE_KEY) || 0) < 7 * 86400000; } catch (e) { return false; }
   });
+  const [eased, setEased] = React.useState(null); // new targets after easing
   if (snoozed) return null;
   const freq = window.bigDaysInLastWeek ? window.bigDaysInLastWeek() : 0;
-  if (freq < 3) return null;
+  if (freq < 3 && !eased) return null;
   const snooze = () => { try { localStorage.setItem(ADAPT_SNOOZE_KEY, String(Date.now())); } catch (e) {} setSnoozed(true); };
+  // "Ease the target" DOES the easing (calories → maintenance, carbs refill),
+  // then confirms what changed. Only when there's nothing to ease (no targets
+  // yet, or already at maintenance) does it fall back to the calculator.
+  const ease = () => {
+    const next = window.applyTargetEase ? window.applyTargetEase() : null;
+    if (next) { setEased(next); onChanged && onChanged(); }
+    else if (onRecalc) { snooze(); onRecalc(); }
+  };
+
+  if (eased) {
+    return (
+      <div style={{ marginTop: 14, padding: '14px 16px', background: C.accentSoft, border: `1px solid ${C.accentDim}`, borderRadius: 14 }}>
+        <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 16, letterSpacing: 0.5, color: C.text, textTransform: 'uppercase', lineHeight: 1.1 }}>
+          Done — target eased
+        </div>
+        <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: C.textMid, lineHeight: 1.5, margin: '6px 0 0' }}>
+          {eased.easedFrom ? `${eased.easedFrom} → ` : ''}<span style={{ color: C.text, fontWeight: 600 }}>{eased.calories} kcal</span> — maintenance. Hold it here for a couple of weeks, hit it, then tighten again any time in Settings → Recalculate targets.
+        </p>
+        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+          <button onClick={snooze} style={{ background: C.accent, border: 0, color: C.onAccent, padding: '9px 16px', borderRadius: 10, fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 13, letterSpacing: 1.2, textTransform: 'uppercase', cursor: 'pointer' }}>
+            Got it
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ marginTop: 14, padding: '14px 16px', background: C.accentSoft, border: `1px solid ${C.accentDim}`, borderRadius: 14 }}>
       <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 16, letterSpacing: 0.5, color: C.text, textTransform: 'uppercase', lineHeight: 1.1 }}>
         The target might not fit right now
       </div>
       <p style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12.5, color: C.textMid, lineHeight: 1.5, margin: '6px 0 0' }}>
-        A few big days this week — that's information, not failure. It usually means the target doesn't match this stretch of life. An easier target you actually hit beats a hard one you hide from. Two weeks at maintenance is a fine plan.
+        A few big days this week — that's information, not failure. It usually means the target doesn't match this stretch of life. An easier target you actually hit beats a hard one you hide from. One tap below moves you to maintenance for a couple of weeks.
       </p>
       <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-        <button onClick={() => onRecalc && onRecalc()} style={{ background: C.accent, border: 0, color: C.onAccent, padding: '9px 16px', borderRadius: 10, fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 13, letterSpacing: 1.2, textTransform: 'uppercase', cursor: 'pointer' }}>
+        <button onClick={ease} style={{ background: C.accent, border: 0, color: C.onAccent, padding: '9px 16px', borderRadius: 10, fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 13, letterSpacing: 1.2, textTransform: 'uppercase', cursor: 'pointer' }}>
           Ease the target
         </button>
         <button onClick={snooze} style={{ background: 'transparent', border: `1px solid ${C.line}`, color: C.textMid, padding: '9px 14px', borderRadius: 10, fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 13, letterSpacing: 1.2, textTransform: 'uppercase', cursor: 'pointer' }}>

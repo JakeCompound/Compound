@@ -409,10 +409,31 @@ function applyPlateauTrim() {
   } catch (e) { return null; }
 }
 
+
+// AdaptCard "Ease the target": do what the card promises, right here — a
+// stretch at maintenance. Calories move up to TDEE (or +300 capped near a
+// typical maintenance when TDEE isn't stored), carbs refill the gap, protein
+// and fat hold. The old target is kept on the object so tightening back is
+// one tap later. Returns the new targets, or null when there's nothing to
+// ease (no targets yet, or already at/above maintenance).
+function applyTargetEase() {
+  try {
+    const t = window.loadTargets ? window.loadTargets() : null;
+    if (!t || !t.calories) return null;
+    const maintenance = Math.round(t.tdee || Math.min(t.calories + 300, Math.round((t.bmr || 1800) * 1.55)));
+    if (!maintenance || maintenance <= t.calories) return null;
+    let carbs = Math.round((maintenance - (t.protein || 0) * 4 - (t.fat || 0) * 9) / 4);
+    if (carbs < 0) carbs = 0;
+    const next = { ...t, calories: maintenance, carbs, easedFrom: t.calories, easedAt: Date.now(), setAt: Date.now() };
+    if (window.saveTargets) window.saveTargets(next);
+    return next;
+  } catch (e) { return null; }
+}
+
 Object.assign(window, {
   loadCheckins, saveCheckins, recordCheckin, checkinEffectiveDate, deriveMetricsFromCheckin,
   deriveLiveState, computeStreaks, buildWeek, isoDate, computeWeeklyNips,
-  detectPlateau, dismissPlateau, applyPlateauTrim,
+  detectPlateau, dismissPlateau, applyPlateauTrim, applyTargetEase,
 });
 
-export { CHECKINS_KEY, ZERO_METRICS, applyPlateauTrim, buildLiveInsight, buildWeek, checkinEffectiveDate, computeStreaks, computeWeeklyNips, deriveLiveState, deriveMetricsFromCheckin, detectPlateau, dismissPlateau, isoDate, loadCheckins, nextMilestone, recordCheckin, saveCheckins, strengthTrendUp, waistTrend };
+export { CHECKINS_KEY, ZERO_METRICS, applyPlateauTrim, applyTargetEase, buildLiveInsight, buildWeek, checkinEffectiveDate, computeStreaks, computeWeeklyNips, deriveLiveState, deriveMetricsFromCheckin, detectPlateau, dismissPlateau, isoDate, loadCheckins, nextMilestone, recordCheckin, saveCheckins, strengthTrendUp, waistTrend };

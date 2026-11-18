@@ -112,7 +112,7 @@ function HomeScreen({ user, set, state, checkins, onOpenCheckin, onOpenCheckinFo
           silently do nothing. Nudge until fixed (dismiss snoozes 7 days). */}
       <ReminderNudge variant="home" checkInTime={user.checkInTime} />
       <MorningResetCard />
-      <AdaptCard onRecalc={onRecalc} />
+      <AdaptCard onRecalc={onRecalc} onChanged={onChanged} />
 
       {/* Birthday takeover (above everything) */}
       {demoFlags?.birthday && (

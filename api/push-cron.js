@@ -290,67 +290,61 @@ export default async function handler(req, res) {
 
   const supa = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false, autoRefreshToken: false } });
 
-  const { data: allSubs, error: subErr } = await supa
-    .from('push_subscriptions').select('endpoint,user_id,p256dh,auth,timezone');
-  if (subErr) return res.status(500).json({ error: 'read subs failed', detail: subErr.message });
-  // Disabled (banned) accounts get nothing — their devices stay registered so
-  // switching the account back on resumes reminders with no re-setup.
-  let banned = new Set();
-  try {
-    const { data: ul } = await supa.auth.admin.listUsers({ perPage: 1000 });
-    const nowMs = Date.now();
-    (ul && ul.users || []).forEach((u) => { if (u.banned_until && new Date(u.banned_until).getTime() > nowMs) banned.add(u.id); });
-  } catch (e) { /* never block reminders on this lookup */ }
-  const subs = (allSubs || []).filter((s) => !banned.has(s.user_id));
-  if (!subs || !subs.length) return res.status(200).json({ checked: 0, sent: 0 });
-
   const isTest = req.body && req.body.test === true;
   const isDry = req.body && req.body.eventsDryRun === true; // debug: compute events, don't send
-  let profMap = {};
+
+  // Every read runs in parallel: the scheduler (pg_net) only waits 5 s, and
+  // these used to run one after another.
+  const dayAgo = (n) => new Date(Date.now() - n * 86400000).toISOString();
+  const q = (builder) => Promise.resolve(builder).then((r) => r, () => ({ data: null, error: { message: 'query failed' } }));
+  const [subsRes, usersRes, profsRes, cRes, wRes, wwRes, fRes, twRes, pRes, pdRes, sdRes, ndRes] = await Promise.all([
+    q(supa.from('push_subscriptions').select('endpoint,user_id,p256dh,auth,timezone')),
+    supa.auth.admin.listUsers({ perPage: 1000 }).then((r) => r, () => ({ data: null })),
+    isTest ? {} : q(supa.from('profiles').select('id,onboarding,notif_prefs')),
+    isTest ? {} : q(supa.from('checkins').select('user_id,date')),
+    isTest ? {} : q(supa.from('workouts').select('user_id,date,cardio:data->cardio,wname:data->name')),
+    isTest ? {} : q(supa.from('workout_week').select('user_id,week_start,data')),
+    // Recent food entries feed the meal-slot reminders.
+    isTest ? {} : q(supa.from('food_entries').select('user_id,ts,kind,info').gte('ts', dayAgo(8))),
+    // The week's three — this week + last week is all the Sunday prompt needs.
+    isTest ? {} : q(supa.from('week_threes').select('user_id,week_start,data').gte('week_start', dayAgo(21).slice(0, 10))),
+    // 3-Week Reset: programmes + the last 9 days of their logs (a full week
+    // back for the weekly lift/jog tallies and "never miss twice").
+    isTest ? {} : q(supa.from('programmes').select('user_id,data')),
+    isTest ? {} : q(supa.from('programme_days').select('user_id,date,data').gte('date', dayAgo(9).slice(0, 10))),
+    isTest ? {} : q(supa.from('step_days').select('user_id,date,entries').gte('date', dayAgo(9).slice(0, 10))),
+    isTest ? {} : q(supa.from('nip_days').select('user_id,date,nips').gte('date', dayAgo(9).slice(0, 10))),
+  ]);
+  if (subsRes.error) return res.status(500).json({ error: 'read subs failed', detail: subsRes.error.message });
+
+  // Disabled (banned) accounts get nothing — their devices stay registered so
+  // switching the account back on resumes reminders with no re-setup.
+  const banned = new Set();
+  const nowMs = Date.now();
+  ((usersRes && usersRes.data && usersRes.data.users) || []).forEach((u) => { if (u.banned_until && new Date(u.banned_until).getTime() > nowMs) banned.add(u.id); });
+  const subs = (subsRes.data || []).filter((sub) => !banned.has(sub.user_id));
+  if (!subs.length) return res.status(200).json({ checked: 0, sent: 0 });
+
+  const profMap = {};
   const udByUser = {};
   if (!isTest) {
-    const { data: profs } = await supa.from('profiles').select('id,onboarding,notif_prefs');
-    (profs || []).forEach((p) => { profMap[p.id] = p; });
-    // Event reminders need the user's check-in + workout dates, plus any
-    // in-week postpone/cancel override so a handled day doesn't get nagged.
+    (profsRes.data || []).forEach((p) => { profMap[p.id] = p; });
     const ensure = (u) => (udByUser[u] = udByUser[u] || { checkins: new Set(), workouts: new Set(), weekOverride: {}, foodTs: [], threeWeeks: {} });
-    const { data: cRows } = await supa.from('checkins').select('user_id,date');
-    const { data: wRows } = await supa.from('workouts').select('user_id,date,cardio:data->cardio,wname:data->name');
-    // 3-Week Reset: active programmes + the last few days of their logs
-    // (reminder text, "never miss twice" for yesterday).
-    try {
-      const { data: pRows } = await supa.from('programmes').select('user_id,data');
-      (pRows || []).forEach((r) => { if (r.data && r.data.status === 'active') ensure(r.user_id).programme = r.data; });
-      const since = new Date(Date.now() - 9 * 86400000).toISOString().slice(0, 10);
-      const progUsers = Object.keys(udByUser).filter((u) => udByUser[u].programme);
-      if (progUsers.length) {
-        const [{ data: pdRows }, { data: sdRows }, { data: ndRows }] = await Promise.all([
-          supa.from('programme_days').select('user_id,date,data').in('user_id', progUsers).gte('date', since),
-          supa.from('step_days').select('user_id,date,entries').in('user_id', progUsers).gte('date', since),
-          supa.from('nip_days').select('user_id,date,nips').in('user_id', progUsers).gte('date', since),
-        ]);
-        (pdRows || []).forEach((r) => { const u = ensure(r.user_id); (u.progDays = u.progDays || {})[r.date] = r.data; });
-        (sdRows || []).forEach((r) => { const u = ensure(r.user_id); (u.steps = u.steps || {})[r.date] = (r.entries || []).reduce((s, e) => s + (Number(e && e.steps) || 0), 0); });
-        (ndRows || []).forEach((r) => { const u = ensure(r.user_id); (u.nips = u.nips || {})[r.date] = Number(r.nips); });
-      }
-    } catch (e) { /* tables missing → no programme reminders */ }
-    const { data: wwRows } = await supa.from('workout_week').select('user_id,week_start,data');
-    (cRows || []).forEach((r) => ensure(r.user_id).checkins.add(r.date));
-    (wRows || []).forEach((r) => {
+    (cRes.data || []).forEach((r) => ensure(r.user_id).checkins.add(r.date));
+    (wRes.data || []).forEach((r) => {
       const u = ensure(r.user_id);
       u.workouts.add(r.date);
       if (r.cardio === true) { if (/run|jog/i.test(r.wname || '')) (u.runDates = u.runDates || new Set()).add(r.date); }
       else (u.liftDates = u.liftDates || new Set()).add(r.date);
     });
-    (wwRows || []).forEach((r) => { ensure(r.user_id).weekOverride[r.week_start] = r.data; });
-    // Recent food entries feed the meal-slot reminders (a 4-day window covers
-    // "today" in any timezone plus the 3-day activity gate).
-    const { data: fRows } = await supa.from('food_entries').select('user_id,ts,kind,info').gte('ts', new Date(Date.now() - 8 * 86400000).toISOString());
-    (fRows || []).forEach((r) => ensure(r.user_id).foodTs.push({ ts: r.ts, kind: r.kind || 'food', info: r.info || '' }));
-    // The week's three — recent weeks only (the Sunday prompt needs this week
-    // + last week; a missing table just means nobody gets the prompt).
-    const { data: twRows } = await supa.from('week_threes').select('user_id,week_start,data').gte('week_start', new Date(Date.now() - 21 * 86400000).toISOString().slice(0, 10));
-    (twRows || []).forEach((r) => { ensure(r.user_id).threeWeeks[r.week_start] = r.data; });
+    // In-week postpone/cancel overrides, so a handled day doesn't get nagged.
+    (wwRes.data || []).forEach((r) => { ensure(r.user_id).weekOverride[r.week_start] = r.data; });
+    (fRes.data || []).forEach((r) => ensure(r.user_id).foodTs.push({ ts: r.ts, kind: r.kind || 'food', info: r.info || '' }));
+    (twRes.data || []).forEach((r) => { ensure(r.user_id).threeWeeks[r.week_start] = r.data; });
+    (pRes.data || []).forEach((r) => { if (r.data && r.data.status === 'active') ensure(r.user_id).programme = r.data; });
+    (pdRes.data || []).forEach((r) => { const u = ensure(r.user_id); (u.progDays = u.progDays || {})[r.date] = r.data; });
+    (sdRes.data || []).forEach((r) => { const u = ensure(r.user_id); (u.steps = u.steps || {})[r.date] = (r.entries || []).reduce((t, e) => t + (Number(e && e.steps) || 0), 0); });
+    (ndRes.data || []).forEach((r) => { const u = ensure(r.user_id); (u.nips = u.nips || {})[r.date] = Number(r.nips); });
   }
 
   if (isDry) {

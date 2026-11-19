@@ -391,7 +391,7 @@ function ResetCheckinStep({ date, nipsAnswer, stepsAnswer, value, onChange }) {
       {d >= 1 && d <= 4 && yn('ruleKept', 'Beer only (or spirits capped at 8 measured nips): kept?')}
       {yn('afterTea', 'First drink only after tea (6:00pm)?')}
       {yn('noGames', 'No PUBG or YouTube?')}
-      {d !== 0 && yn('screensOff', 'Screens off by 9:45pm?')}
+      {d !== 0 && d !== 5 && yn('screensOff', 'Screens off by 9:45pm?')}
       {yn('familyWalk', 'Family walk?', true)}
       <div style={{ ...body, fontSize: 13, color: C.textMid, lineHeight: 1.5, padding: '12px 0 2px', borderTop: `1px solid ${C.line}` }}>
         {slipped

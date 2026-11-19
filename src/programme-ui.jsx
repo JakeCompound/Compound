@@ -55,13 +55,15 @@ function MiracleMorningScreen({ date, onClose }) {
   };
   // Danger time: when tonight's number is most likely to break (one tap, optional).
   const [danger, setDanger] = React.useState(saved.danger || null);
+  // How do you feel this morning? 1–5, one tap, optional.
+  const [feel, setFeel] = React.useState(typeof saved.feel === 'number' ? saved.feel : null);
   // Weight: optional; saved into the normal weigh-in log so the weigh-in to-do
   // and the end-of-programme summary both see it.
   const loadW = () => { try { return JSON.parse(localStorage.getItem('compound:weighins') || '[]'); } catch (e) { return []; } };
   const [weight, setWeight] = React.useState(() => { const w = loadW().find((e) => e.date === day); return w ? String(w.value) : ''; });
   const numOk = num !== '' && Number.isFinite(Number(num)) && Number(num) >= 0;
   const done = () => {
-    persist({ savers: ticks, number: Number(num), danger, journal: line.trim(), morningDoneAt: Date.now() });
+    persist({ savers: ticks, number: Number(num), danger, feel, journal: line.trim(), morningDoneAt: Date.now() });
     const w = Number(weight);
     if (weight !== '' && Number.isFinite(w) && w >= 30 && w <= 300) {
       const next = [...loadW().filter((e) => e.date !== day), { date: day, value: w }].sort((a, b) => (a.date < b.date ? -1 : 1));
@@ -81,11 +83,23 @@ function MiracleMorningScreen({ date, onClose }) {
       <h1 style={{ ...head, fontSize: 38, lineHeight: 0.95, color: C.text, marginTop: 10 }}>
         SAVERS.<br /><span style={{ color: C.accent }}>{count}/6 DONE.</span>
       </h1>
+      {d === 0 && <div style={{ ...body, fontSize: 13, color: C.textMid, marginTop: 8 }}>Lord's Day · ten minutes before you leave.</div>}
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 14 }}>
+        <span style={{ ...body, flex: 1, fontSize: 14, color: C.textMid }}>How do you feel?</span>
+        {[1, 2, 3, 4, 5].map((n) => (
+          <button key={n} onClick={() => setFeel(feel === n ? null : n)}
+            style={{ ...btnBase, ...mono, width: 38, height: 36, fontSize: 15, letterSpacing: 0, background: feel === n ? C.accent : 'transparent', color: feel === n ? C.onAccent : C.textMid, border: `1px solid ${feel === n ? C.accent : C.lineStrong}` }}>
+            {n}
+          </button>
+        ))}
+      </div>
 
       <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
         {SAVERS.map((s, i) => {
           const on = ticks[i];
-          const detail = s.t === 'Exercise' ? (isJogDay ? `Jog ${JOG_KM} km` : '20 push-ups') : s.d;
+          const detail = s.t === 'Exercise' ? (isJogDay ? `Jog ${JOG_KM} km` : d === 0 ? '20 push-ups or family walk later' : '20 push-ups')
+            : s.t === 'Reading' && d === 0 ? "Lord's Supper" : s.d;
           return (
             <button key={i} onClick={() => toggle(i)}
               style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 12, cursor: 'pointer', textAlign: 'left',
@@ -212,7 +226,7 @@ function ResetHomeCard({ onOpenMorning, onOpenSummary }) {
       <div style={{ marginTop: 12 }}>
         {row('Miracle Morning', dayData.morningDoneAt ? `${saversCount(dayData)}/6 · tonight's number ${dayData.number}` : 'SAVERS + tonight\'s number', !!dayData.morningDoneAt && saversCount(dayData) === 6,
           !dayData.morningDoneAt || saversCount(dayData) < 6 ? smallBtn(dayData.morningDoneAt ? 'Edit' : 'Open', onOpenMorning) : null)}
-        {plan.lift && row(`Day ${plan.lift} · ${RESET_DAYS[plan.lift].name}`, plan.liftDue ? 'Gym 5:05pm · two lifts still counts' : 'Optional today · or tomorrow', liftDone,
+        {plan.lift && row(`Day ${plan.lift} · ${RESET_DAYS[plan.lift].name}`, plan.liftDue ? ([0, 6].includes(dowOf(today)) ? 'Today · two lifts still counts' : 'Gym 5:05pm · two lifts still counts') : 'Optional today · or tomorrow', liftDone,
           liftDone ? null : smallBtn('Start', startLift))}
         {plan.jog && row(`Jog ${JOG_KM} km · 5:50am`, `${steps.toLocaleString()} steps · ${JOG_STEPS_MIN.toLocaleString()}+ counts`, jogOk, null)}
       </div>
@@ -291,7 +305,7 @@ function ResetCheckinStep({ date, nipsAnswer, stepsAnswer, value, onChange }) {
       {d >= 1 && d <= 4 && yn('ruleKept', 'Beer only (or spirits capped at 8 measured nips): kept?')}
       {yn('afterTea', 'First drink only after tea (6:00pm)?')}
       {yn('noGames', 'No PUBG or YouTube?')}
-      {yn('screensOff', 'Screens off by 9:45pm?')}
+      {d !== 0 && yn('screensOff', 'Screens off by 9:45pm?')}
       {yn('familyWalk', 'Family walk?', true)}
     </div>
   );
@@ -358,6 +372,7 @@ function ProgrammeSummaryScreen({ programme, onClose }) {
         {stat('Drinks at/under number', `${s.drinks.nightsUnder}/${s.drinks.nightsNumbered}`, 'nights')}
         {stat('Avg drinks per night', s.drinks.byWeek.map((x) => (x.avg == null ? '—' : x.avg)).join(' · '), s.drinks.byWeek.map((x) => `wk ${x.week}`).join(' · '))}
         {stat('Longest streaks', `${s.longest.savers} · ${s.longest.drinks} · ${s.longest.sessions}`, 'morning · drinks · sessions')}
+        {s.feel && s.feel.all != null && stat('Morning feel (1–5)', `${s.feel.afterUnder ?? '—'} vs ${s.feel.afterOver ?? '—'}`, `after nights at/under vs over${s.feel.mondays != null ? ` · Mondays ${s.feel.mondays}` : ''}`)}
         {s.overReasons && Object.keys(s.overReasons).length > 0 && stat('Nights over: why', Object.entries(s.overReasons).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k} ${n}`).join(' · '), 'your triggers')}
       </div>
       {isOpen && (

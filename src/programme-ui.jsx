@@ -1,9 +1,9 @@
 import React from 'react';
 import { C } from './compound-ui.jsx';
 import {
-  DANGER_TIMES, JOG_KM, JOG_STEPS_MIN, OVER_REASONS, RESET_DAYS, RESET_NOTIFS, SAVERS, STEP_TARGET,
+  BIG_STEP_MIN, DANGER_TIMES, JOG_KM, JOG_STEPS_MIN, OVER_REASONS, RESET_DAYS, RESET_NOTIFS, SAVERS, STEP_TARGET,
   addDays, dayNumber, dowOf, endDateOf, inProgramme, missReasons, notifSetting, planFor,
-  jogDone, jogWeek, liftWeek, missStreak, nextLiftKey, programmeStreaks, programmeSummary, saversCount, weekNumber,
+  bigStepDay, jogDone, jogWeek, liftWeek, missStreak, nextLiftKey, programmeStreaks, programmeSummary, saversCount, weekNumber,
 } from './programme-core.js';
 import {
   activeProgramme, getProgrammeDay, loadProgrammes, patchProgrammeDay, programmeCtx,
@@ -184,6 +184,8 @@ function StreakPill({ label, s }) {
 
 function ResetHomeCard({ onOpenMorning, onOpenSummary }) {
   const p = useProgramme();
+  const [askSteps, setAskSteps] = React.useState(false); // "Big step day" entry open?
+  const [stepsIn, setStepsIn] = React.useState('');
   if (!p) return null;
   const today = todayKey();
   const end = endDateOf(p);
@@ -209,6 +211,10 @@ function ResetHomeCard({ onOpenMorning, onOpenSummary }) {
   const steps = ctx.stepsOn(today);
   const jogOk = jogDone(p, ctx, today);
   const jw = jogWeek(p, today, ctx);
+  const bigDay = !jogOk && bigStepDay(ctx, today);
+  const jogTally = jw.walks ? `${jw.jogs} jog${jw.jogs === 1 ? '' : 's'} + ${jw.walks} step day${jw.walks === 1 ? '' : 's'}${jw.target ? ` of ${jw.target}` : ''}` : jw.target ? `${jw.done}/${jw.target} this week` : `${jw.done} this week`;
+  const stepsNum = Number(stepsIn);
+  const saveBigSteps = () => { if (stepsNum >= BIG_STEP_MIN) { patchProgrammeDay(today, { bigSteps: stepsNum }); setAskSteps(false); } };
   const isLast = end && today === end;
 
   const startLift = () => { try { window.dispatchEvent(new CustomEvent('compound:start-programme', { detail: { day: plan.lift } })); } catch (e) {} };
@@ -251,14 +257,31 @@ function ResetHomeCard({ onOpenMorning, onOpenSummary }) {
         {plan.lift && row(liftDone ? `Day ${plan.lift} · ${RESET_DAYS[plan.lift].name} · done` : `Next: Day ${plan.lift} · ${RESET_DAYS[plan.lift].name}`,
           `${plan.week.done}/${plan.week.target} this week · ${liftDone ? 'nice work' : dayData.aim === true ? 'you said today · two lifts still counts' : 'any day you like'}`,
           liftDone, liftDone ? null : smallBtn('Start', startLift))}
-        {row(jogOk ? 'Jog · done' : `Jog · aim ${JOG_KM} km`,
-          `${jw.target ? `${jw.done}/${jw.target} this week` : `${jw.done} this week`} · ${jogOk ? 'you got out the door' : plan.jog ? '5:50am or this arvo · any distance counts' : 'any day · any distance counts'}`,
-          jogOk,
+        {row(jogOk ? 'Jog · done' : bigDay ? 'Big step day · covered' : `Jog · aim ${JOG_KM} km`,
+          `${jogTally} · ${jogOk ? 'you got out the door' : bigDay ? 'a 500 m lap still earns the jog' : plan.jog ? '5:50am or this arvo · any distance counts' : 'any day · any distance counts'}`,
+          jogOk || bigDay,
           jogOk
             ? <input inputMode="decimal" defaultValue={dayData.jogKm != null ? String(dayData.jogKm) : ''} placeholder="km"
                 onBlur={(e) => { const n = Number(e.target.value); patchProgrammeDay(today, { jog: true, jogKm: e.target.value !== '' && Number.isFinite(n) && n > 0 ? n : null }); }}
                 style={{ ...mono, width: 62, height: 34, textAlign: 'center', fontSize: 14, color: C.text, background: C.surf2, border: `1px solid ${C.lineStrong}`, borderRadius: 8 }} />
             : smallBtn('Log jog', () => patchProgrammeDay(today, { jog: true })))}
+        {!jogOk && !bigDay && (askSteps ? (
+          <div style={{ padding: '2px 0 10px 30px' }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input inputMode="numeric" autoFocus value={stepsIn} onChange={(e) => setStepsIn(e.target.value.replace(/[^0-9]/g, ''))} placeholder="today's steps"
+                style={{ ...mono, flex: 1, minWidth: 0, height: 34, textAlign: 'center', fontSize: 14, color: C.text, background: C.surf2, border: `1px solid ${C.lineStrong}`, borderRadius: 8 }} />
+              <button onClick={saveBigSteps} style={{ ...btnBase, height: 34, padding: '0 14px', fontSize: 12, background: stepsNum >= BIG_STEP_MIN ? C.accent : C.accentDim, color: stepsNum >= BIG_STEP_MIN ? C.onAccent : C.textLow }}>Save</button>
+            </div>
+            <div style={{ ...body, fontSize: 12, color: C.textMid, marginTop: 6 }}>
+              {stepsIn !== '' && stepsNum < BIG_STEP_MIN ? `Needs ${BIG_STEP_MIN.toLocaleString()}+. A 500 m lap still earns the jog.` : `${BIG_STEP_MIN.toLocaleString()}+ steps covers a jog for the week.`}
+            </div>
+          </div>
+        ) : (
+          <button onClick={() => { setStepsIn(steps ? String(steps) : ''); setAskSteps(true); }}
+            style={{ ...btnBase, background: 'transparent', color: C.textMid, fontSize: 11.5, letterSpacing: 1, padding: '0 0 10px 30px' }}>
+            Or log a big step day ({BIG_STEP_MIN.toLocaleString()}+)
+          </button>
+        ))}
       </div>
       {isLast && <GhostBtn onClick={onOpenSummary} style={{ marginTop: 10 }}>Final day · see summary</GhostBtn>}
     </div>
@@ -316,6 +339,7 @@ function ResetCheckinStep({ date, nipsAnswer, stepsAnswer, value, onChange }) {
         <span style={{ ...body, flex: 1, fontSize: 14, color: C.text }}>Steps <span style={{ color: C.textLow }}>· target {STEP_TARGET.toLocaleString()}</span></span>
         {numIn('steps', steps, '0')}
       </div>
+      {typeof steps === 'number' && steps >= BIG_STEP_MIN && <div style={{ ...mono, fontSize: 10.5, letterSpacing: 1.2, textAlign: 'right', color: C.success, paddingBottom: 8 }}>BIG STEP DAY · COUNTS TOWARD YOUR JOGS</div>}
       <div style={{ padding: '9px 0', borderTop: `1px solid ${C.line}` }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ ...body, flex: 1, fontSize: 14, color: C.text }}>Drinks <span style={{ color: C.textLow }}>· this morning's number {typeof num === 'number' ? num : '—'}</span></span>
@@ -406,7 +430,7 @@ function ProgrammeSummaryScreen({ programme, onClose }) {
       <div style={{ marginTop: 16 }}>
         {stat('Weight', w.last != null ? `${w.last} kg` : '—', w.first != null ? `day 1 ${w.first} kg${delta != null ? ` · ${delta > 0 ? '+' : ''}${delta} kg` : ''}` : 'no day-1 weigh-in')}
         {stat('Workouts', `${s.lifts.done}/${s.lifts.scheduled}`, 'completed / scheduled')}
-        {stat('Jogs', `${s.jogs.done}/${s.jogs.scheduled}`, `completed / scheduled${s.jogs.km ? ` · ${s.jogs.km} km logged` : ''}`)}
+        {stat('Jogs', `${s.jogs.done}/${s.jogs.scheduled}`, `completed / scheduled${s.jogs.stepDays ? ` · plus ${s.jogs.stepDays} big step day${s.jogs.stepDays === 1 ? '' : 's'}` : ''}${s.jogs.km ? ` · ${s.jogs.km} km logged` : ''}`)}
         {stat('Miracle Morning', `${s.miracleMorning}`, 'days with all six')}
         {s.nightsLogged != null && stat('Nights logged', `${s.nightsLogged}/${s.days}`, 'checked in, good day or not')}
         {stat('Drinks at/under number', `${s.drinks.nightsUnder}/${s.drinks.nightsNumbered}`, 'nights')}

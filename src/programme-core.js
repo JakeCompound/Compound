@@ -61,7 +61,8 @@ export const SAVERS = [
 
 export const DANGER_TIMES = ['After tea', 'Kids in bed', 'Mates over', 'None'];
 export const OVER_REASONS = ['Tired', 'Stress', 'Social', 'Boredom', 'No plan'];
-export const STEP_TARGET = 8000;
+export const STEP_TARGET = 7000;
+export const BIG_STEP_MIN = 10000; // a "big step day" - covers a jog for the week
 export const JOG_STEPS_MIN = 5000;
 export const JOG_KM = 7;
 export const GYM_TIME = '17:05';
@@ -162,13 +163,25 @@ export function jogDone(p, ctx, date) {
   if (day.jog === true || (day.night && day.night.jog === true)) return true;
   return false; // no step threshold: getting out the door is what counts, even 500 m
 }
+// A big step day: 10,000+ steps (typed on the Home card, entered at the
+// check-in, or already in the step ledger). It works towards the week's jogs
+// but is recorded separately - it is not a jog.
+export function bigStepDay(ctx, date) {
+  const day = ((ctx && ctx.days) || {})[date] || {};
+  const n = Math.max(Number(day.bigSteps) || 0, Number(day.night && day.night.steps) || 0, ctx && ctx.stepsOn ? ctx.stepsOn(date) : 0);
+  return n >= BIG_STEP_MIN;
+}
 // The week's jog tally. target = scheduled jog days in the week; due = the
 // week's last day with the target unmet (the only way a jog counts as a miss).
 export function jogWeek(p, date, ctx) {
   const { start, end } = weekBounds(p, date);
-  let target = 0, done = 0;
-  for (let x = start; x <= end; x = addDays(x, 1)) { if (isJogDay(p, x)) target += 1; if (jogDone(p, ctx, x)) done += 1; }
-  return { start, end, target, done, due: date === end && done < target };
+  let target = 0, jogs = 0, walks = 0;
+  for (let x = start; x <= end; x = addDays(x, 1)) {
+    if (isJogDay(p, x)) target += 1;
+    if (jogDone(p, ctx, x)) jogs += 1; else if (bigStepDay(ctx, x)) walks += 1;
+  }
+  const done = jogs + walks;
+  return { start, end, target, done, jogs, walks, due: date === end && done < target };
 }
 // Why a day counts as missed ("any slip"): returns a list of reasons, empty = fine.
 export function missReasons(p, ctx, date) {
@@ -225,7 +238,7 @@ export function programmeStreaks(p, ctx, today) {
     // Every lift extends it (any day); a missed jog day or a week that ends
     // short of 3 lifts breaks it.
     sessions: streak(p, ctx, today, (d) => {
-      if (ctx.liftDates.has(d) || jogDone(p, ctx, d)) return true;
+      if (ctx.liftDates.has(d) || jogDone(p, ctx, d) || bigStepDay(ctx, d)) return true;
       const plan = planFor(p, d, ctx.liftDates);
       if (plan.liftDue || jogWeek(p, d, ctx).due) return d === today ? null : false;
       return null;
@@ -243,7 +256,7 @@ export function programmeSummary(p, ctx, weighins, today) {
   const before = (weighins || []).filter((w) => w.date < p.startDate && daysBetween(w.date, p.startDate) <= 3).sort((a, b) => (a.date < b.date ? -1 : 1)).pop();
   const first = (ws[0] && ws[0].date === p.startDate ? ws[0] : null) || before || ws[0] || null;
   const last = ws.length ? ws[ws.length - 1] : null;
-  let liftsDone = 0, liftsSched = 0, jogsDone = 0, jogsSched = 0, jogKm = 0, mm = 0, nightsLogged = 0, nightsUnder = 0, nightsNumbered = 0;
+  let liftsDone = 0, liftsSched = 0, jogsDone = 0, jogsSched = 0, jogKm = 0, stepDays = 0, mm = 0, nightsLogged = 0, nightsUnder = 0, nightsNumbered = 0;
   const weeks = {};
   const overReasons = {};
   const feel = { afterUnder: [], afterOver: [], mondays: [], all: [] };
@@ -252,7 +265,7 @@ export function programmeSummary(p, ctx, weighins, today) {
     const plan = planFor(p, d, ctx.liftDates);
     if (ctx.liftDates.has(d)) liftsDone += 1;
     if (plan.week && d === plan.week.start) liftsSched += plan.week.target;
-    if (jogDone(p, ctx, d)) { jogsDone += 1; jogKm += Number(((ctx.days || {})[d] || {}).jogKm) || 0; }
+    if (jogDone(p, ctx, d)) { jogsDone += 1; jogKm += Number(((ctx.days || {})[d] || {}).jogKm) || 0; } else if (bigStepDay(ctx, d)) stepDays += 1;
     if (plan.week && d === plan.week.start) jogsSched += jogWeek(p, d, ctx).target;
     const day = (ctx.days || {})[d] || {};
     if (saversCount(day) >= 6) mm += 1;
@@ -281,7 +294,7 @@ export function programmeSummary(p, ctx, weighins, today) {
   return {
     weight: { first: first ? first.value : null, firstDate: first ? first.date : null, last: last ? last.value : null, lastDate: last ? last.date : null },
     lifts: { done: liftsDone, scheduled: liftsSched },
-    jogs: { done: jogsDone, scheduled: jogsSched, km: Math.round(jogKm * 10) / 10 },
+    jogs: { done: jogsDone, stepDays, scheduled: jogsSched, km: Math.round(jogKm * 10) / 10 },
     miracleMorning: mm,
     nightsLogged,
     days: daysBetween(p.startDate, end) + 1,

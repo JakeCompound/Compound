@@ -153,14 +153,14 @@ export function drinksActual(day, ctx, date) {
 }
 // Jogs are scheduled Wed + Fri (from the first Monday) but count on ANY day:
 // a missed morning can be made up that afternoon or on another day. A jog
-// counts when a run is logged, when it's ticked on the Home card or in the
-// check-in, or - on a scheduled jog day - when steps reach 5,000.
+// counts when a run is logged or when it's ticked on the Home card or in the
+// check-in. Any distance counts - 7 km is the aim, not the bar.
 export const isJogDay = (p, date) => inProgramme(p, date) && date >= firstMonday(p) && [3, 5].includes(dowOf(date));
 export function jogDone(p, ctx, date) {
   const day = ((ctx && ctx.days) || {})[date] || {};
   if (ctx.runDates && ctx.runDates.has(date)) return true;
   if (day.jog === true || (day.night && day.night.jog === true)) return true;
-  return isJogDay(p, date) && (ctx.stepsOn ? ctx.stepsOn(date) : 0) >= JOG_STEPS_MIN;
+  return false; // no step threshold: getting out the door is what counts, even 500 m
 }
 // The week's jog tally. target = scheduled jog days in the week; due = the
 // week's last day with the target unmet (the only way a jog counts as a miss).
@@ -243,7 +243,7 @@ export function programmeSummary(p, ctx, weighins, today) {
   const before = (weighins || []).filter((w) => w.date < p.startDate && daysBetween(w.date, p.startDate) <= 3).sort((a, b) => (a.date < b.date ? -1 : 1)).pop();
   const first = (ws[0] && ws[0].date === p.startDate ? ws[0] : null) || before || ws[0] || null;
   const last = ws.length ? ws[ws.length - 1] : null;
-  let liftsDone = 0, liftsSched = 0, jogsDone = 0, jogsSched = 0, mm = 0, nightsLogged = 0, nightsUnder = 0, nightsNumbered = 0;
+  let liftsDone = 0, liftsSched = 0, jogsDone = 0, jogsSched = 0, jogKm = 0, mm = 0, nightsLogged = 0, nightsUnder = 0, nightsNumbered = 0;
   const weeks = {};
   const overReasons = {};
   const feel = { afterUnder: [], afterOver: [], mondays: [], all: [] };
@@ -252,7 +252,7 @@ export function programmeSummary(p, ctx, weighins, today) {
     const plan = planFor(p, d, ctx.liftDates);
     if (ctx.liftDates.has(d)) liftsDone += 1;
     if (plan.week && d === plan.week.start) liftsSched += plan.week.target;
-    if (jogDone(p, ctx, d)) jogsDone += 1;
+    if (jogDone(p, ctx, d)) { jogsDone += 1; jogKm += Number(((ctx.days || {})[d] || {}).jogKm) || 0; }
     if (plan.week && d === plan.week.start) jogsSched += jogWeek(p, d, ctx).target;
     const day = (ctx.days || {})[d] || {};
     if (saversCount(day) >= 6) mm += 1;
@@ -281,7 +281,7 @@ export function programmeSummary(p, ctx, weighins, today) {
   return {
     weight: { first: first ? first.value : null, firstDate: first ? first.date : null, last: last ? last.value : null, lastDate: last ? last.date : null },
     lifts: { done: liftsDone, scheduled: liftsSched },
-    jogs: { done: jogsDone, scheduled: jogsSched },
+    jogs: { done: jogsDone, scheduled: jogsSched, km: Math.round(jogKm * 10) / 10 },
     miracleMorning: mm,
     nightsLogged,
     days: daysBetween(p.startDate, end) + 1,

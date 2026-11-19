@@ -118,7 +118,7 @@ function MiracleMorningScreen({ date, onClose }) {
       <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
         {SAVERS.map((s, i) => {
           const on = ticks[i];
-          const detail = s.t === 'Exercise' ? (isJogDay ? `Jog ${JOG_KM} km` : '20 push-ups')
+          const detail = s.t === 'Exercise' ? (isJogDay ? `Jog · aim ${JOG_KM} km, any distance counts` : '20 push-ups')
             : s.t === 'Reading' && d === 0 ? 'A verse, a hymn or the order of service' : s.d;
           return (
             <button key={i} onClick={() => toggle(i)}
@@ -251,9 +251,14 @@ function ResetHomeCard({ onOpenMorning, onOpenSummary }) {
         {plan.lift && row(liftDone ? `Day ${plan.lift} · ${RESET_DAYS[plan.lift].name} · done` : `Next: Day ${plan.lift} · ${RESET_DAYS[plan.lift].name}`,
           `${plan.week.done}/${plan.week.target} this week · ${liftDone ? 'nice work' : dayData.aim === true ? 'you said today · two lifts still counts' : 'any day you like'}`,
           liftDone, liftDone ? null : smallBtn('Start', startLift))}
-        {row(jogOk ? `Jog ${JOG_KM} km · done` : `Jog ${JOG_KM} km`,
-          `${jw.target ? `${jw.done}/${jw.target} this week` : `${jw.done} this week`} · ${jogOk ? 'nice work' : plan.jog ? `5:50am or this arvo · ${JOG_STEPS_MIN.toLocaleString()}+ steps counts` : 'any day counts'}`,
-          jogOk, jogOk ? null : smallBtn('Log jog', () => patchProgrammeDay(today, { jog: true })))}
+        {row(jogOk ? 'Jog · done' : `Jog · aim ${JOG_KM} km`,
+          `${jw.target ? `${jw.done}/${jw.target} this week` : `${jw.done} this week`} · ${jogOk ? 'you got out the door' : plan.jog ? '5:50am or this arvo · any distance counts' : 'any day · any distance counts'}`,
+          jogOk,
+          jogOk
+            ? <input inputMode="decimal" defaultValue={dayData.jogKm != null ? String(dayData.jogKm) : ''} placeholder="km"
+                onBlur={(e) => { const n = Number(e.target.value); patchProgrammeDay(today, { jog: true, jogKm: e.target.value !== '' && Number.isFinite(n) && n > 0 ? n : null }); }}
+                style={{ ...mono, width: 62, height: 34, textAlign: 'center', fontSize: 14, color: C.text, background: C.surf2, border: `1px solid ${C.lineStrong}`, borderRadius: 8 }} />
+            : smallBtn('Log jog', () => patchProgrammeDay(today, { jog: true })))}
       </div>
       {isLast && <GhostBtn onClick={onOpenSummary} style={{ marginTop: 10 }}>Final day · see summary</GhostBtn>}
     </div>
@@ -305,7 +310,7 @@ function ResetCheckinStep({ date, nipsAnswer, stepsAnswer, value, onChange }) {
         <span style={{ ...mono, fontSize: 15, color: saversCount(day) === 6 ? C.success : C.accent }}>{saversCount(day)}/6</span>
       </div>
       {sessionLabel && yn('workoutDone', sessionLabel)}
-      {(plan.jog || v.jog != null) && yn('jog', 'Jog today (morning or arvo)?')}
+      {(plan.jog || v.jog != null) && yn('jog', 'Jog today? Any distance counts.')}
       {yn('protein', 'Protein 120 g across the day?')}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderTop: `1px solid ${C.line}` }}>
         <span style={{ ...body, flex: 1, fontSize: 14, color: C.text }}>Steps <span style={{ color: C.textLow }}>· target {STEP_TARGET.toLocaleString()}</span></span>
@@ -401,7 +406,7 @@ function ProgrammeSummaryScreen({ programme, onClose }) {
       <div style={{ marginTop: 16 }}>
         {stat('Weight', w.last != null ? `${w.last} kg` : '—', w.first != null ? `day 1 ${w.first} kg${delta != null ? ` · ${delta > 0 ? '+' : ''}${delta} kg` : ''}` : 'no day-1 weigh-in')}
         {stat('Workouts', `${s.lifts.done}/${s.lifts.scheduled}`, 'completed / scheduled')}
-        {stat('Jogs', `${s.jogs.done}/${s.jogs.scheduled}`, 'completed / scheduled')}
+        {stat('Jogs', `${s.jogs.done}/${s.jogs.scheduled}`, `completed / scheduled${s.jogs.km ? ` · ${s.jogs.km} km logged` : ''}`)}
         {stat('Miracle Morning', `${s.miracleMorning}`, 'days with all six')}
         {s.nightsLogged != null && stat('Nights logged', `${s.nightsLogged}/${s.days}`, 'checked in, good day or not')}
         {stat('Drinks at/under number', `${s.drinks.nightsUnder}/${s.drinks.nightsNumbered}`, 'nights')}

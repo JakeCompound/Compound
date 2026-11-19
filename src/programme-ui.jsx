@@ -3,7 +3,7 @@ import { C } from './compound-ui.jsx';
 import {
   BIG_STEP_MIN, DANGER_TIMES, JOG_KM, JOG_STEPS_MIN, OVER_REASONS, RESET_DAYS, RESET_NOTIFS, SAVERS, STEP_TARGET,
   addDays, dayNumber, dowOf, endDateOf, inProgramme, missReasons, notifSetting, planFor,
-  bigStepDay, jogDone, jogWeek, liftWeek, missStreak, nextLiftKey, programmeStreaks, programmeSummary, saversCount, weekNumber,
+  bigStepDay, jogDone, jogWeek, liftWeek, missStreak, nextLiftKey, programmeStreaks, programmeSummary, saversCount, saversExempt, weekNumber,
 } from './programme-core.js';
 import {
   activeProgramme, getProgrammeDay, loadProgrammes, patchProgrammeDay, programmeCtx,
@@ -91,6 +91,7 @@ function MiracleMorningScreen({ date, onClose }) {
         SAVERS.<br /><span style={{ color: C.accent }}>{count}/6 DONE.</span>
       </h1>
       {d === 0 && <div style={{ ...body, fontSize: 13, color: C.textMid, marginTop: 8 }}>Lord's Day · ten minutes before you leave.</div>}
+      {saversExempt(activeProgramme(), day) && <div style={{ ...body, fontSize: 13, color: C.textMid, marginTop: 8, lineHeight: 1.45 }}>Afternoon start. This morning's SAVERS don't count against you - just set tonight's number. Tick anything you did do.</div>}
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 14 }}>
         <span style={{ ...body, flex: 1, fontSize: 14, color: C.textMid }}>How do you feel?</span>
@@ -204,6 +205,7 @@ function ResetHomeCard({ onOpenMorning, onOpenSummary }) {
   const n = dayNumber(p, today);
   const plan = planFor(p, today, ctx.liftDates);
   const dayData = ctx.days[today] || {};
+  const pmStart = saversExempt(p, today);
   const streaks = programmeStreaks(p, ctx, today);
   const missN = missStreak(p, ctx, today);
   const must = missN > 0;
@@ -252,8 +254,8 @@ function ResetHomeCard({ onOpenMorning, onOpenSummary }) {
       </div>
 
       <div style={{ marginTop: 12 }}>
-        {row('Miracle Morning', dayData.morningDoneAt ? `${saversCount(dayData)}/6 · tonight's number ${dayData.number}` : 'SAVERS + tonight\'s number', !!dayData.morningDoneAt && saversCount(dayData) === 6,
-          !dayData.morningDoneAt || saversCount(dayData) < 6 ? smallBtn(dayData.morningDoneAt ? 'Edit' : 'Open', onOpenMorning) : null)}
+        {row('Miracle Morning', dayData.morningDoneAt ? `${saversCount(dayData)}/6 · tonight's number ${dayData.number}` : 'SAVERS + tonight\'s number', !!dayData.morningDoneAt && (pmStart || saversCount(dayData) === 6),
+          !dayData.morningDoneAt || (!pmStart && saversCount(dayData) < 6) ? smallBtn(dayData.morningDoneAt ? 'Edit' : 'Open', onOpenMorning) : null)}
         {plan.lift && row(liftDone ? `Day ${plan.lift} · ${RESET_DAYS[plan.lift].name} · done` : `Next: Day ${plan.lift} · ${RESET_DAYS[plan.lift].name}`,
           `${plan.week.done}/${plan.week.target} this week · ${liftDone ? 'nice work' : dayData.aim === true ? 'you said today · two lifts still counts' : 'any day you like'}`,
           liftDone, liftDone ? null : smallBtn('Start', startLift))}
@@ -307,7 +309,7 @@ function ResetCheckinStep({ date, nipsAnswer, stepsAnswer, value, onChange }) {
   const cmp = typeof num === 'number' && typeof act === 'number' ? (act < num ? 'UNDER' : act === num ? 'MATCH' : 'OVER') : null;
   const steps = typeof v.steps === 'number' ? v.steps : stepsAnswer;
   // Any slip today? Drives the closing line only - never a red mark.
-  const slipped = cmp === 'OVER' || saversCount(day) < 6 || ['protein', 'ruleKept', 'afterTea', 'noGames', 'screensOff'].some((k) => v[k] === false);
+  const slipped = cmp === 'OVER' || (!saversExempt(p, date) && saversCount(day) < 6) || ['protein', 'ruleKept', 'afterTea', 'noGames', 'screensOff'].some((k) => v[k] === false);
 
   const yn = (k, label, opt) => (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderTop: `1px solid ${C.line}` }}>

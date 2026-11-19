@@ -32,6 +32,7 @@ export function startReset(startDate, lengthDays = 21) {
   const list = loadProgrammes().filter((p) => p.status !== 'active' || p.id === 'reset-' + startDate);
   if (list.find((p) => p.id === 'reset-' + startDate)) return list.find((p) => p.id === 'reset-' + startDate);
   const p = makeResetProgramme(startDate, lengthDays);
+  if (startDate === todayKey() && new Date().getHours() >= 12) p.afternoonStart = true;
   saveProgrammes([...list, p]);
   return p;
 }

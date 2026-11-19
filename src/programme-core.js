@@ -146,6 +146,9 @@ export function planFor(p, date, liftDates) {
 // ── Day status ────────────────────────────────────────────────────────────
 // ctx: { days: {[date]: dayData}, liftDates: Set, runDates: Set,
 //        stepsOn(date) → n, checkinDates: Set, nipsOn(date) → n }
+// Afternoon start: a programme begun after midday doesn't expect that
+// morning's SAVERS - day 1 can't be a SAVERS miss. Everything else counts.
+export const saversExempt = (p, date) => !!(p && p.afternoonStart && date === p.startDate);
 export const saversCount = (day) => ((day && day.savers) || []).filter(Boolean).length;
 export function drinksActual(day, ctx, date) {
   const n = day && day.night && day.night.drinks;
@@ -188,7 +191,7 @@ export function missReasons(p, ctx, date) {
   if (!inProgramme(p, date)) return [];
   const day = (ctx.days || {})[date] || {};
   const r = [];
-  if (saversCount(day) < 6) r.push('savers');
+  if (!saversExempt(p, date) && saversCount(day) < 6) r.push('savers');
   const plan = planFor(p, date, ctx.liftDates);
   if (plan.liftDue) r.push('lift'); // week ended short of 3
   if (jogWeek(p, date, ctx).due) r.push('jog'); // week ended short on jogs
@@ -225,7 +228,7 @@ export function programmeStreaks(p, ctx, today) {
   return {
     savers: streak(p, ctx, today, (d) => {
       const ok = saversCount((ctx.days || {})[d]) >= 6;
-      return d === today && !ok ? null : ok;
+      return (d === today || saversExempt(p, d)) && !ok ? null : ok;
     }),
     drinks: streak(p, ctx, today, (d) => {
       const day = (ctx.days || {})[d] || {};

@@ -98,8 +98,8 @@ function MiracleMorningScreen({ date, onClose }) {
       <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
         {SAVERS.map((s, i) => {
           const on = ticks[i];
-          const detail = s.t === 'Exercise' ? (isJogDay ? `Jog ${JOG_KM} km` : d === 0 ? '20 push-ups or family walk later' : '20 push-ups')
-            : s.t === 'Reading' && d === 0 ? "Lord's Supper" : s.d;
+          const detail = s.t === 'Exercise' ? (isJogDay ? `Jog ${JOG_KM} km` : '20 push-ups')
+            : s.t === 'Reading' && d === 0 ? 'A verse, a hymn or the order of service' : s.d;
           return (
             <button key={i} onClick={() => toggle(i)}
               style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 12, cursor: 'pointer', textAlign: 'left',
@@ -200,10 +200,13 @@ function ResetHomeCard({ onOpenMorning, onOpenSummary }) {
       {action}
     </div>
   );
+  const weekend = [0, 6].includes(dowOf(today));
+  const cPlan = dayData.cPlan || null;
+  const pickBtn = (txt, fn, on) => <button onClick={fn} style={{ ...btnBase, height: 34, padding: '0 11px', fontSize: 12, background: on ? C.accentSoft : 'transparent', color: on ? C.accent : C.textMid, border: `1px solid ${on ? C.accent : C.lineStrong}` }}>{txt}</button>;
   const smallBtn = (txt, fn) => <button onClick={fn} style={{ ...btnBase, height: 34, padding: '0 14px', fontSize: 12, background: C.accent, color: C.onAccent }}>{txt}</button>;
 
   return (
-    <div style={{ marginTop: 14, padding: '14px 14px 12px', borderRadius: 16, background: C.surf1, border: `1px solid ${must ? C.danger : C.lineStrong}` }}>
+    <div style={{ marginTop: 14, padding: '14px 14px 12px', borderRadius: 16, background: C.surf1, border: `1px solid ${must ? C.accent : C.lineStrong}` }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
         <div style={{ ...mono, fontSize: 10, letterSpacing: 2, color: C.accent }}>{p.name.toUpperCase()}</div>
         <div style={{ ...mono, fontSize: 10, letterSpacing: 1.4, color: C.textLow }}>WEEK {weekNumber(p, today)}</div>
@@ -212,8 +215,8 @@ function ResetHomeCard({ onOpenMorning, onOpenSummary }) {
         DAY {n}<span style={{ color: C.textLow }}> OF {p.lengthDays || '∞'}</span>
       </h2>
       {must && (
-        <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(229,86,75,.12)', border: `1px solid ${C.danger}`, ...mono, fontSize: 10.5, letterSpacing: 1.2, color: C.danger }}>
-          MUST DO TODAY · NEVER MISS TWICE
+        <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 10, background: C.accentSoft, border: `1px solid ${C.accent}`, ...mono, fontSize: 10.5, letterSpacing: 1.2, color: C.accent }}>
+          NEVER MISS TWICE · TODAY'S THE COMEBACK
         </div>
       )}
 
@@ -226,8 +229,14 @@ function ResetHomeCard({ onOpenMorning, onOpenSummary }) {
       <div style={{ marginTop: 12 }}>
         {row('Miracle Morning', dayData.morningDoneAt ? `${saversCount(dayData)}/6 · tonight's number ${dayData.number}` : 'SAVERS + tonight\'s number', !!dayData.morningDoneAt && saversCount(dayData) === 6,
           !dayData.morningDoneAt || saversCount(dayData) < 6 ? smallBtn(dayData.morningDoneAt ? 'Edit' : 'Open', onOpenMorning) : null)}
-        {plan.lift && row(`Day ${plan.lift} · ${RESET_DAYS[plan.lift].name}`, plan.liftDue ? ([0, 6].includes(dowOf(today)) ? 'Today · two lifts still counts' : 'Gym 5:05pm · two lifts still counts') : 'Optional today · or tomorrow', liftDone,
-          liftDone ? null : smallBtn('Start', startLift))}
+        {plan.lift && row(`Day ${plan.lift} · ${RESET_DAYS[plan.lift].name}`,
+          plan.liftDue ? (weekend ? 'Today · two lifts still counts' : 'Gym 5:05pm · two lifts still counts')
+            : cPlan === 'tomorrow' ? 'Booked for tomorrow' : cPlan === 'today' ? 'Today · two lifts still counts' : 'Today or tomorrow · pick one',
+          liftDone,
+          liftDone ? null
+            : plan.liftDue || cPlan === 'today' ? smallBtn('Start', startLift)
+              : cPlan === 'tomorrow' ? pickBtn('Tomorrow ✓', () => patchProgrammeDay(today, { cPlan: null }), true)
+                : <span style={{ display: 'flex', gap: 6 }}>{pickBtn('Today', () => patchProgrammeDay(today, { cPlan: 'today' }))}{pickBtn('Tomorrow', () => patchProgrammeDay(today, { cPlan: 'tomorrow' }))}</span>)}
         {plan.jog && row(`Jog ${JOG_KM} km · 5:50am`, `${steps.toLocaleString()} steps · ${JOG_STEPS_MIN.toLocaleString()}+ counts`, jogOk, null)}
       </div>
       {isLast && <GhostBtn onClick={onOpenSummary} style={{ marginTop: 10 }}>Final day · see summary</GhostBtn>}
@@ -252,13 +261,15 @@ function ResetCheckinStep({ date, nipsAnswer, stepsAnswer, value, onChange }) {
   const act = typeof v.drinks === 'number' ? v.drinks : nipsAnswer;
   const cmp = typeof num === 'number' && typeof act === 'number' ? (act < num ? 'UNDER' : act === num ? 'MATCH' : 'OVER') : null;
   const steps = typeof v.steps === 'number' ? v.steps : stepsAnswer;
+  // Any slip today? Drives the closing line only - never a red mark.
+  const slipped = cmp === 'OVER' || saversCount(day) < 6 || ['workoutDone', 'protein', 'ruleKept', 'afterTea', 'noGames', 'screensOff'].some((k) => v[k] === false);
 
   const yn = (k, label, opt) => (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderTop: `1px solid ${C.line}` }}>
       <span style={{ ...body, flex: 1, fontSize: 14, color: C.text, lineHeight: 1.3 }}>{label}{opt && <span style={{ color: C.textLow }}> · optional</span>}</span>
       {[true, false].map((b) => (
         <button key={String(b)} onClick={() => set(k, v[k] === b ? null : b)}
-          style={{ ...btnBase, width: 50, height: 34, fontSize: 12, background: v[k] === b ? (b ? C.success : C.danger) : 'transparent', color: v[k] === b ? '#0b0b0b' : C.textMid, border: `1px solid ${v[k] === b ? 'transparent' : C.lineStrong}` }}>
+          style={{ ...btnBase, width: 50, height: 34, fontSize: 12, background: v[k] === b ? (b ? C.success : C.surf3) : 'transparent', color: v[k] === b ? (b ? '#0b0b0b' : C.text) : C.textMid, border: `1px solid ${v[k] === b ? 'transparent' : C.lineStrong}` }}>
           {b ? 'Yes' : 'No'}
         </button>
       ))}
@@ -287,10 +298,10 @@ function ResetCheckinStep({ date, nipsAnswer, stepsAnswer, value, onChange }) {
           <span style={{ ...body, flex: 1, fontSize: 14, color: C.text }}>Drinks <span style={{ color: C.textLow }}>· this morning's number {typeof num === 'number' ? num : '—'}</span></span>
           {numIn('drinks', act, '0')}
         </div>
-        {cmp && <div style={{ ...mono, fontSize: 10.5, letterSpacing: 1.4, marginTop: 6, textAlign: 'right', color: cmp === 'OVER' ? C.danger : C.success }}>{cmp}{typeof num === 'number' ? ` · COMMITTED TO ${num}` : ''}</div>}
+        {cmp && <div style={{ ...mono, fontSize: 10.5, letterSpacing: 1.4, marginTop: 6, textAlign: 'right', color: cmp === 'OVER' ? C.accent : C.success }}>{cmp}{typeof num === 'number' ? ` · COMMITTED TO ${num}` : ''}</div>}
         {cmp === 'OVER' && (
           <div style={{ marginTop: 8 }}>
-            <div style={{ ...body, fontSize: 13, color: C.textMid }}>What made it hard?</div>
+            <div style={{ ...body, fontSize: 13, color: C.textMid, lineHeight: 1.45 }}>Over tonight, and you logged it honestly. That's the part that makes the rest work. What made it hard?</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
               {OVER_REASONS.map((t) => (
                 <button key={t} onClick={() => set('overReason', v.overReason === t ? null : t)}
@@ -307,6 +318,11 @@ function ResetCheckinStep({ date, nipsAnswer, stepsAnswer, value, onChange }) {
       {yn('noGames', 'No PUBG or YouTube?')}
       {d !== 0 && yn('screensOff', 'Screens off by 9:45pm?')}
       {yn('familyWalk', 'Family walk?', true)}
+      <div style={{ ...body, fontSize: 13, color: C.textMid, lineHeight: 1.5, padding: '12px 0 2px', borderTop: `1px solid ${C.line}` }}>
+        {slipped
+          ? "Not every box today, and that's fine. You showed up and told the truth. You're growing - tomorrow gets a fresh number."
+          : 'Solid day. Stack another one tomorrow.'}
+      </div>
     </div>
   );
 }
@@ -369,6 +385,7 @@ function ProgrammeSummaryScreen({ programme, onClose }) {
         {stat('Workouts', `${s.lifts.done}/${s.lifts.scheduled}`, 'completed / scheduled')}
         {stat('Jogs', `${s.jogs.done}/${s.jogs.scheduled}`, 'completed / scheduled')}
         {stat('Miracle Morning', `${s.miracleMorning}`, 'days with all six')}
+        {s.nightsLogged != null && stat('Nights logged', `${s.nightsLogged}/${s.days}`, 'checked in, good day or not')}
         {stat('Drinks at/under number', `${s.drinks.nightsUnder}/${s.drinks.nightsNumbered}`, 'nights')}
         {stat('Avg drinks per night', s.drinks.byWeek.map((x) => (x.avg == null ? '—' : x.avg)).join(' · '), s.drinks.byWeek.map((x) => `wk ${x.week}`).join(' · '))}
         {stat('Longest streaks', `${s.longest.savers} · ${s.longest.drinks} · ${s.longest.sessions}`, 'morning · drinks · sessions')}

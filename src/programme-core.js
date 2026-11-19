@@ -118,10 +118,12 @@ export function planFor(p, date, liftDates) {
     return { ...out, lift: 'C', liftDue: k === windowDays - 1 };
   }
   const d = dowOf(date);
-  // Monday and Sunday are rest days.
+  // Monday is a rest day. Day C is Saturday OR Sunday (your pick): it shows on
+  // Saturday, and only becomes due on Sunday if Saturday's wasn't done.
   if (d === 2) return { ...out, lift: 'A', liftDue: true };
   if (d === 4) return { ...out, lift: 'B', liftDue: true };
-  if (d === 6) return { ...out, lift: 'C', liftDue: true };
+  if (d === 6) return { ...out, lift: 'C', liftDue: false };
+  if (d === 0) return liftDates && liftDates.has(addDays(date, -1)) ? out : { ...out, lift: 'C', liftDue: true };
   if (d === 3 || d === 5) return { ...out, jog: true };
   return out;
 }
@@ -211,7 +213,7 @@ export function programmeSummary(p, ctx, weighins, today) {
   const before = (weighins || []).filter((w) => w.date < p.startDate && daysBetween(w.date, p.startDate) <= 3).sort((a, b) => (a.date < b.date ? -1 : 1)).pop();
   const first = (ws[0] && ws[0].date === p.startDate ? ws[0] : null) || before || ws[0] || null;
   const last = ws.length ? ws[ws.length - 1] : null;
-  let liftsDone = 0, liftsSched = 0, jogsDone = 0, jogsSched = 0, mm = 0, nightsUnder = 0, nightsNumbered = 0;
+  let liftsDone = 0, liftsSched = 0, jogsDone = 0, jogsSched = 0, mm = 0, nightsLogged = 0, nightsUnder = 0, nightsNumbered = 0;
   const weeks = {};
   const overReasons = {};
   const feel = { afterUnder: [], afterOver: [], mondays: [], all: [] };
@@ -225,6 +227,7 @@ export function programmeSummary(p, ctx, weighins, today) {
     if (plan.jog) { jogsSched += 1; if (jogDone(ctx, d)) jogsDone += 1; }
     const day = (ctx.days || {})[d] || {};
     if (saversCount(day) >= 6) mm += 1;
+    if (ctx.checkinDates && ctx.checkinDates.has(d)) nightsLogged += 1;
     const act = drinksActual(day, ctx, d);
     if (typeof day.number === 'number' && typeof act === 'number') {
       nightsNumbered += 1;
@@ -251,6 +254,7 @@ export function programmeSummary(p, ctx, weighins, today) {
     lifts: { done: liftsDone, scheduled: liftsSched },
     jogs: { done: jogsDone, scheduled: jogsSched },
     miracleMorning: mm,
+    nightsLogged,
     days: daysBetween(p.startDate, end) + 1,
     drinks: {
       nightsUnder, nightsNumbered,
@@ -293,14 +297,14 @@ export const RESET_NOTIFS = [
     when: (p, date) => planFor(p, date).jog, body: () => SAVERS_BODY },
   { id: 'saversSat', label: 'Miracle Morning (Saturday)', hint: 'Sat', time: '07:00', days: [6],
     body: () => "Saturday. SAVERS first, then the day's yours. Set tonight's number before the first invite." },
-  { id: 'saversSun', label: "Miracle Morning (Lord's Day)", hint: 'Sun · 10 minutes before you leave', time: '05:15', days: [0],
-    body: () => "Ten minutes before the Lord's Supper. SAVERS, then set today's number - one you'll be glad of at 6am tomorrow." },
+  { id: 'saversSun', label: "Miracle Morning (Lord's Day)", hint: 'Sun', time: '05:15', days: [0],
+    body: () => "Ten minutes to yourself. SAVERS, then set today's number - one you'll be glad of at 6am tomorrow." },
   { id: 'gym', label: 'Gym reminder', hint: 'Weekday lift days', time: '17:00', days: WEEKDAYS,
     when: (p, date, ctx) => { const pl = planFor(p, date, ctx && ctx.liftDates); return !!pl.lift && !(ctx && ctx.liftDates && ctx.liftDates.has(date)); },
     body: (p, date, ctx) => `Gym at 5:05 - Day ${planFor(p, date, ctx && ctx.liftDates).lift}. Two lifts still counts.` },
-  { id: 'gymWeekend', label: 'Gym reminder (weekend)', hint: 'Sat · Day C', time: '08:00', days: [6, 0],
+  { id: 'gymWeekend', label: 'Gym reminder (weekend)', hint: 'Sat · or Sun if not done', time: '08:00', days: [6, 0],
     when: (p, date, ctx) => { const pl = planFor(p, date, ctx && ctx.liftDates); return !!pl.lift && !(ctx && ctx.liftDates && ctx.liftDates.has(date)); },
-    body: (p, date, ctx) => `Day ${planFor(p, date, ctx && ctx.liftDates).lift} today. Two lifts still counts.` },
+    body: (p, date) => (dowOf(date) === 6 ? 'Day C today or tomorrow. Open the app and pick one. Two lifts still counts.' : 'Day C today. Two lifts still counts.') },
   { id: 'satNoon', label: 'Saturday number', hint: 'Sat', time: '12:00', days: [6],
     body: (p, date, ctx) => `${committed(ctx, date)} No clock on it - just the number. Water first.` },
   { id: 'sunArvo', label: "Lord's Day afternoon", hint: 'Sun', time: '12:30', days: [0],
@@ -311,12 +315,11 @@ export const RESET_NOTIFS = [
     body: (p, date, ctx) => {
       const day = ((ctx && ctx.days) || {})[date] || {};
       const danger = typeof day.number === 'number' && day.danger && day.danger !== 'None' ? ` Watch out: ${day.danger.toLowerCase()}.` : '';
-      return `Heading home. Kids first. No drinks till after tea. ${committed(ctx, date)}${danger}`;
+      const rule = dowOf(date) === 5 ? "It's Friday - enjoy it." : 'No drinks till after tea.';
+      return `Heading home. Kids first. ${rule} ${committed(ctx, date)}${danger}`;
     } },
   { id: 'brooke', label: 'Time with Brooke', hint: 'Mon – Fri', time: '20:10', days: WEEKDAYS,
     body: () => 'Time with Brooke. No PUBG or YouTube.' },
-  { id: 'sunHold', label: "Lord's Day evening", hint: 'Sun', time: '20:30', days: [0],
-    body: (p, date, ctx) => `${committed(ctx, date, 'today')} Hold the number. Monday is a must.` },
   { id: 'jogPrep', label: 'Jog prep', hint: 'Night before a jog', time: '21:00', days: [0, 1, 2, 3, 4, 5, 6],
     when: (p, date) => planFor(p, addDays(date, 1)).jog,
     body: () => 'Jog tomorrow at 5:50. Gear out, shoes by the door.' },
@@ -325,7 +328,7 @@ export const RESET_NOTIFS = [
   { id: 'checkinSun', label: "Lord's Day check-in", hint: 'Sun', time: '21:45', days: [0],
     body: () => 'Do the nightly check-in. Log the real number.' },
 ];
-export const NEVER_MISS = 'Never miss twice - today is a must.';
+export const NEVER_MISS = "Yesterday's behind you. Never miss twice - today is a must.";
 
 export function notifSetting(p, n) {
   const o = ((p && p.notifs) || {})[n.id] || {};

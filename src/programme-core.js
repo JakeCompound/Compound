@@ -113,7 +113,10 @@ export function weekBounds(p, date) {
   return { start, end };
 }
 export function liftWeek(p, date, liftDates) {
-  const { start, end } = weekBounds(p, date);
+  const { end } = weekBounds(p, date);
+  const floor = p.liftsFrom || p.startDate; // lifts can count from before the start date
+  let start = addDays(date, -((dowOf(date) + 6) % 7));
+  if (start < floor) start = floor;
   const days = daysBetween(start, end) + 1;
   const target = days >= 7 ? LIFTS_PER_WEEK : Math.max(0, Math.min(LIFTS_PER_WEEK, days - 1));
   let done = 0;
@@ -122,7 +125,7 @@ export function liftWeek(p, date, liftDates) {
 }
 export function nextLiftKey(p, date, liftDates) {
   let n = 0;
-  if (liftDates) liftDates.forEach((x) => { if (x >= p.startDate && x < date) n += 1; });
+  if (liftDates) liftDates.forEach((x) => { if (x >= (p.liftsFrom || p.startDate) && x < date) n += 1; });
   return ['A', 'B', 'C'][n % 3];
 }
 // What's on for `date`? → { lift, liftDue, jog, week }
@@ -264,10 +267,11 @@ export function programmeSummary(p, ctx, weighins, today) {
   const overReasons = {};
   const feel = { afterUnder: [], afterOver: [], mondays: [], all: [] };
   const avg = (a) => (a.length ? Math.round((a.reduce((x, y) => x + y, 0) / a.length) * 10) / 10 : null);
+  for (let d = p.liftsFrom || p.startDate; d < p.startDate; d = addDays(d, 1)) if (ctx.liftDates.has(d)) liftsDone += 1;
   for (let d = p.startDate; d <= end; d = addDays(d, 1)) {
     const plan = planFor(p, d, ctx.liftDates);
     if (ctx.liftDates.has(d)) liftsDone += 1;
-    if (plan.week && d === plan.week.start) liftsSched += plan.week.target;
+    if (plan.week && d === (plan.week.start < p.startDate ? p.startDate : plan.week.start)) liftsSched += plan.week.target;
     if (jogDone(p, ctx, d)) { jogsDone += 1; jogKm += Number(((ctx.days || {})[d] || {}).jogKm) || 0; } else if (bigStepDay(ctx, d)) stepDays += 1;
     if (plan.week && d === plan.week.start) jogsSched += jogWeek(p, d, ctx).target;
     const day = (ctx.days || {})[d] || {};

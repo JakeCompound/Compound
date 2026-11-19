@@ -13,7 +13,7 @@
 // push to every saved device immediately (used in step 7).
 import webpush from 'web-push';
 import { createClient } from '@supabase/supabase-js';
-import { remindersFor } from '../src/programme-core.js';
+import { inProgramme, remindersFor } from '../src/programme-core.js';
 
 const SUPABASE_URL = 'https://jzlimmbllpbbovyvssfp.supabase.co';
 // Public VAPID key (safe). Private key + service role + cron secret come from env.
@@ -393,7 +393,7 @@ export default async function handler(req, res) {
     const prog = ud && ud.programme;
     // While a programme runs, its own reminders replace the overlapping
     // check-in / workout ones (no doubles). Everything else is unchanged.
-    const MUTED = prog ? new Set(['nightly', 'workout', 'missed', 'urgency']) : new Set();
+    const MUTED = prog && inProgramme(prog, now.date) ? new Set(['nightly', 'workout', 'missed', 'urgency']) : new Set();
     const kinds = dueKinds(profMap[sub.user_id], now, ud).filter((k) => !MUTED.has(k));
     if (prog) {
       const pctx = {

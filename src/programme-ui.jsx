@@ -200,6 +200,32 @@ function ResetHomeCard({ onOpenMorning, onOpenSummary }) {
         </div>
       );
     }
+    // Not started yet, but workouts already count (liftsFrom): show a holding
+    // card with the next lift so today's session lands in week 1.
+    if (today < p.startDate && (p.liftsFrom || p.startDate) <= today) {
+      const key = nextLiftKey(p, today, ctx.liftDates);
+      const wk = liftWeek(p, today, ctx.liftDates);
+      const lifted = ctx.liftDates.has(today);
+      const go = () => { try { window.dispatchEvent(new CustomEvent('compound:start-programme', { detail: { day: key } })); } catch (e) {} };
+      return (
+        <div style={{ marginTop: 14, padding: '14px 14px 12px', borderRadius: 16, background: C.surf1, border: `1px solid ${C.lineStrong}` }}>
+          <div style={{ ...mono, fontSize: 10, letterSpacing: 2, color: C.accent }}>{p.name.toUpperCase()}</div>
+          <h2 style={{ ...head, fontSize: 30, lineHeight: 1, color: C.text, marginTop: 4 }}>
+            STARTS <span style={{ color: C.accent }}>{p.startDate === addDays(today, 1) ? 'TOMORROW' : p.startDate}.</span>
+          </h2>
+          <p style={{ ...body, fontSize: 13, color: C.textMid, lineHeight: 1.5, margin: '8px 0 10px' }}>
+            SAVERS, the drink number and the Reset check-in begin in the morning. Nothing is tracked tonight. Today's workout still counts.
+          </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0 0', borderTop: `1px solid ${C.line}` }}>
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <span style={{ ...head, fontSize: 15, fontWeight: 700, color: C.text, display: 'block' }}>{lifted ? `Day ${key} · ${RESET_DAYS[key].name} · done` : `Day ${key} · ${RESET_DAYS[key].name}`}</span>
+              <span style={{ ...body, fontSize: 12, color: C.textMid }}>{wk.done}/{wk.target} this week · {lifted ? 'banked for week 1' : 'two lifts still counts'}</span>
+            </span>
+            {!lifted && <button onClick={go} style={{ ...btnBase, height: 34, padding: '0 14px', fontSize: 12, background: C.accent, color: C.onAccent }}>Start</button>}
+          </div>
+        </div>
+      );
+    }
     return null;
   }
   const n = dayNumber(p, today);

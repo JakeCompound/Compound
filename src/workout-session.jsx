@@ -165,7 +165,7 @@ function WorkoutSession({ session, config, startedAt: startedAtProp, initialIdx 
   };
 
   // ── Set completion flow ─────────────────────────────────────────────────
-  const startRest = (sec = 120) => setRestEndAt(Date.now() + sec * 1000);
+  const startRest = (sec = (config && config.restSec) || 120) => setRestEndAt(Date.now() + sec * 1000);
   const skipRest = () => setRestEndAt(null);
 
   // Superset-aware advance after a set lands: chain to the partner with no
@@ -449,7 +449,7 @@ function FocusExercise({ exercise, exNumber, exTotal, partner, onUpdateSet, onCo
             <BigStepper display={<>{Math.floor(weightShown)}<span style={{ fontSize: 16, color: C.textLow }}>{(weightShown % 1 ? '.' + Math.round((weightShown % 1) * 10) : '')}</span></>} sub="KG · ±2.5" step={2.5} onChange={bumpWeight} />
           )}
           {!isHold && (
-            <BigStepper display={repsShown} sub={`REPS · TARGET ${cur.target ?? '—'}`} step={1} onChange={bumpReps} />
+            <BigStepper display={repsShown} sub={exercise.repRange ? `REPS · ${exercise.repRange}` : `REPS · TARGET ${cur.target ?? '—'}`} step={1} onChange={bumpReps} />
           )}
           {isHold && (
             <BigStepper display={holdShown} sub="SECONDS · ±5" step={5} onChange={bumpHold} />

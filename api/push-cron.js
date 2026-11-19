@@ -13,6 +13,7 @@
 // push to every saved device immediately (used in step 7).
 import webpush from 'web-push';
 import { createClient } from '@supabase/supabase-js';
+import { remindersFor } from '../src/programme-core.js';
 
 const SUPABASE_URL = 'https://jzlimmbllpbbovyvssfp.supabase.co';
 // Public VAPID key (safe). Private key + service role + cron secret come from env.
@@ -289,9 +290,18 @@ export default async function handler(req, res) {
 
   const supa = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false, autoRefreshToken: false } });
 
-  const { data: subs, error: subErr } = await supa
+  const { data: allSubs, error: subErr } = await supa
     .from('push_subscriptions').select('endpoint,user_id,p256dh,auth,timezone');
   if (subErr) return res.status(500).json({ error: 'read subs failed', detail: subErr.message });
+  // Disabled (banned) accounts get nothing — their devices stay registered so
+  // switching the account back on resumes reminders with no re-setup.
+  let banned = new Set();
+  try {
+    const { data: ul } = await supa.auth.admin.listUsers({ perPage: 1000 });
+    const nowMs = Date.now();
+    (ul && ul.users || []).forEach((u) => { if (u.banned_until && new Date(u.banned_until).getTime() > nowMs) banned.add(u.id); });
+  } catch (e) { /* never block reminders on this lookup */ }
+  const subs = (allSubs || []).filter((s) => !banned.has(s.user_id));
   if (!subs || !subs.length) return res.status(200).json({ checked: 0, sent: 0 });
 
   const isTest = req.body && req.body.test === true;
@@ -305,10 +315,33 @@ export default async function handler(req, res) {
     // in-week postpone/cancel override so a handled day doesn't get nagged.
     const ensure = (u) => (udByUser[u] = udByUser[u] || { checkins: new Set(), workouts: new Set(), weekOverride: {}, foodTs: [], threeWeeks: {} });
     const { data: cRows } = await supa.from('checkins').select('user_id,date');
-    const { data: wRows } = await supa.from('workouts').select('user_id,date');
+    const { data: wRows } = await supa.from('workouts').select('user_id,date,cardio:data->cardio,wname:data->name');
+    // 3-Week Reset: active programmes + the last few days of their logs
+    // (reminder text, "never miss twice" for yesterday).
+    try {
+      const { data: pRows } = await supa.from('programmes').select('user_id,data');
+      (pRows || []).forEach((r) => { if (r.data && r.data.status === 'active') ensure(r.user_id).programme = r.data; });
+      const since = new Date(Date.now() - 4 * 86400000).toISOString().slice(0, 10);
+      const progUsers = Object.keys(udByUser).filter((u) => udByUser[u].programme);
+      if (progUsers.length) {
+        const [{ data: pdRows }, { data: sdRows }, { data: ndRows }] = await Promise.all([
+          supa.from('programme_days').select('user_id,date,data').in('user_id', progUsers).gte('date', since),
+          supa.from('step_days').select('user_id,date,entries').in('user_id', progUsers).gte('date', since),
+          supa.from('nip_days').select('user_id,date,nips').in('user_id', progUsers).gte('date', since),
+        ]);
+        (pdRows || []).forEach((r) => { const u = ensure(r.user_id); (u.progDays = u.progDays || {})[r.date] = r.data; });
+        (sdRows || []).forEach((r) => { const u = ensure(r.user_id); (u.steps = u.steps || {})[r.date] = (r.entries || []).reduce((s, e) => s + (Number(e && e.steps) || 0), 0); });
+        (ndRows || []).forEach((r) => { const u = ensure(r.user_id); (u.nips = u.nips || {})[r.date] = Number(r.nips); });
+      }
+    } catch (e) { /* tables missing → no programme reminders */ }
     const { data: wwRows } = await supa.from('workout_week').select('user_id,week_start,data');
     (cRows || []).forEach((r) => ensure(r.user_id).checkins.add(r.date));
-    (wRows || []).forEach((r) => ensure(r.user_id).workouts.add(r.date));
+    (wRows || []).forEach((r) => {
+      const u = ensure(r.user_id);
+      u.workouts.add(r.date);
+      if (r.cardio === true) { if (/run|jog/i.test(r.wname || '')) (u.runDates = u.runDates || new Set()).add(r.date); }
+      else (u.liftDates = u.liftDates || new Set()).add(r.date);
+    });
     (wwRows || []).forEach((r) => { ensure(r.user_id).weekOverride[r.week_start] = r.data; });
     // Recent food entries feed the meal-slot reminders (a 4-day window covers
     // "today" in any timezone plus the 3-day activity gate).
@@ -362,7 +395,34 @@ export default async function handler(req, res) {
       continue;
     }
     const now = localNow(sub.timezone);
-    const kinds = dueKinds(profMap[sub.user_id], now, udByUser[sub.user_id]);
+    const ud = udByUser[sub.user_id];
+    const prog = ud && ud.programme;
+    // While a programme runs, its own reminders replace the overlapping
+    // check-in / workout ones (no doubles). Everything else is unchanged.
+    const MUTED = prog ? new Set(['nightly', 'workout', 'missed', 'urgency']) : new Set();
+    const kinds = dueKinds(profMap[sub.user_id], now, ud).filter((k) => !MUTED.has(k));
+    if (prog) {
+      const pctx = {
+        days: ud.progDays || {},
+        liftDates: ud.liftDates || new Set(),
+        runDates: ud.runDates || new Set(),
+        checkinDates: ud.checkins || new Set(),
+        stepsOn: (d) => (ud.steps || {})[d] || 0,
+        nipsOn: (d) => ((ud.nips || {})[d] != null ? ud.nips[d] : null),
+      };
+      for (const r of remindersFor(prog, now.date, pctx)) {
+        if (r.time !== now.hhmm) continue;
+        const kind = `reset-${r.id}`;
+        const { data: claimed } = await supa
+          .from('push_sent')
+          .upsert({ endpoint: sub.endpoint, kind, sent_on: now.date }, { onConflict: 'endpoint,kind,sent_on', ignoreDuplicates: true })
+          .select();
+        if (!claimed || !claimed.length) continue;
+        const ok = await send(sub, { title: 'COMPOUND', body: r.body, tag: kind, url: '/' });
+        if (ok) sent++;
+        else { errors.push(`${kind}:${sub.endpoint.slice(-12)}`); await supa.from('push_sent').delete().match({ endpoint: sub.endpoint, kind, sent_on: now.date }); }
+      }
+    }
     for (const kind of kinds) {
       // Atomic claim: insert dedup row; if it already existed, skip (already sent today).
       const { data: claimed } = await supa
@@ -376,7 +436,7 @@ export default async function handler(req, res) {
     }
 
     // Event-based reminders (same atomic-claim + dedup pattern).
-    const events = eventKinds(profMap[sub.user_id], now, udByUser[sub.user_id], false, sub.timezone);
+    const events = eventKinds(profMap[sub.user_id], now, ud, false, sub.timezone).filter((ev) => !MUTED.has(ev.kind));
     for (const ev of events) {
       const { data: claimed } = await supa
         .from('push_sent')

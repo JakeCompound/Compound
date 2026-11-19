@@ -7,6 +7,8 @@ import { clearAllCloudData } from './cloud-sync.js';
 import { alcoholOn } from './alcohol.js';
 import { useBackClose } from './back-button.js';
 import { CoachReviewScreen, useIsCoach } from './coach-review.jsx';
+import { ProgrammeSettings } from './programme-ui.jsx';
+import { activeProgramme } from './programme.js';
 
 // settings-screen.jsx — Full settings, accessible via Home cog
 // Profile, goals, reminders, equipment, gratitude management, account, danger zone.
@@ -80,6 +82,9 @@ function SettingsScreen({ user, set, onClose, onReset, onRecalc, onFixCheckinDay
     return <SettingsAbout onBack={() => setSection(null)} />;
   }
 
+  if (section === 'programme') {
+    return <ProgrammeSettings onBack={() => setSection(null)} />;
+  }
   if (section === 'niplimit') {
     return <SettingsNipLimit onBack={() => setSection(null)} />;
   }
@@ -144,6 +149,15 @@ function SettingsScreen({ user, set, onClose, onReset, onRecalc, onFixCheckinDay
             hint={currentThemeName() === 'dark' ? 'Dark · the original look' : 'Light · stone'}
             value={currentThemeName() === 'dark' ? 'DARK' : 'LIGHT'}
             onClick={() => { setThemeName(currentThemeName() === 'dark' ? 'stone' : 'dark'); window.location.reload(); }}
+          />
+        </SettingsGroup>
+
+        <SettingsGroup label="PROGRAMME">
+          <SettingsRow
+            icon={<IconTarget />}
+            label="3-Week Reset"
+            hint={(() => { const p = activeProgramme(); return p ? `Started ${p.startDate} · ${p.lengthDays ? p.lengthDays + ' days' : 'no end date'} · reminders` : 'Not running · past programmes'; })()}
+            onClick={() => setSection('programme')}
           />
         </SettingsGroup>
 

@@ -3,6 +3,7 @@ import { C, FieldLabel, MultiChip, StarRating, StepBar, Stepper } from './compou
 import { FooterNav } from './onboarding-screens.jsx';
 import { alcoholOn } from './alcohol.js';
 import { checkinEffectiveDate } from './live-state.jsx';
+import { ResetCheckinStep, resetActiveOn, resetNightDefaults, saveResetNight } from './programme-ui.jsx';
 
 // checkin-modal.jsx — Nightly 9-question check-in
 // Slides up from bottom over the Home screen.
@@ -93,6 +94,10 @@ function CheckinModal({ open, onClose, onComplete, gratitudeLibrary = [], user =
     }
 
     setStep(0);
+    // 3-Week Reset answers ride in answers.resetNight only while the modal is
+    // open; on completion they go to programme_days and are stripped from the
+    // (coach-readable) check-in entry.
+    setAnswers((a) => ({ ...a, resetNight: resetNightDefaults(ciToday(targetDate)) }));
     const shuf = [...pool].sort(() => Math.random() - 0.5).slice(0, 6);
     setGratShuffle(shuf);
     gratSeenRef.current = new Set(shuf.map((g) => g.text));
@@ -166,6 +171,7 @@ function CheckinModal({ open, onClose, onComplete, gratitudeLibrary = [], user =
     if (user.married !== false) s.push('partner');
     s.push('spirit');
     if (answers.spirit === true) s.push('spiritDetail');
+    if (resetActiveOn(ciToday(targetDate))) s.push('reset');
     if (isSunday) s.push('weekPlan');
     return s;
   })();
@@ -177,7 +183,9 @@ function CheckinModal({ open, onClose, onComplete, gratitudeLibrary = [], user =
     if (step >= total - 1) {
       clearCheckinDraft();
       const bigDay = (window.foodForDay ? window.foodForDay(ciToday(targetDate)) : []).some((f) => f && f.kind === 'bigday');
-      const final = bigDay && !answers.dietRating ? { ...answers, dietRating: 1 } : answers;
+      const { resetNight, ...plain } = answers;
+      if (resetNight && resetActiveOn(ciToday(targetDate))) saveResetNight(ciToday(targetDate), resetNight);
+      const final = bigDay && !plain.dietRating ? { ...plain, dietRating: 1 } : plain;
       onComplete && onComplete(final, targetDate);
     } else {
       setStep(step + 1);
@@ -466,6 +474,18 @@ function CheckinModal({ open, onClose, onComplete, gratitudeLibrary = [], user =
         return (
           <CIQuestion tag="SUNDAY REVIEW" title="WHICH DAYS DO YOU" accent="TRAIN THIS WEEK?" sub="Pick your sessions for the week ahead. These become Workout to-dos on Home.">
             <WeekDayPicker value={answers.workoutDays || []} onChange={(v) => set({ workoutDays: v })} />
+          </CIQuestion>
+        );
+      case 'reset':
+        return (
+          <CIQuestion tag="3-WEEK RESET" title="THE RESET." accent="HOW DID TODAY GO?" sub="Private to you. Tap what's true.">
+            <ResetCheckinStep
+              date={ciToday(targetDate)}
+              nipsAnswer={answers.afd ? 0 : answers.nips}
+              stepsAnswer={answers.steps}
+              value={answers.resetNight}
+              onChange={(v) => set({ resetNight: v })}
+            />
           </CIQuestion>
         );
       default:

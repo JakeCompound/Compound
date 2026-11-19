@@ -26,7 +26,8 @@ const EXERCISES = [
   { id: 'deadlift',    name: 'Barbell Deadlift',       type: 'weighted',   primary: ['Back','Legs'], groups: ['Back','Legs'],       equip: 'gym',  compound: true },
   { id: 'barrow',      name: 'Bent-over Barbell Row',  type: 'weighted',   primary: ['Back'],      groups: ['Back','Biceps'],       equip: 'gym',  compound: true },
   { id: 'smithrow',    name: 'Smith Machine Row',      type: 'weighted',   primary: ['Back'],      groups: ['Back','Biceps'],       equip: 'gym',  compound: true },
-  { id: 'dbrow',       name: 'Single-arm DB Row',      type: 'weighted',   primary: ['Back'],      groups: ['Back','Biceps'],       equip: 'gym',  compound: true },
+  { id: 'dbbentrow',   name: 'Bent-over DB Row',       type: 'weighted',   primary: ['Back'],      groups: ['Back','Biceps'],       equip: 'gym',  compound: true, aliases: ['dumbbell row', 'bent over'] },
+  { id: 'dbrow',       name: 'Single-arm DB Row',     type: 'weighted',   primary: ['Back'],      groups: ['Back','Biceps'],       equip: 'gym',  compound: true },
   { id: 'straightarm', name: 'Straight-arm Pulldown',  type: 'weighted',   primary: ['Back'],      groups: ['Back'],                equip: 'gym' },
   { id: 'facepull',    name: 'Face Pull',              type: 'weighted',   primary: ['Back'],      groups: ['Back','Shoulders'],    equip: 'gym',  aliases: ['cable', 'rope'] },
   { id: 'rackpull',    name: 'Rack Pull',              type: 'weighted',   primary: ['Back'],      groups: ['Back','Legs'],         equip: 'gym',  compound: true, aliases: ['barbell', 'deadlift'] },
@@ -99,6 +100,8 @@ const EXERCISES = [
   // ── CARDIO / FULL BODY ──
   { id: 'burpee',      name: 'Burpees',                type: 'bodyweight', primary: ['Full Body','Cardio'], groups: ['Full Body','Cardio'], equip: 'home' },
   { id: 'mtnclimb',    name: 'Mountain Climbers',      type: 'bodyweight', primary: ['Core'],      groups: ['Core','Cardio'],       equip: 'home' },
+  // Farmer's carry: kg = per hand, each "rep" = one 40 m carry.
+  { id: 'farmer',      name: "Farmer's Carry (40 m)",  type: 'weighted',   primary: ['Full Body'], groups: ['Full Body','Core'],    equip: 'gym',  aliases: ['farmers walk', 'carry'] },
 ];
 
 const MUSCLE_GROUP_OPTIONS = ['Chest', 'Triceps', 'Biceps', 'Back', 'Legs', 'Core', 'Shoulders', 'Cardio', 'Full Body'];

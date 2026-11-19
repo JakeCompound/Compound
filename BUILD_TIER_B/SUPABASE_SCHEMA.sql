@@ -264,3 +264,38 @@ create policy "own_rows" on workout_drafts
   for all to authenticated
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
+
+-- ============================================================================
+-- PROGRAMMES (added 19 Nov 2026) — preset programmes, e.g. the 3-Week Reset
+-- ============================================================================
+-- Replaces: compound:programmes (array) + compound:programmeDays ({[date]: day})
+-- day = { savers[6], number, journal, morningDoneAt, night:{...Reset answers} }
+-- Own-rows RLS only; deliberately NO coach_read policy and never on the ladder.
+-- The push sender (service role) reads them for the Reset reminders.
+create table if not exists programmes (
+  user_id    uuid not null references auth.users(id) on delete cascade,
+  id         text not null,
+  data       jsonb not null,
+  updated_at timestamptz not null default now(),
+  primary key (user_id, id)
+);
+alter table programmes enable row level security;
+create policy "own_rows" on programmes for all to authenticated
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create table if not exists programme_days (
+  user_id    uuid not null references auth.users(id) on delete cascade,
+  date       date not null,
+  data       jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now(),
+  primary key (user_id, date)
+);
+alter table programme_days enable row level security;
+create policy "own_rows" on programme_days for all to authenticated
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- Disabling a member without deleting anything (19 Nov 2026: Carl, Isaac):
+--   update auth.users set banned_until = '2999-01-01' where id = '<uid>';
+--   delete from auth.sessions where user_id = '<uid>';
+-- Re-enable:  update auth.users set banned_until = null where id = '<uid>';
+-- The push sender skips banned accounts.

@@ -1,6 +1,8 @@
 import React from 'react';
 import { C } from './compound-ui.jsx';
 import { isJoinDay, getJoinedAt } from './mid-week-join.js';
+import { activeProgramme } from './programme.js';
+import { inProgramme } from './programme-core.js';
 
 // todo-list.jsx — "Today's To-Do List" for Home.
 // Tasks with live countdowns; turn red on expiry, count into the negatives,
@@ -124,7 +126,10 @@ function TodayTodos({ user, set, state, history, weighins, onOpenCheckin, onCatc
 
   // Workout — scheduled days only
   const todayDow = new Date().getDay();
-  const isWorkoutDay = effectiveDays.includes(todayDow);
+  // While the 3-Week Reset runs, its own card on Home owns the workout/jog
+  // to-dos (its schedule replaces the usual training days) — no doubles.
+  const resetOn = (() => { const p = activeProgramme(); return !!(p && inProgramme(p, dateKey)); })();
+  const isWorkoutDay = !resetOn && effectiveDays.includes(todayDow);
   let workoutDoneToday = false;
   try {
     const ws = window.loadWorkouts ? window.loadWorkouts() : [];

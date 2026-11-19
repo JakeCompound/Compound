@@ -91,6 +91,7 @@ function recordWorkout(exercises, config) {
     location: config.location,
     feeling: config.preFeel || 0,
     custom: !!config.custom,
+    programme: config.programme || null, // { id, day: 'A'|'B'|'C', name } for preset-programme sessions
     // Session-specific AI estimate — dayEarnedKcal prefers this over the flat
     // duration × MET formula when present.
     aiKcal: config.aiKcal != null ? Math.round(config.aiKcal) : null,

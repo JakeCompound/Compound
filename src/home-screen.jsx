@@ -12,6 +12,7 @@ import { ReminderNudge } from './push-nudge.jsx';
 import { LadderCard } from './ladder.jsx';
 import { WeekThreeCard } from './week-three.jsx';
 import { AdaptCard, MorningResetCard } from './bigday.jsx';
+import { ResetHomeCard } from './programme-ui.jsx';
 
 // home-screen.jsx — The Home tab — assembles all the components
 
@@ -128,6 +129,12 @@ function HomeScreen({ user, set, state, checkins, onOpenCheckin, onOpenCheckinFo
         if (!p) return null;
         return <PlateauCard p={p} user={user} set={set} onGoTo={onGoTo} onChanged={onChanged} />;
       })()}
+
+      {/* 3-Week Reset — Day X of N, streaks, never-miss-twice (only while a programme exists) */}
+      <ResetHomeCard
+        onOpenMorning={() => { try { window.dispatchEvent(new CustomEvent('compound:open-morning')); } catch (e) {} }}
+        onOpenSummary={() => { try { window.dispatchEvent(new CustomEvent('compound:open-programme-summary')); } catch (e) {} }}
+      />
 
       {/* Three north-star rings hero */}
       <div style={{ marginTop: 14 }}>

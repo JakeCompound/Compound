@@ -225,6 +225,26 @@ const DOMAINS = [
     },
   },
   {
+    // Preset programmes (3-Week Reset) — own rows only, no coach access.
+    name: 'programmes', keys: ['compound:programmes'],
+    async push() { const a = J('compound:programmes') || []; await replaceRows('programmes', a.map((p) => ({ user_id: uid, id: p.id, data: p, updated_at: new Date().toISOString() }))); },
+    async pull() {
+      const { data, error } = await supabase.from('programmes').select('*').eq('user_id', uid);
+      if (error) throw error; // missing table must not wipe the local copy
+      setJSON('compound:programmes', (data || []).map((r) => r.data));
+    },
+  },
+  {
+    // Per-day programme log: SAVERS, tonight's number, journal line, nightly Reset answers.
+    name: 'programme_days', keys: ['compound:programmeDays'],
+    async push() { const o = J('compound:programmeDays') || {}; await replaceRows('programme_days', Object.entries(o).map(([date, d]) => ({ user_id: uid, date, data: d, updated_at: new Date().toISOString() }))); },
+    async pull() {
+      const { data, error } = await supabase.from('programme_days').select('*').eq('user_id', uid);
+      if (error) throw error;
+      const o = {}; (data || []).forEach((r) => { o[r.date] = r.data; }); setJSON('compound:programmeDays', o);
+    },
+  },
+  {
     name: 'todo_state', keys: ['compound:todostate'],
     async push() { const o = J('compound:todostate') || {}; await replaceRows('todo_state', Object.entries(o).map(([date, d]) => ({ user_id: uid, date, data: d }))); },
     async pull() { const { data } = await supabase.from('todo_state').select('*').eq('user_id', uid); const o = {}; (data || []).forEach((r) => { o[r.date] = r.data; }); setJSON('compound:todostate', o); },
@@ -325,7 +345,7 @@ export async function clearAllCloudData(userId) {
   const userKeyed = [
     'weighins', 'checkins', 'workouts', 'saved_workouts', 'workout_week',
     'food_entries', 'nip_days', 'measurements', 'todo_state', 'nutrition_messages',
-    'week_threes', 'workout_drafts', 'push_subscriptions',
+    'week_threes', 'workout_drafts', 'push_subscriptions', 'programmes', 'programme_days',
   ];
   for (const t of userKeyed) {
     const { error } = await supabase.from(t).delete().eq('user_id', userId);

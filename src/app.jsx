@@ -21,6 +21,9 @@ import { SavedWorkoutsScreen } from './workout-enhancements.jsx';
 import { NewWorkoutFlow, WorkoutHome } from './workout-screens.jsx';
 import { CustomWorkoutLog } from './custom-workout.jsx';
 import { WorkoutSession, loadActiveDraft } from './workout-session.jsx';
+import { activeProgramme, buildProgrammeSession, morningPending, programmeSessionConfig } from './programme.js';
+import { endDateOf } from './programme-core.js';
+import { MiracleMorningScreen, ProgrammeSummaryScreen } from './programme-ui.jsx';
 
 // app.jsx — COMPOUND root: state, step machine, persistence, frame, tweaks
 
@@ -161,6 +164,29 @@ function App() {
     try { const t = JSON.parse(localStorage.getItem('compound:targets') || 'null'); return !!(t && t.formula !== 'leangains'); } catch (e) { return false; }
   });
   const [nutTick, setNutTick] = React.useState(0);
+
+  // ── 3-Week Reset ─────────────────────────────────────────────────────────
+  // Miracle Morning shows first thing on open until today's is done (it can
+  // be closed, but comes back on the next open). The summary opens itself on
+  // the final day after the check-in, or on open once the end date has passed.
+  const [showMorning, setShowMorning] = React.useState(() => morningPending(activeProgramme()));
+  const [showProgSummary, setShowProgSummary] = React.useState(() => {
+    const p = activeProgramme(); const end = endDateOf(p);
+    return !!(p && end && isoDate(new Date()) > end);
+  });
+  React.useEffect(() => {
+    const onVis = () => { if (document.visibilityState === 'visible' && morningPending(activeProgramme())) setShowMorning(true); };
+    const openMorning = () => setShowMorning(true);
+    const openSummary = () => setShowProgSummary(true);
+    document.addEventListener('visibilitychange', onVis);
+    window.addEventListener('compound:open-morning', openMorning);
+    window.addEventListener('compound:open-programme-summary', openSummary);
+    return () => {
+      document.removeEventListener('visibilitychange', onVis);
+      window.removeEventListener('compound:open-morning', openMorning);
+      window.removeEventListener('compound:open-programme-summary', openSummary);
+    };
+  }, []);
   // Demo flags for Home variants (Tweak-controlled)
   const [demoFlags, setDemoFlags] = React.useState({
     wearableConnected: false,
@@ -231,6 +257,25 @@ function App() {
       return () => clearTimeout(t);
     }
   }, [step, renderStepIndex]);
+
+  // "Start Day A/B/C" from the Reset card → straight into a live session.
+  React.useEffect(() => {
+    const onStart = (e) => {
+      const p = activeProgramme();
+      const day = e && e.detail && e.detail.day;
+      if (!p || !day) return;
+      const existing = loadActiveDraft();
+      if (!existing) {
+        setActiveSession({ config: programmeSessionConfig(p, day), session: buildProgrammeSession(day), currentIdx: 0, startedAt: Date.now() });
+      } else if (!activeSession) {
+        setActiveSession({ config: existing.config, session: existing.exercises, currentIdx: existing.currentIdx || 0, startedAt: existing.startedAt });
+      }
+      setTab('workout');
+      setTimeout(() => setWorkoutView('session'), 0);
+    };
+    window.addEventListener('compound:start-programme', onStart);
+    return () => window.removeEventListener('compound:start-programme', onStart);
+  }, [activeSession]);
 
   // Reset workout sub-view when switching away from the workout tab
   React.useEffect(() => {
@@ -303,6 +348,11 @@ function App() {
       const updated = recordCheckin(answers, data, forDate);
       setCheckins(updated);
     }
+    // Final night of the Reset → the summary follows the celebration.
+    try {
+      const p = activeProgramme();
+      if (p && endDateOf(p) === targetKey) setTimeout(() => setShowProgSummary(true), 1800);
+    } catch (e) {}
   };
 
   // Recovery for a check-in logged on the wrong side of midnight (after the
@@ -610,6 +660,13 @@ function App() {
         )}
         {view === 'app' && celebrate && (
           <CheckinCelebration onClose={() => setCelebrate(false)} />
+        )}
+
+        {view === 'app' && showMorning && !checkinOpen && (
+          <MiracleMorningScreen onClose={() => { setShowMorning(false); setNutTick((x) => x + 1); }} />
+        )}
+        {view === 'app' && showProgSummary && !showMorning && !checkinOpen && (
+          <ProgrammeSummaryScreen onClose={() => { setShowProgSummary(false); setNutTick((x) => x + 1); }} />
         )}
 
         {/* Settings overlay */}

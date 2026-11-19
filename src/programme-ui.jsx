@@ -119,7 +119,7 @@ function MiracleMorningScreen({ date, onClose }) {
       <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
         {SAVERS.map((s, i) => {
           const on = ticks[i];
-          const detail = s.t === 'Exercise' ? (isJogDay ? `Jog · aim ${JOG_KM} km, any distance counts` : '20 push-ups')
+          const detail = s.t === 'Exercise' ? (isJogDay ? 'Jog (any distance) or 20 push-ups' : '20 push-ups')
             : s.t === 'Reading' && d === 0 ? 'A verse, a hymn or the order of service' : s.d;
           return (
             <button key={i} onClick={() => toggle(i)}
@@ -157,7 +157,7 @@ function MiracleMorningScreen({ date, onClose }) {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12, padding: '0 14px', height: 46, borderRadius: 12, background: C.surf1, border: `1px solid ${C.lineStrong}` }}>
-        <span style={{ ...body, flex: 1, fontSize: 14, color: C.textMid }}>Weight this morning <span style={{ color: C.textLow }}>· optional</span></span>
+        <span style={{ ...body, flex: 1, fontSize: 14, color: C.textMid }}>Weight this morning</span>
         <input inputMode="decimal" value={weight} onChange={(e) => setWeight(e.target.value.replace(/[^0-9.]/g, ''))} placeholder="kg"
           style={{ ...mono, width: 76, height: 32, textAlign: 'center', fontSize: 15, color: C.text, background: C.surf2, border: `1px solid ${C.line}`, borderRadius: 8 }} />
       </div>
@@ -244,7 +244,7 @@ function ResetHomeCard({ onOpenMorning, onOpenSummary }) {
   const jogOk = jogDone(p, ctx, today);
   const jw = jogWeek(p, today, ctx);
   const bigDay = !jogOk && bigStepDay(ctx, today);
-  const jogTally = jw.walks ? `${jw.jogs} jog${jw.jogs === 1 ? '' : 's'} + ${jw.walks} step day${jw.walks === 1 ? '' : 's'}${jw.target ? ` of ${jw.target}` : ''}` : jw.target ? `${jw.done}/${jw.target} this week` : `${jw.done} this week`;
+  const jogTally = jw.walks ? `${jw.jogs} jog${jw.jogs === 1 ? '' : 's'} + ${jw.walks} step day${jw.walks === 1 ? '' : 's'}${jw.target ? ` of ${jw.target}` : ''}` : jw.target ? `${jw.done}/${jw.target} done` : `${jw.done} done`;
   const stepsNum = Number(stepsIn);
   const saveBigSteps = () => { if (stepsNum >= BIG_STEP_MIN) { patchProgrammeDay(today, { bigSteps: stepsNum }); setAskSteps(false); } };
   const isLast = end && today === end;
@@ -260,6 +260,11 @@ function ResetHomeCard({ onOpenMorning, onOpenSummary }) {
       {action}
     </div>
   );
+  const quietBtn = (txt, fn) => <button onClick={fn} style={{ ...btnBase, height: 34, padding: '0 14px', fontSize: 12, background: 'transparent', color: C.textMid, border: `1px solid ${C.lineStrong}` }}>{txt}</button>;
+  const sectionLabel = { ...mono, fontSize: 9.5, letterSpacing: 2, color: C.textLow, marginTop: 14, marginBottom: 2 };
+  const logJog = () => patchProgrammeDay(today, { jog: true });
+  const liftsLeft = Math.max(0, plan.week.target - plan.week.done);
+  const jogsLeft = Math.max(0, jw.target - jw.done);
   const smallBtn = (txt, fn) => <button onClick={fn} style={{ ...btnBase, height: 34, padding: '0 14px', fontSize: 12, background: C.accent, color: C.onAccent }}>{txt}</button>;
 
   return (
@@ -283,22 +288,32 @@ function ResetHomeCard({ onOpenMorning, onOpenSummary }) {
         <StreakPill label="SESSIONS" s={streaks.sessions} />
       </div>
 
-      <div style={{ marginTop: 12 }}>
+      {/* TODAY: only what is actually asked of today. */}
+      <div style={sectionLabel}>TODAY</div>
+      <div>
         {friPending && row("Friday's check-in", friOpen ? 'Open till midday' : 'Marked missed · you can still log it', false,
           smallBtn('Log', () => { try { window.dispatchEvent(new CustomEvent('compound:open-checkin-for', { detail: { date: yest } })); } catch (e) {} }))}
         {row('Miracle Morning', dayData.morningDoneAt ? `${saversCount(dayData)}/6 · tonight's number ${dayData.number}` : 'SAVERS + tonight\'s number', !!dayData.morningDoneAt && (pmStart || saversCount(dayData) === 6),
-          !dayData.morningDoneAt || (!pmStart && saversCount(dayData) < 6) ? smallBtn(dayData.morningDoneAt ? 'Edit' : 'Open', onOpenMorning) : null)}
-        {plan.lift && row(liftDone ? `Day ${plan.lift} · ${RESET_DAYS[plan.lift].name} · done` : `Next: Day ${plan.lift} · ${RESET_DAYS[plan.lift].name}`,
-          `${plan.week.done}/${plan.week.target} this week · ${liftDone ? 'nice work' : dayData.aim === true ? 'you said today · two lifts still counts' : 'any day you like'}`,
-          liftDone, liftDone ? null : smallBtn('Start', startLift))}
-        {row(jogOk ? 'Jog · done' : bigDay ? 'Big step day · covered' : `Jog · aim ${JOG_KM} km`,
-          `${jogTally} · ${jogOk ? 'you got out the door' : bigDay ? 'a 500 m lap still earns the jog' : plan.jog ? '5:50am or this arvo · any distance counts' : 'any day · any distance counts'}`,
-          jogOk || bigDay,
+          dayData.morningDoneAt ? quietBtn('Edit', onOpenMorning) : smallBtn('Open', onOpenMorning))}
+        {dayData.aim === true && !liftDone && row(`Workout · Day ${plan.lift} · ${RESET_DAYS[plan.lift].name}`, 'You said today · two lifts still counts', false, smallBtn('Start', startLift))}
+        {plan.jog && !jogOk && !bigDay && row('Jog', '5:50am or this arvo · any distance counts', false, smallBtn('Log jog', logJog))}
+      </div>
+
+      {/* THIS WEEK: what's still to go - do them on any day. */}
+      <div style={sectionLabel}>THIS WEEK</div>
+      <div>
+        {row(liftsLeft ? `Workouts · ${liftsLeft} to go` : 'Workouts · week done',
+          `${plan.week.done}/${plan.week.target} done · next: Day ${plan.lift} · ${RESET_DAYS[plan.lift].name}${liftDone ? ' · trained today' : ''}`,
+          liftsLeft === 0,
+          liftDone || dayData.aim === true ? null : smallBtn('Start', startLift))}
+        {row(jw.target === 0 ? 'Jogs · optional this week' : jogsLeft ? `Jogs · ${jogsLeft} to go` : 'Jogs · week done',
+          `${jogTally} · ${jogOk ? 'jogged today' : bigDay ? 'big step day today' : 'any day, any distance'}`,
+          jw.target > 0 && jogsLeft === 0,
           jogOk
             ? <input inputMode="decimal" defaultValue={dayData.jogKm != null ? String(dayData.jogKm) : ''} placeholder="km"
                 onBlur={(e) => { const n = Number(e.target.value); patchProgrammeDay(today, { jog: true, jogKm: e.target.value !== '' && Number.isFinite(n) && n > 0 ? n : null }); }}
                 style={{ ...mono, width: 62, height: 34, textAlign: 'center', fontSize: 14, color: C.text, background: C.surf2, border: `1px solid ${C.lineStrong}`, borderRadius: 8 }} />
-            : smallBtn('Log jog', () => patchProgrammeDay(today, { jog: true })))}
+            : plan.jog && !bigDay ? null : smallBtn('Log jog', logJog))}
         {!jogOk && !bigDay && (askSteps ? (
           <div style={{ padding: '2px 0 10px 30px' }}>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>

@@ -51,12 +51,12 @@ export const RESET_DAYS = {
 };
 
 export const SAVERS = [
-  { k: 'S', t: 'Silence', d: 'Pray beside the bed' },
+  { k: 'S', t: 'Silence', d: 'Prayer counts · pray beside the bed' },
   { k: 'A', t: 'Affirmations', d: 'Verse + declaration out loud' },
   { k: 'V', t: 'Visualization', d: 'Picture today going right' },
   { k: 'E', t: 'Exercise', d: 'Jog (Wed/Fri) or 20 push-ups' },
   { k: 'R', t: 'Reading', d: 'Bible + a few pages' },
-  { k: 'S', t: 'Scribing', d: 'Journal one line' },
+  { k: 'S', t: 'Scribing', d: 'Write out a verse or journal one line' },
 ];
 
 export const DANGER_TIMES = ['After tea', 'Kids in bed', 'Mates over', 'None'];

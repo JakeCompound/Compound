@@ -321,7 +321,7 @@ export default async function handler(req, res) {
     try {
       const { data: pRows } = await supa.from('programmes').select('user_id,data');
       (pRows || []).forEach((r) => { if (r.data && r.data.status === 'active') ensure(r.user_id).programme = r.data; });
-      const since = new Date(Date.now() - 4 * 86400000).toISOString().slice(0, 10);
+      const since = new Date(Date.now() - 9 * 86400000).toISOString().slice(0, 10);
       const progUsers = Object.keys(udByUser).filter((u) => udByUser[u].programme);
       if (progUsers.length) {
         const [{ data: pdRows }, { data: sdRows }, { data: ndRows }] = await Promise.all([

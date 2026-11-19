@@ -3,7 +3,7 @@ import { C } from './compound-ui.jsx';
 import {
   DANGER_TIMES, JOG_KM, JOG_STEPS_MIN, OVER_REASONS, RESET_DAYS, RESET_NOTIFS, SAVERS, STEP_TARGET,
   addDays, dayNumber, dowOf, endDateOf, inProgramme, missReasons, notifSetting, planFor,
-  liftWeek, missStreak, nextLiftKey, programmeStreaks, programmeSummary, saversCount, weekNumber,
+  jogDone, jogWeek, liftWeek, missStreak, nextLiftKey, programmeStreaks, programmeSummary, saversCount, weekNumber,
 } from './programme-core.js';
 import {
   activeProgramme, getProgrammeDay, loadProgrammes, patchProgrammeDay, programmeCtx,
@@ -207,7 +207,8 @@ function ResetHomeCard({ onOpenMorning, onOpenSummary }) {
   const must = missN > 0;
   const liftDone = ctx.liftDates.has(today);
   const steps = ctx.stepsOn(today);
-  const jogOk = ctx.runDates.has(today) || steps >= JOG_STEPS_MIN;
+  const jogOk = jogDone(p, ctx, today);
+  const jw = jogWeek(p, today, ctx);
   const isLast = end && today === end;
 
   const startLift = () => { try { window.dispatchEvent(new CustomEvent('compound:start-programme', { detail: { day: plan.lift } })); } catch (e) {} };
@@ -250,7 +251,9 @@ function ResetHomeCard({ onOpenMorning, onOpenSummary }) {
         {plan.lift && row(liftDone ? `Day ${plan.lift} · ${RESET_DAYS[plan.lift].name} · done` : `Next: Day ${plan.lift} · ${RESET_DAYS[plan.lift].name}`,
           `${plan.week.done}/${plan.week.target} this week · ${liftDone ? 'nice work' : dayData.aim === true ? 'you said today · two lifts still counts' : 'any day you like'}`,
           liftDone, liftDone ? null : smallBtn('Start', startLift))}
-        {plan.jog && row(`Jog ${JOG_KM} km · 5:50am`, `${steps.toLocaleString()} steps · ${JOG_STEPS_MIN.toLocaleString()}+ counts`, jogOk, null)}
+        {row(jogOk ? `Jog ${JOG_KM} km · done` : `Jog ${JOG_KM} km`,
+          `${jw.target ? `${jw.done}/${jw.target} this week` : `${jw.done} this week`} · ${jogOk ? 'nice work' : plan.jog ? `5:50am or this arvo · ${JOG_STEPS_MIN.toLocaleString()}+ steps counts` : 'any day counts'}`,
+          jogOk, jogOk ? null : smallBtn('Log jog', () => patchProgrammeDay(today, { jog: true })))}
       </div>
       {isLast && <GhostBtn onClick={onOpenSummary} style={{ marginTop: 10 }}>Final day · see summary</GhostBtn>}
     </div>
@@ -270,7 +273,7 @@ function ResetCheckinStep({ date, nipsAnswer, stepsAnswer, value, onChange }) {
   const v = value || {};
   const set = (k, x) => onChange({ ...v, [k]: x });
   const liftedToday = ctx.liftDates.has(date);
-  const sessionLabel = liftedToday || day.aim === true ? 'Workout done today?' : plan.jog ? 'Jog done (or 5,000+ steps)?' : null;
+  const sessionLabel = liftedToday || day.aim === true ? 'Workout done today?' : null;
   const num = day.number;
   const act = typeof v.drinks === 'number' ? v.drinks : nipsAnswer;
   const cmp = typeof num === 'number' && typeof act === 'number' ? (act < num ? 'UNDER' : act === num ? 'MATCH' : 'OVER') : null;
@@ -302,6 +305,7 @@ function ResetCheckinStep({ date, nipsAnswer, stepsAnswer, value, onChange }) {
         <span style={{ ...mono, fontSize: 15, color: saversCount(day) === 6 ? C.success : C.accent }}>{saversCount(day)}/6</span>
       </div>
       {sessionLabel && yn('workoutDone', sessionLabel)}
+      {(plan.jog || v.jog != null) && yn('jog', 'Jog today (morning or arvo)?')}
       {yn('protein', 'Protein 120 g across the day?')}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderTop: `1px solid ${C.line}` }}>
         <span style={{ ...body, flex: 1, fontSize: 14, color: C.text }}>Steps <span style={{ color: C.textLow }}>· target {STEP_TARGET.toLocaleString()}</span></span>
@@ -350,7 +354,7 @@ function resetNightDefaults(date) {
   const plan = planFor(p, date, ctx.liftDates);
   const out = {};
   if (ctx.liftDates.has(date)) out.workoutDone = true;
-  else if (plan.jog) out.workoutDone = (ctx.runDates.has(date) || ctx.stepsOn(date) >= JOG_STEPS_MIN) ? true : null;
+  if (jogDone(p, ctx, date)) out.jog = true;
   return out;
 }
 function saveResetNight(date, night) {

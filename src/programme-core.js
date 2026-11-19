@@ -137,7 +137,7 @@ export function planFor(p, date, liftDates) {
   return {
     lift: nextLiftKey(p, date, liftDates),
     liftDue: date === week.end && week.done < week.target,
-    jog: date >= firstMonday(p) && (d === 3 || d === 5),
+    jog: isJogDay(p, date), // scheduled today (jogs still count on any day)
     week,
   };
 }
@@ -151,8 +151,24 @@ export function drinksActual(day, ctx, date) {
   if (typeof n === 'number') return n;
   return ctx && ctx.nipsOn ? ctx.nipsOn(date) : null;
 }
-export function jogDone(ctx, date) {
-  return !!(ctx.runDates && ctx.runDates.has(date)) || (ctx.stepsOn ? ctx.stepsOn(date) : 0) >= JOG_STEPS_MIN;
+// Jogs are scheduled Wed + Fri (from the first Monday) but count on ANY day:
+// a missed morning can be made up that afternoon or on another day. A jog
+// counts when a run is logged, when it's ticked on the Home card or in the
+// check-in, or - on a scheduled jog day - when steps reach 5,000.
+export const isJogDay = (p, date) => inProgramme(p, date) && date >= firstMonday(p) && [3, 5].includes(dowOf(date));
+export function jogDone(p, ctx, date) {
+  const day = ((ctx && ctx.days) || {})[date] || {};
+  if (ctx.runDates && ctx.runDates.has(date)) return true;
+  if (day.jog === true || (day.night && day.night.jog === true)) return true;
+  return isJogDay(p, date) && (ctx.stepsOn ? ctx.stepsOn(date) : 0) >= JOG_STEPS_MIN;
+}
+// The week's jog tally. target = scheduled jog days in the week; due = the
+// week's last day with the target unmet (the only way a jog counts as a miss).
+export function jogWeek(p, date, ctx) {
+  const { start, end } = weekBounds(p, date);
+  let target = 0, done = 0;
+  for (let x = start; x <= end; x = addDays(x, 1)) { if (isJogDay(p, x)) target += 1; if (jogDone(p, ctx, x)) done += 1; }
+  return { start, end, target, done, due: date === end && done < target };
 }
 // Why a day counts as missed ("any slip"): returns a list of reasons, empty = fine.
 export function missReasons(p, ctx, date) {
@@ -162,7 +178,7 @@ export function missReasons(p, ctx, date) {
   if (saversCount(day) < 6) r.push('savers');
   const plan = planFor(p, date, ctx.liftDates);
   if (plan.liftDue) r.push('lift'); // week ended short of 3
-  if (plan.jog && !jogDone(ctx, date)) r.push('jog');
+  if (jogWeek(p, date, ctx).due) r.push('jog'); // week ended short on jogs
   const num = day.number;
   const act = drinksActual(day, ctx, date);
   if (typeof num === 'number' && typeof act === 'number' && act > num) r.push('drinks');
@@ -209,11 +225,9 @@ export function programmeStreaks(p, ctx, today) {
     // Every lift extends it (any day); a missed jog day or a week that ends
     // short of 3 lifts breaks it.
     sessions: streak(p, ctx, today, (d) => {
-      const lifted = ctx.liftDates.has(d);
+      if (ctx.liftDates.has(d) || jogDone(p, ctx, d)) return true;
       const plan = planFor(p, d, ctx.liftDates);
-      if (plan.jog) return lifted || jogDone(ctx, d) ? true : (d === today ? null : false);
-      if (lifted) return true;
-      if (plan.liftDue) return d === today ? null : false;
+      if (plan.liftDue || jogWeek(p, d, ctx).due) return d === today ? null : false;
       return null;
     }),
   };
@@ -238,7 +252,8 @@ export function programmeSummary(p, ctx, weighins, today) {
     const plan = planFor(p, d, ctx.liftDates);
     if (ctx.liftDates.has(d)) liftsDone += 1;
     if (plan.week && d === plan.week.start) liftsSched += plan.week.target;
-    if (plan.jog) { jogsSched += 1; if (jogDone(ctx, d)) jogsDone += 1; }
+    if (jogDone(p, ctx, d)) jogsDone += 1;
+    if (plan.week && d === plan.week.start) jogsSched += jogWeek(p, d, ctx).target;
     const day = (ctx.days || {})[d] || {};
     if (saversCount(day) >= 6) mm += 1;
     if (ctx.checkinDates && ctx.checkinDates.has(d)) nightsLogged += 1;

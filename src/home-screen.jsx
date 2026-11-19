@@ -25,6 +25,12 @@ function HomeScreen({ user, set, state, checkins, onOpenCheckin, onOpenCheckinFo
   const todayKey = window.isoDate ? window.isoDate(new Date()) : new Date().toISOString().slice(0, 10);
   const loadW = () => { try { return JSON.parse(localStorage.getItem('compound:weighins') || '[]'); } catch (e) { return []; } };
   const [weighEntries, setWeighEntries] = React.useState(loadW);
+  // A weight entered on the Miracle Morning screen lands in the same store.
+  React.useEffect(() => {
+    const reload = () => setWeighEntries(loadW());
+    window.addEventListener('compound:weighins-changed', reload);
+    return () => window.removeEventListener('compound:weighins-changed', reload);
+  }, []);
   const [weighOpen, setWeighOpen] = React.useState(false);
   const [weighTargetDate, setWeighTargetDate] = React.useState(null); // null = today
   // Hardware back closes the modal (and drops any catch-up target).

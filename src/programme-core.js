@@ -59,6 +59,8 @@ export const SAVERS = [
   { k: 'S', t: 'Scribing', d: 'Journal one line' },
 ];
 
+export const DANGER_TIMES = ['After tea', 'Kids in bed', 'Mates over', 'None'];
+export const OVER_REASONS = ['Tired', 'Stress', 'Social', 'Boredom', 'No plan'];
 export const STEP_TARGET = 8000;
 export const JOG_STEPS_MIN = 5000;
 export const JOG_KM = 7;
@@ -210,6 +212,7 @@ export function programmeSummary(p, ctx, weighins, today) {
   const last = ws.length ? ws[ws.length - 1] : null;
   let liftsDone = 0, liftsSched = 0, jogsDone = 0, jogsSched = 0, mm = 0, nightsUnder = 0, nightsNumbered = 0;
   const weeks = {};
+  const overReasons = {};
   for (let d = p.startDate; d <= end; d = addDays(d, 1)) {
     const plan = planFor(p, d, ctx.liftDates);
     if (plan.lift) {
@@ -220,7 +223,11 @@ export function programmeSummary(p, ctx, weighins, today) {
     const day = (ctx.days || {})[d] || {};
     if (saversCount(day) >= 6) mm += 1;
     const act = drinksActual(day, ctx, d);
-    if (typeof day.number === 'number' && typeof act === 'number') { nightsNumbered += 1; if (act <= day.number) nightsUnder += 1; }
+    if (typeof day.number === 'number' && typeof act === 'number') {
+      nightsNumbered += 1;
+      if (act <= day.number) nightsUnder += 1;
+      else if (day.night && day.night.overReason) overReasons[day.night.overReason] = (overReasons[day.night.overReason] || 0) + 1;
+    }
     const wk = weekNumber(p, d);
     const w = (weeks[wk] = weeks[wk] || { week: wk, total: 0, nights: 0 });
     if (typeof act === 'number') { w.total += act; w.nights += 1; }
@@ -236,6 +243,7 @@ export function programmeSummary(p, ctx, weighins, today) {
       nightsUnder, nightsNumbered,
       byWeek: Object.values(weeks).sort((a, b) => a.week - b.week).map((w) => ({ week: w.week, avg: w.nights ? Math.round((w.total / w.nights) * 10) / 10 : null })),
     },
+    overReasons,
     longest: { savers: s.savers.best, drinks: s.drinks.best, sessions: s.sessions.best },
   };
 }
@@ -269,8 +277,12 @@ export const RESET_NOTIFS = [
     body: (p, date, ctx) => `Gym at 5:05 - Day ${planFor(p, date, ctx && ctx.liftDates).lift}. Two lifts still counts.` },
   { id: 'home', label: 'Heading home', hint: 'Mon – Fri', time: '17:40', days: [1, 2, 3, 4, 5],
     body: (p, date, ctx) => {
-      const n = ((ctx && ctx.days) || {})[date] && ctx.days[date].number;
-      return `Heading home. Kids first. No drinks till after tea. Tonight's number: ${typeof n === 'number' ? n : 'not set - set it now'}.`;
+      const day = ((ctx && ctx.days) || {})[date] || {};
+      const n = day.number;
+      const tail = typeof n === 'number'
+        ? `You committed to ${n} tonight.${day.danger && day.danger !== 'None' ? ` Watch out: ${day.danger.toLowerCase()}.` : ''}`
+        : "Tonight's number isn't set - set it now.";
+      return `Heading home. Kids first. No drinks till after tea. ${tail}`;
     } },
   { id: 'brooke', label: 'Time with Brooke', hint: 'Mon – Fri', time: '20:10', days: [1, 2, 3, 4, 5],
     body: () => 'Time with Brooke. No PUBG or YouTube.' },

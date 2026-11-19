@@ -1,7 +1,7 @@
 import React from 'react';
 import { C } from './compound-ui.jsx';
 import {
-  JOG_KM, JOG_STEPS_MIN, RESET_DAYS, RESET_NOTIFS, SAVERS, STEP_TARGET,
+  DANGER_TIMES, JOG_KM, JOG_STEPS_MIN, OVER_REASONS, RESET_DAYS, RESET_NOTIFS, SAVERS, STEP_TARGET,
   addDays, dayNumber, dowOf, endDateOf, inProgramme, missReasons, notifSetting, planFor,
   programmeStreaks, programmeSummary, saversCount, weekNumber,
 } from './programme-core.js';
@@ -53,9 +53,20 @@ function MiracleMorningScreen({ date, onClose }) {
       return next;
     });
   };
+  // Danger time: when tonight's number is most likely to break (one tap, optional).
+  const [danger, setDanger] = React.useState(saved.danger || null);
+  // Weight: optional; saved into the normal weigh-in log so the weigh-in to-do
+  // and the end-of-programme summary both see it.
+  const loadW = () => { try { return JSON.parse(localStorage.getItem('compound:weighins') || '[]'); } catch (e) { return []; } };
+  const [weight, setWeight] = React.useState(() => { const w = loadW().find((e) => e.date === day); return w ? String(w.value) : ''; });
   const numOk = num !== '' && Number.isFinite(Number(num)) && Number(num) >= 0;
   const done = () => {
-    persist({ savers: ticks, number: Number(num), journal: line.trim(), morningDoneAt: Date.now() });
+    persist({ savers: ticks, number: Number(num), danger, journal: line.trim(), morningDoneAt: Date.now() });
+    const w = Number(weight);
+    if (weight !== '' && Number.isFinite(w) && w >= 30 && w <= 300) {
+      const next = [...loadW().filter((e) => e.date !== day), { date: day, value: w }].sort((a, b) => (a.date < b.date ? -1 : 1));
+      try { localStorage.setItem('compound:weighins', JSON.stringify(next)); window.dispatchEvent(new CustomEvent('compound:weighins-changed')); } catch (e) {}
+    }
     onClose && onClose(true);
   };
   const count = ticks.filter(Boolean).length;
@@ -99,6 +110,21 @@ function MiracleMorningScreen({ date, onClose }) {
             style={{ ...mono, flex: 1, minWidth: 0, height: 44, textAlign: 'center', fontSize: 24, color: C.text, background: 'transparent', border: `1px solid ${C.line}`, borderRadius: 10 }} />
           <button onClick={() => setNum((n) => String((Number(n) || 0) + 1))} style={{ ...btnBase, width: 44, height: 44, background: C.surf2, color: C.text, fontSize: 20 }}>＋</button>
         </div>
+        <div style={{ ...mono, fontSize: 10, letterSpacing: 2, color: C.textLow, marginTop: 14 }}>DANGER TIME TONIGHT?</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+          {DANGER_TIMES.map((t) => (
+            <button key={t} onClick={() => setDanger(danger === t ? null : t)}
+              style={{ ...btnBase, height: 34, padding: '0 12px', fontSize: 12, letterSpacing: 0.8, background: danger === t ? C.accent : 'transparent', color: danger === t ? C.onAccent : C.textMid, border: `1px solid ${danger === t ? C.accent : C.lineStrong}` }}>
+              {t}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12, padding: '0 14px', height: 46, borderRadius: 12, background: C.surf1, border: `1px solid ${C.lineStrong}` }}>
+        <span style={{ ...body, flex: 1, fontSize: 14, color: C.textMid }}>Weight this morning <span style={{ color: C.textLow }}>· optional</span></span>
+        <input inputMode="decimal" value={weight} onChange={(e) => setWeight(e.target.value.replace(/[^0-9.]/g, ''))} placeholder="kg"
+          style={{ ...mono, width: 76, height: 32, textAlign: 'center', fontSize: 15, color: C.text, background: C.surf2, border: `1px solid ${C.line}`, borderRadius: 8 }} />
       </div>
 
       <input value={line} onChange={(e) => setLine(e.target.value)} placeholder="One line for today (optional)" maxLength={160}
@@ -247,7 +273,20 @@ function ResetCheckinStep({ date, nipsAnswer, stepsAnswer, value, onChange }) {
           <span style={{ ...body, flex: 1, fontSize: 14, color: C.text }}>Drinks <span style={{ color: C.textLow }}>· this morning's number {typeof num === 'number' ? num : '—'}</span></span>
           {numIn('drinks', act, '0')}
         </div>
-        {cmp && <div style={{ ...mono, fontSize: 10.5, letterSpacing: 1.4, marginTop: 6, textAlign: 'right', color: cmp === 'OVER' ? C.danger : C.success }}>{cmp}</div>}
+        {cmp && <div style={{ ...mono, fontSize: 10.5, letterSpacing: 1.4, marginTop: 6, textAlign: 'right', color: cmp === 'OVER' ? C.danger : C.success }}>{cmp}{typeof num === 'number' ? ` · COMMITTED TO ${num}` : ''}</div>}
+        {cmp === 'OVER' && (
+          <div style={{ marginTop: 8 }}>
+            <div style={{ ...body, fontSize: 13, color: C.textMid }}>What made it hard?</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+              {OVER_REASONS.map((t) => (
+                <button key={t} onClick={() => set('overReason', v.overReason === t ? null : t)}
+                  style={{ ...btnBase, height: 32, padding: '0 11px', fontSize: 12, letterSpacing: 0.8, background: v.overReason === t ? C.accent : 'transparent', color: v.overReason === t ? C.onAccent : C.textMid, border: `1px solid ${v.overReason === t ? C.accent : C.lineStrong}` }}>
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
       {d >= 1 && d <= 4 && yn('ruleKept', 'Beer only (or spirits capped at 8 measured nips): kept?')}
       {yn('afterTea', 'First drink only after tea (6:00pm)?')}
@@ -319,6 +358,7 @@ function ProgrammeSummaryScreen({ programme, onClose }) {
         {stat('Drinks at/under number', `${s.drinks.nightsUnder}/${s.drinks.nightsNumbered}`, 'nights')}
         {stat('Avg drinks per night', s.drinks.byWeek.map((x) => (x.avg == null ? '—' : x.avg)).join(' · '), s.drinks.byWeek.map((x) => `wk ${x.week}`).join(' · '))}
         {stat('Longest streaks', `${s.longest.savers} · ${s.longest.drinks} · ${s.longest.sessions}`, 'morning · drinks · sessions')}
+        {s.overReasons && Object.keys(s.overReasons).length > 0 && stat('Nights over: why', Object.entries(s.overReasons).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k} ${n}`).join(' · '), 'your triggers')}
       </div>
       {isOpen && (
         <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 8 }}>

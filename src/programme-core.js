@@ -99,33 +99,47 @@ export function weekNumber(p, date) {
   return Math.floor(daysBetween(fm, date) / 7) + (p.startDate < fm ? 2 : 1);
 }
 
-// What's on for `date`? → { lift: 'A'|'B'|'C'|null, liftDue, jog }
-// liftDue = a miss if not done. Week 1 runs A, B, C on consecutive days from
-// the start; C may slide to any later day before the first Monday and is only
-// "due" (a miss) on the last of those days. No jogs in week 1.
+// Lifts are flexible: aim for 3 a week on ANY days (back-to-back is fine, more
+// than 3 is fine). The next one is always the next in the A → B → C rotation.
+// Weeks run Mon–Sun; week 1 is the start day through the first Sunday.
+export const LIFTS_PER_WEEK = 3;
+export function weekBounds(p, date) {
+  let start = addDays(date, -((dowOf(date) + 6) % 7)); // Monday
+  let end = addDays(start, 6);
+  if (start < p.startDate) start = p.startDate;
+  const pe = endDateOf(p);
+  if (pe && end > pe) end = pe;
+  return { start, end };
+}
+export function liftWeek(p, date, liftDates) {
+  const { start, end } = weekBounds(p, date);
+  const days = daysBetween(start, end) + 1;
+  const target = days >= 7 ? LIFTS_PER_WEEK : Math.max(0, Math.min(LIFTS_PER_WEEK, days - 1));
+  let done = 0;
+  if (liftDates) for (let x = start; x <= end; x = addDays(x, 1)) if (liftDates.has(x)) done += 1;
+  return { start, end, target, done };
+}
+export function nextLiftKey(p, date, liftDates) {
+  let n = 0;
+  if (liftDates) liftDates.forEach((x) => { if (x >= p.startDate && x < date) n += 1; });
+  return ['A', 'B', 'C'][n % 3];
+}
+// What's on for `date`? → { lift, liftDue, jog, week }
+//   lift    — the next lift in the rotation (today's, if already done today)
+//   liftDue — true only on the week's LAST day while the week is still short of
+//             its target; that is the only way a lift can count as a miss
+//   jog     — Wed + Fri from the first Monday (no jogs in week 1)
 export function planFor(p, date, liftDates) {
-  const out = { lift: null, liftDue: false, jog: false };
+  const out = { lift: null, liftDue: false, jog: false, week: null };
   if (!inProgramme(p, date)) return out;
-  const fm = firstMonday(p);
-  if (date < fm) {
-    const k = daysBetween(p.startDate, date);
-    const windowDays = daysBetween(p.startDate, fm);
-    if (k === 0) return { ...out, lift: 'A', liftDue: true };
-    if (k === 1) return { ...out, lift: 'B', liftDue: true };
-    if (windowDays < 3) return out;
-    // C: shown from day 3 until done; due on the window's last day.
-    for (let j = 2; j < k; j++) if (liftDates && liftDates.has(addDays(p.startDate, j))) return out;
-    return { ...out, lift: 'C', liftDue: k === windowDays - 1 };
-  }
+  const week = liftWeek(p, date, liftDates);
   const d = dowOf(date);
-  // Monday is a rest day. Day C is Saturday OR Sunday (your pick): it shows on
-  // Saturday, and only becomes due on Sunday if Saturday's wasn't done.
-  if (d === 2) return { ...out, lift: 'A', liftDue: true };
-  if (d === 4) return { ...out, lift: 'B', liftDue: true };
-  if (d === 6) return { ...out, lift: 'C', liftDue: false };
-  if (d === 0) return liftDates && liftDates.has(addDays(date, -1)) ? out : { ...out, lift: 'C', liftDue: true };
-  if (d === 3 || d === 5) return { ...out, jog: true };
-  return out;
+  return {
+    lift: nextLiftKey(p, date, liftDates),
+    liftDue: date === week.end && week.done < week.target,
+    jog: date >= firstMonday(p) && (d === 3 || d === 5),
+    week,
+  };
 }
 
 // ── Day status ────────────────────────────────────────────────────────────
@@ -140,12 +154,6 @@ export function drinksActual(day, ctx, date) {
 export function jogDone(ctx, date) {
   return !!(ctx.runDates && ctx.runDates.has(date)) || (ctx.stepsOn ? ctx.stepsOn(date) : 0) >= JOG_STEPS_MIN;
 }
-export function sessionDone(p, ctx, date) {
-  const plan = planFor(p, date, ctx.liftDates);
-  if (plan.lift) return ctx.liftDates.has(date);
-  if (plan.jog) return jogDone(ctx, date);
-  return null; // nothing scheduled
-}
 // Why a day counts as missed ("any slip"): returns a list of reasons, empty = fine.
 export function missReasons(p, ctx, date) {
   if (!inProgramme(p, date)) return [];
@@ -153,13 +161,19 @@ export function missReasons(p, ctx, date) {
   const r = [];
   if (saversCount(day) < 6) r.push('savers');
   const plan = planFor(p, date, ctx.liftDates);
-  if (plan.lift && plan.liftDue && !ctx.liftDates.has(date)) r.push('lift');
+  if (plan.liftDue) r.push('lift'); // week ended short of 3
   if (plan.jog && !jogDone(ctx, date)) r.push('jog');
   const num = day.number;
   const act = drinksActual(day, ctx, date);
   if (typeof num === 'number' && typeof act === 'number' && act > num) r.push('drinks');
   if (!(ctx.checkinDates && ctx.checkinDates.has(date))) r.push('checkin');
   return r;
+}
+// How many days in a row (ending yesterday) were missed.
+export function missStreak(p, ctx, today) {
+  let n = 0;
+  for (let d = addDays(today, -1); inProgramme(p, d) && missReasons(p, ctx, d).length > 0; d = addDays(d, -1)) n += 1;
+  return n;
 }
 export const missedYesterday = (p, ctx, today) => {
   const y = addDays(today, -1);
@@ -192,13 +206,15 @@ export function programmeStreaks(p, ctx, today) {
       const act = drinksActual(day, ctx, d);
       return typeof act === 'number' ? act <= day.number : null;
     }),
+    // Every lift extends it (any day); a missed jog day or a week that ends
+    // short of 3 lifts breaks it.
     sessions: streak(p, ctx, today, (d) => {
+      const lifted = ctx.liftDates.has(d);
       const plan = planFor(p, d, ctx.liftDates);
-      if (!plan.lift && !plan.jog) return null;
-      const done = sessionDone(p, ctx, d);
-      if (plan.lift && !plan.liftDue && !done) return null; // optional C day
-      if (d === today && !done) return null;
-      return !!done;
+      if (plan.jog) return lifted || jogDone(ctx, d) ? true : (d === today ? null : false);
+      if (lifted) return true;
+      if (plan.liftDue) return d === today ? null : false;
+      return null;
     }),
   };
 }
@@ -220,10 +236,8 @@ export function programmeSummary(p, ctx, weighins, today) {
   const avg = (a) => (a.length ? Math.round((a.reduce((x, y) => x + y, 0) / a.length) * 10) / 10 : null);
   for (let d = p.startDate; d <= end; d = addDays(d, 1)) {
     const plan = planFor(p, d, ctx.liftDates);
-    if (plan.lift) {
-      const done = ctx.liftDates.has(d);
-      if (plan.liftDue || done) { liftsSched += 1; if (done) liftsDone += 1; }
-    }
+    if (ctx.liftDates.has(d)) liftsDone += 1;
+    if (plan.week && d === plan.week.start) liftsSched += plan.week.target;
     if (plan.jog) { jogsSched += 1; if (jogDone(ctx, d)) jogsDone += 1; }
     const day = (ctx.days || {})[d] || {};
     if (saversCount(day) >= 6) mm += 1;
@@ -299,12 +313,9 @@ export const RESET_NOTIFS = [
     body: () => "Saturday. SAVERS first, then the day's yours. Set tonight's number before the first invite." },
   { id: 'saversSun', label: "Miracle Morning (Lord's Day)", hint: 'Sun', time: '05:15', days: [0],
     body: () => "Ten minutes to yourself. SAVERS, then set today's number - one you'll be glad of at 6am tomorrow." },
-  { id: 'gym', label: 'Gym reminder', hint: 'Weekday lift days', time: '17:00', days: WEEKDAYS,
-    when: (p, date, ctx) => { const pl = planFor(p, date, ctx && ctx.liftDates); return !!pl.lift && !(ctx && ctx.liftDates && ctx.liftDates.has(date)); },
-    body: (p, date, ctx) => `Gym at 5:05 - Day ${planFor(p, date, ctx && ctx.liftDates).lift}. Two lifts still counts.` },
-  { id: 'gymWeekend', label: 'Gym reminder (weekend)', hint: 'Sat · or Sun if not done', time: '08:00', days: [6, 0],
-    when: (p, date, ctx) => { const pl = planFor(p, date, ctx && ctx.liftDates); return !!pl.lift && !(ctx && ctx.liftDates && ctx.liftDates.has(date)); },
-    body: (p, date) => (dowOf(date) === 6 ? 'Day C today or tomorrow. Open the app and pick one. Two lifts still counts.' : 'Day C today. Two lifts still counts.') },
+  { id: 'aim', label: 'Workout nudge', hint: "Only on days you said you'd train", time: '16:30', days: [0, 1, 2, 3, 4, 5, 6],
+    when: (p, date, ctx) => { const day = ((ctx && ctx.days) || {})[date] || {}; return day.aim === true && !(ctx && ctx.liftDates && ctx.liftDates.has(date)); },
+    body: (p, date, ctx) => `You said you'd train today - Day ${planFor(p, date, ctx && ctx.liftDates).lift}. Still on? Two lifts still counts.` },
   { id: 'satNoon', label: 'Saturday number', hint: 'Sat', time: '12:00', days: [6],
     body: (p, date, ctx) => `${committed(ctx, date)} No clock on it - just the number. Water first.` },
   { id: 'sunArvo', label: "Lord's Day afternoon", hint: 'Sun', time: '12:30', days: [0],
@@ -328,6 +339,7 @@ export const RESET_NOTIFS = [
   { id: 'checkinSun', label: "Lord's Day check-in", hint: 'Sun', time: '21:45', days: [0],
     body: () => 'Do the nightly check-in. Log the real number.' },
 ];
+export const FRESH_START = "Couple of rough days. Nothing's lost - today only needs SAVERS and a number.";
 export const NEVER_MISS = "Yesterday's behind you. Never miss twice - today is a must.";
 
 export function notifSetting(p, n) {
@@ -346,6 +358,7 @@ export function remindersFor(p, date, ctx) {
     .filter(({ n, s }) => s.on && s.time && (!n.when || n.when(p, date, ctx)))
     .map(({ n, s }) => ({ id: n.id, time: s.time, body: n.body(p, date, ctx) }))
     .sort((a, b) => (a.time < b.time ? -1 : 1));
-  if (list.length && ctx && missedYesterday(p, ctx, date)) list[0] = { ...list[0], body: `${list[0].body} ${NEVER_MISS}` };
+  const missN = list.length && ctx ? missStreak(p, ctx, date) : 0;
+  if (missN > 0) list[0] = { ...list[0], body: `${list[0].body} ${missN >= 2 ? FRESH_START : NEVER_MISS}` };
   return list;
 }

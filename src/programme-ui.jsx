@@ -3,7 +3,7 @@ import { C } from './compound-ui.jsx';
 import {
   DANGER_TIMES, JOG_KM, JOG_STEPS_MIN, OVER_REASONS, RESET_DAYS, RESET_NOTIFS, SAVERS, STEP_TARGET,
   addDays, dayNumber, dowOf, endDateOf, inProgramme, missReasons, notifSetting, planFor,
-  programmeStreaks, programmeSummary, saversCount, weekNumber,
+  liftWeek, missStreak, nextLiftKey, programmeStreaks, programmeSummary, saversCount, weekNumber,
 } from './programme-core.js';
 import {
   activeProgramme, getProgrammeDay, loadProgrammes, patchProgrammeDay, programmeCtx,
@@ -57,13 +57,20 @@ function MiracleMorningScreen({ date, onClose }) {
   const [danger, setDanger] = React.useState(saved.danger || null);
   // How do you feel this morning? 1–5, one tap, optional.
   const [feel, setFeel] = React.useState(typeof saved.feel === 'number' ? saved.feel : null);
+  // Aiming to work out today? Not binding - a yes just earns a nudge at 4:30pm.
+  const [aim, setAim] = React.useState(typeof saved.aim === 'boolean' ? saved.aim : null);
+  const liftInfo = (() => {
+    const p = activeProgramme(); if (!p) return null;
+    const ld = programmeCtx().liftDates;
+    return { week: liftWeek(p, day, ld), next: nextLiftKey(p, day, ld) };
+  })();
   // Weight: optional; saved into the normal weigh-in log so the weigh-in to-do
   // and the end-of-programme summary both see it.
   const loadW = () => { try { return JSON.parse(localStorage.getItem('compound:weighins') || '[]'); } catch (e) { return []; } };
   const [weight, setWeight] = React.useState(() => { const w = loadW().find((e) => e.date === day); return w ? String(w.value) : ''; });
   const numOk = num !== '' && Number.isFinite(Number(num)) && Number(num) >= 0;
   const done = () => {
-    persist({ savers: ticks, number: Number(num), danger, feel, journal: line.trim(), morningDoneAt: Date.now() });
+    persist({ savers: ticks, number: Number(num), danger, feel, aim, journal: line.trim(), morningDoneAt: Date.now() });
     const w = Number(weight);
     if (weight !== '' && Number.isFinite(w) && w >= 30 && w <= 300) {
       const next = [...loadW().filter((e) => e.date !== day), { date: day, value: w }].sort((a, b) => (a.date < b.date ? -1 : 1));
@@ -91,6 +98,19 @@ function MiracleMorningScreen({ date, onClose }) {
           <button key={n} onClick={() => setFeel(feel === n ? null : n)}
             style={{ ...btnBase, ...mono, width: 38, height: 36, fontSize: 15, letterSpacing: 0, background: feel === n ? C.accent : 'transparent', color: feel === n ? C.onAccent : C.textMid, border: `1px solid ${feel === n ? C.accent : C.lineStrong}` }}>
             {n}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10 }}>
+        <span style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ ...body, fontSize: 14, color: C.textMid, display: 'block' }}>Aiming to work out today?</span>
+          {liftInfo && <span style={{ ...mono, fontSize: 9.5, color: C.textLow }}>{liftInfo.week.done}/{liftInfo.week.target} THIS WEEK · NEXT: DAY {liftInfo.next}</span>}
+        </span>
+        {[true, false].map((b) => (
+          <button key={String(b)} onClick={() => setAim(aim === b ? null : b)}
+            style={{ ...btnBase, width: 58, height: 36, fontSize: 12, background: aim === b ? C.accent : 'transparent', color: aim === b ? C.onAccent : C.textMid, border: `1px solid ${aim === b ? C.accent : C.lineStrong}` }}>
+            {b ? 'Yes' : 'Not today'}
           </button>
         ))}
       </div>
@@ -183,7 +203,8 @@ function ResetHomeCard({ onOpenMorning, onOpenSummary }) {
   const plan = planFor(p, today, ctx.liftDates);
   const dayData = ctx.days[today] || {};
   const streaks = programmeStreaks(p, ctx, today);
-  const must = inProgramme(p, addDays(today, -1)) && missReasons(p, ctx, addDays(today, -1)).length > 0;
+  const missN = missStreak(p, ctx, today);
+  const must = missN > 0;
   const liftDone = ctx.liftDates.has(today);
   const steps = ctx.stepsOn(today);
   const jogOk = ctx.runDates.has(today) || steps >= JOG_STEPS_MIN;
@@ -200,9 +221,6 @@ function ResetHomeCard({ onOpenMorning, onOpenSummary }) {
       {action}
     </div>
   );
-  const weekend = [0, 6].includes(dowOf(today));
-  const cPlan = dayData.cPlan || null;
-  const pickBtn = (txt, fn, on) => <button onClick={fn} style={{ ...btnBase, height: 34, padding: '0 11px', fontSize: 12, background: on ? C.accentSoft : 'transparent', color: on ? C.accent : C.textMid, border: `1px solid ${on ? C.accent : C.lineStrong}` }}>{txt}</button>;
   const smallBtn = (txt, fn) => <button onClick={fn} style={{ ...btnBase, height: 34, padding: '0 14px', fontSize: 12, background: C.accent, color: C.onAccent }}>{txt}</button>;
 
   return (
@@ -216,7 +234,7 @@ function ResetHomeCard({ onOpenMorning, onOpenSummary }) {
       </h2>
       {must && (
         <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 10, background: C.accentSoft, border: `1px solid ${C.accent}`, ...mono, fontSize: 10.5, letterSpacing: 1.2, color: C.accent }}>
-          NEVER MISS TWICE · TODAY'S THE COMEBACK
+          {missN >= 2 ? 'FRESH START · JUST SAVERS AND A NUMBER TODAY' : "NEVER MISS TWICE · TODAY'S THE COMEBACK"}
         </div>
       )}
 
@@ -229,14 +247,9 @@ function ResetHomeCard({ onOpenMorning, onOpenSummary }) {
       <div style={{ marginTop: 12 }}>
         {row('Miracle Morning', dayData.morningDoneAt ? `${saversCount(dayData)}/6 · tonight's number ${dayData.number}` : 'SAVERS + tonight\'s number', !!dayData.morningDoneAt && saversCount(dayData) === 6,
           !dayData.morningDoneAt || saversCount(dayData) < 6 ? smallBtn(dayData.morningDoneAt ? 'Edit' : 'Open', onOpenMorning) : null)}
-        {plan.lift && row(`Day ${plan.lift} · ${RESET_DAYS[plan.lift].name}`,
-          plan.liftDue ? (weekend ? 'Today · two lifts still counts' : 'Gym 5:05pm · two lifts still counts')
-            : cPlan === 'tomorrow' ? 'Booked for tomorrow' : cPlan === 'today' ? 'Today · two lifts still counts' : 'Today or tomorrow · pick one',
-          liftDone,
-          liftDone ? null
-            : plan.liftDue || cPlan === 'today' ? smallBtn('Start', startLift)
-              : cPlan === 'tomorrow' ? pickBtn('Tomorrow ✓', () => patchProgrammeDay(today, { cPlan: null }), true)
-                : <span style={{ display: 'flex', gap: 6 }}>{pickBtn('Today', () => patchProgrammeDay(today, { cPlan: 'today' }))}{pickBtn('Tomorrow', () => patchProgrammeDay(today, { cPlan: 'tomorrow' }))}</span>)}
+        {plan.lift && row(liftDone ? `Day ${plan.lift} · ${RESET_DAYS[plan.lift].name} · done` : `Next: Day ${plan.lift} · ${RESET_DAYS[plan.lift].name}`,
+          `${plan.week.done}/${plan.week.target} this week · ${liftDone ? 'nice work' : dayData.aim === true ? 'you said today · two lifts still counts' : 'any day you like'}`,
+          liftDone, liftDone ? null : smallBtn('Start', startLift))}
         {plan.jog && row(`Jog ${JOG_KM} km · 5:50am`, `${steps.toLocaleString()} steps · ${JOG_STEPS_MIN.toLocaleString()}+ counts`, jogOk, null)}
       </div>
       {isLast && <GhostBtn onClick={onOpenSummary} style={{ marginTop: 10 }}>Final day · see summary</GhostBtn>}
@@ -256,20 +269,21 @@ function ResetCheckinStep({ date, nipsAnswer, stepsAnswer, value, onChange }) {
   const d = dowOf(date);
   const v = value || {};
   const set = (k, x) => onChange({ ...v, [k]: x });
-  const sessionLabel = plan.lift ? `Day ${plan.lift} workout done?` : plan.jog ? 'Jog done (or 5,000+ steps)?' : null;
+  const liftedToday = ctx.liftDates.has(date);
+  const sessionLabel = liftedToday || day.aim === true ? 'Workout done today?' : plan.jog ? 'Jog done (or 5,000+ steps)?' : null;
   const num = day.number;
   const act = typeof v.drinks === 'number' ? v.drinks : nipsAnswer;
   const cmp = typeof num === 'number' && typeof act === 'number' ? (act < num ? 'UNDER' : act === num ? 'MATCH' : 'OVER') : null;
   const steps = typeof v.steps === 'number' ? v.steps : stepsAnswer;
   // Any slip today? Drives the closing line only - never a red mark.
-  const slipped = cmp === 'OVER' || saversCount(day) < 6 || ['workoutDone', 'protein', 'ruleKept', 'afterTea', 'noGames', 'screensOff'].some((k) => v[k] === false);
+  const slipped = cmp === 'OVER' || saversCount(day) < 6 || ['protein', 'ruleKept', 'afterTea', 'noGames', 'screensOff'].some((k) => v[k] === false);
 
   const yn = (k, label, opt) => (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderTop: `1px solid ${C.line}` }}>
       <span style={{ ...body, flex: 1, fontSize: 14, color: C.text, lineHeight: 1.3 }}>{label}{opt && <span style={{ color: C.textLow }}> · optional</span>}</span>
       {[true, false].map((b) => (
         <button key={String(b)} onClick={() => set(k, v[k] === b ? null : b)}
-          style={{ ...btnBase, width: 50, height: 34, fontSize: 12, background: v[k] === b ? (b ? C.success : C.surf3) : 'transparent', color: v[k] === b ? (b ? '#0b0b0b' : C.text) : C.textMid, border: `1px solid ${v[k] === b ? 'transparent' : C.lineStrong}` }}>
+          style={{ ...btnBase, width: 50, height: 34, fontSize: 12, background: v[k] === b ? (b ? C.success : C.danger) : 'transparent', color: v[k] === b ? '#0b0b0b' : C.textMid, border: `1px solid ${v[k] === b ? 'transparent' : C.lineStrong}` }}>
           {b ? 'Yes' : 'No'}
         </button>
       ))}
@@ -298,7 +312,7 @@ function ResetCheckinStep({ date, nipsAnswer, stepsAnswer, value, onChange }) {
           <span style={{ ...body, flex: 1, fontSize: 14, color: C.text }}>Drinks <span style={{ color: C.textLow }}>· this morning's number {typeof num === 'number' ? num : '—'}</span></span>
           {numIn('drinks', act, '0')}
         </div>
-        {cmp && <div style={{ ...mono, fontSize: 10.5, letterSpacing: 1.4, marginTop: 6, textAlign: 'right', color: cmp === 'OVER' ? C.accent : C.success }}>{cmp}{typeof num === 'number' ? ` · COMMITTED TO ${num}` : ''}</div>}
+        {cmp && <div style={{ ...mono, fontSize: 10.5, letterSpacing: 1.4, marginTop: 6, textAlign: 'right', color: cmp === 'OVER' ? C.danger : C.success }}>{cmp}{typeof num === 'number' ? ` · COMMITTED TO ${num}` : ''}</div>}
         {cmp === 'OVER' && (
           <div style={{ marginTop: 8 }}>
             <div style={{ ...body, fontSize: 13, color: C.textMid, lineHeight: 1.45 }}>Over tonight, and you logged it honestly. That's the part that makes the rest work. What made it hard?</div>
@@ -335,8 +349,8 @@ function resetNightDefaults(date) {
   if (day.night) return { ...day.night };
   const plan = planFor(p, date, ctx.liftDates);
   const out = {};
-  if (plan.lift) out.workoutDone = ctx.liftDates.has(date) ? true : null;
-  if (plan.jog) out.workoutDone = (ctx.runDates.has(date) || ctx.stepsOn(date) >= JOG_STEPS_MIN) ? true : null;
+  if (ctx.liftDates.has(date)) out.workoutDone = true;
+  else if (plan.jog) out.workoutDone = (ctx.runDates.has(date) || ctx.stepsOn(date) >= JOG_STEPS_MIN) ? true : null;
   return out;
 }
 function saveResetNight(date, night) {

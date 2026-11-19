@@ -1,7 +1,7 @@
 import React from 'react';
 import { C } from './compound-ui.jsx';
 import {
-  BIG_STEP_MIN, DANGER_TIMES, JOG_KM, JOG_STEPS_MIN, OVER_REASONS, RESET_DAYS, RESET_NOTIFS, SAVERS, STEP_TARGET,
+  BIG_STEP_MIN, DANGER_TIMES, FRIDAY_CHECKIN_UNTIL, JOG_KM, JOG_STEPS_MIN, OVER_REASONS, RESET_DAYS, RESET_NOTIFS, SAVERS, STEP_TARGET,
   addDays, dayNumber, dowOf, endDateOf, inProgramme, missReasons, notifSetting, planFor,
   bigStepDay, jogDone, jogWeek, liftWeek, missStreak, nextLiftKey, programmeStreaks, programmeSummary, saversCount, saversExempt, weekNumber,
 } from './programme-core.js';
@@ -232,6 +232,10 @@ function ResetHomeCard({ onOpenMorning, onOpenSummary }) {
   const plan = planFor(p, today, ctx.liftDates);
   const dayData = ctx.days[today] || {};
   const pmStart = saversExempt(p, today);
+  // Saturday: Friday night's check-in can still be done (open till midday, loggable after).
+  const yest = addDays(today, -1);
+  const friPending = dowOf(today) === 6 && inProgramme(p, yest) && !ctx.checkinDates.has(yest);
+  const friOpen = friPending && ctx.now.hhmm < FRIDAY_CHECKIN_UNTIL;
   const streaks = programmeStreaks(p, ctx, today);
   const missN = missStreak(p, ctx, today);
   const must = missN > 0;
@@ -280,6 +284,8 @@ function ResetHomeCard({ onOpenMorning, onOpenSummary }) {
       </div>
 
       <div style={{ marginTop: 12 }}>
+        {friPending && row("Friday's check-in", friOpen ? 'Open till midday' : 'Marked missed · you can still log it', false,
+          smallBtn('Log', () => { try { window.dispatchEvent(new CustomEvent('compound:open-checkin-for', { detail: { date: yest } })); } catch (e) {} }))}
         {row('Miracle Morning', dayData.morningDoneAt ? `${saversCount(dayData)}/6 · tonight's number ${dayData.number}` : 'SAVERS + tonight\'s number', !!dayData.morningDoneAt && (pmStart || saversCount(dayData) === 6),
           !dayData.morningDoneAt || (!pmStart && saversCount(dayData) < 6) ? smallBtn(dayData.morningDoneAt ? 'Edit' : 'Open', onOpenMorning) : null)}
         {plan.lift && row(liftDone ? `Day ${plan.lift} · ${RESET_DAYS[plan.lift].name} · done` : `Next: Day ${plan.lift} · ${RESET_DAYS[plan.lift].name}`,

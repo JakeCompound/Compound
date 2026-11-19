@@ -398,6 +398,7 @@ export default async function handler(req, res) {
     if (prog) {
       const pctx = {
         days: ud.progDays || {},
+        now: { date: now.date, hhmm: now.hhmm },
         liftDates: ud.liftDates || new Set(),
         runDates: ud.runDates || new Set(),
         checkinDates: ud.checkins || new Set(),

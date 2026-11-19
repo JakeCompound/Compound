@@ -58,6 +58,7 @@ export function programmeCtx() {
   try { checkins = JSON.parse(localStorage.getItem('compound:checkins') || '[]'); } catch (e) {}
   return {
     days: loadProgrammeDays(),
+    now: (() => { const n = new Date(); return { date: todayKey(), hhmm: `${String(n.getHours()).padStart(2, '0')}:${String(n.getMinutes()).padStart(2, '0')}` }; })(),
     liftDates,
     runDates,
     checkinDates: new Set(checkins.map((c) => c.date)),

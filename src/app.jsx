@@ -179,10 +179,13 @@ function App() {
     const openMorning = () => setShowMorning(true);
     const openSummary = () => setShowProgSummary(true);
     document.addEventListener('visibilitychange', onVis);
+    const openCheckinForDate = (e) => { const d = e && e.detail && e.detail.date; if (d) { setCheckinTargetDate(d); setCheckinOpen(true); } };
+    window.addEventListener('compound:open-checkin-for', openCheckinForDate);
     window.addEventListener('compound:open-morning', openMorning);
     window.addEventListener('compound:open-programme-summary', openSummary);
     return () => {
       document.removeEventListener('visibilitychange', onVis);
+      window.removeEventListener('compound:open-checkin-for', openCheckinForDate);
       window.removeEventListener('compound:open-morning', openMorning);
       window.removeEventListener('compound:open-programme-summary', openSummary);
     };

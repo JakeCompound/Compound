@@ -62,6 +62,7 @@ export const SAVERS = [
 export const DANGER_TIMES = ['After tea', 'Kids in bed', 'Mates over', 'None'];
 export const OVER_REASONS = ['Tired', 'Stress', 'Social', 'Boredom', 'No plan'];
 export const STEP_TARGET = 7000;
+export const FRIDAY_CHECKIN_UNTIL = '12:00'; // Saturday, local time
 export const BIG_STEP_MIN = 10000; // a "big step day" - covers a jog for the week
 export const JOG_STEPS_MIN = 5000;
 export const JOG_KM = 7;
@@ -201,7 +202,14 @@ export function missReasons(p, ctx, date) {
   const num = day.number;
   const act = drinksActual(day, ctx, date);
   if (typeof num === 'number' && typeof act === 'number' && act > num) r.push('drinks');
-  if (dowOf(date) !== 5 && !(ctx.checkinDates && ctx.checkinDates.has(date))) r.push('checkin');
+  if (!(ctx.checkinDates && ctx.checkinDates.has(date))) {
+    // Friday's check-in stays open until midday Saturday before it counts as
+    // missed (ctx.now = { date, hhmm } in the user's local time). Logging it
+    // later - any time - still clears the miss.
+    const sat = addDays(date, 1);
+    const stillOpen = dowOf(date) === 5 && ctx.now && (ctx.now.date < sat || (ctx.now.date === sat && ctx.now.hhmm < FRIDAY_CHECKIN_UNTIL));
+    if (!stillOpen) r.push('checkin');
+  }
   return r;
 }
 // How many days in a row (ending yesterday) were missed.
@@ -345,7 +353,7 @@ export const RESET_NOTIFS = [
   { id: 'saversJog', label: 'Miracle Morning (jog days)', hint: 'Wed · Fri', time: '05:50', days: WEEKDAYS,
     when: (p, date) => planFor(p, date).jog, body: () => SAVERS_BODY },
   { id: 'saversSat', label: 'Miracle Morning (Saturday)', hint: 'Sat', time: '07:00', days: [6],
-    body: (p, date, ctx) => `Saturday. SAVERS first, then the day's yours. Set tonight's number before the first invite.${ctx && ctx.checkinDates && !ctx.checkinDates.has(addDays(date, -1)) && inProgramme(p, addDays(date, -1)) ? " Log last night's number too." : ''}` },
+    body: (p, date, ctx) => `Saturday. SAVERS first, then the day's yours. Set tonight's number before the first invite.${ctx && ctx.checkinDates && !ctx.checkinDates.has(addDays(date, -1)) && inProgramme(p, addDays(date, -1)) ? " Friday's check-in is open till midday." : ''}` },
   { id: 'saversSun', label: "Miracle Morning (Lord's Day)", hint: 'Sun', time: '05:15', days: [0],
     body: () => "Ten minutes to yourself. SAVERS, then set today's number - one you'll be glad of at 6am tomorrow." },
   { id: 'aim', label: 'Workout nudge', hint: "Only on days you said you'd train", time: '16:30', days: [0, 1, 2, 3, 4, 5, 6],

@@ -393,7 +393,7 @@ export default async function handler(req, res) {
     const prog = ud && ud.programme;
     // While a programme runs, its own reminders replace the overlapping
     // check-in / workout ones (no doubles). Everything else is unchanged.
-    const MUTED = prog && inProgramme(prog, now.date) ? new Set(['nightly', 'workout', 'missed', 'urgency']) : new Set();
+    const MUTED = prog && inProgramme(prog, now.date) ? new Set(['nightly', 'workout', 'missed', 'urgency', 'three']) : new Set();
     const kinds = dueKinds(profMap[sub.user_id], now, ud).filter((k) => !MUTED.has(k));
     if (prog) {
       const pctx = {

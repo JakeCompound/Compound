@@ -208,7 +208,7 @@ function HomeScreen({ user, set, state, checkins, onOpenCheckin, onOpenCheckinFo
 
       {/* The week's three — private commitments (yours + optionally a partner's,
           entered on this phone). Never shared with the family or the ladder. */}
-      <WeekThreeCard />
+      {!resetOn && <WeekThreeCard />}
 
       {/* Family accountability ladder — month-to-date, everyone visible to everyone */}
       <LadderCard />

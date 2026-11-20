@@ -13,6 +13,8 @@ import { LadderCard } from './ladder.jsx';
 import { WeekThreeCard } from './week-three.jsx';
 import { AdaptCard, MorningResetCard } from './bigday.jsx';
 import { ResetHomeCard } from './programme-ui.jsx';
+import { useProgramme } from './programme.js';
+import { inProgramme } from './programme-core.js';
 
 // home-screen.jsx — The Home tab — assembles all the components
 
@@ -25,6 +27,10 @@ function HomeScreen({ user, set, state, checkins, onOpenCheckin, onOpenCheckinFo
   const todayKey = window.isoDate ? window.isoDate(new Date()) : new Date().toISOString().slice(0, 10);
   const loadW = () => { try { return JSON.parse(localStorage.getItem('compound:weighins') || '[]'); } catch (e) { return []; } };
   const [weighEntries, setWeighEntries] = React.useState(loadW);
+  // While the 3-Week Reset runs, its card owns today's to-dos (weigh-in and
+  // check-in included) and the old to-do list below is hidden.
+  const resetProg = useProgramme();
+  const resetOn = !!(resetProg && inProgramme(resetProg, todayKey));
   // A weight entered on the Miracle Morning screen lands in the same store.
   React.useEffect(() => {
     const reload = () => setWeighEntries(loadW());
@@ -138,6 +144,11 @@ function HomeScreen({ user, set, state, checkins, onOpenCheckin, onOpenCheckinFo
 
       {/* 3-Week Reset — Day X of N, streaks, never-miss-twice (only while a programme exists) */}
       <ResetHomeCard
+        onOpenCheckin={onOpenCheckin}
+        onWeighIn={() => openWeighFor(null)}
+        weighDoneToday={weighDoneToday}
+        lastWeigh={lastWeigh}
+        checkinDoneToday={!!state.todayCheckinDone}
         onOpenMorning={() => { try { window.dispatchEvent(new CustomEvent('compound:open-morning')); } catch (e) {} }}
         onOpenSummary={() => { try { window.dispatchEvent(new CustomEvent('compound:open-programme-summary')); } catch (e) {} }}
       />
@@ -157,7 +168,7 @@ function HomeScreen({ user, set, state, checkins, onOpenCheckin, onOpenCheckinFo
           in Reports; the to-do list follows the rings directly. */}
 
       {/* Today's To-Do list (check-in + weigh-in with live countdowns) */}
-      <div style={{ marginTop: 16 }}>
+      <div style={{ marginTop: 16, display: resetOn ? 'none' : 'block' }}>
         {demoFlags?.comeback ? (
           <ComebackCard daysMissed={5} onStart={onOpenCheckin} />
         ) : (

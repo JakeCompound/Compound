@@ -183,7 +183,7 @@ function StreakPill({ label, s }) {
   );
 }
 
-function ResetHomeCard({ onOpenMorning, onOpenSummary }) {
+function ResetHomeCard({ onOpenMorning, onOpenSummary, onOpenCheckin, onWeighIn, weighDoneToday, lastWeigh, checkinDoneToday }) {
   const p = useProgramme();
   const [askSteps, setAskSteps] = React.useState(false); // "Big step day" entry open?
   const [stepsIn, setStepsIn] = React.useState('');
@@ -234,8 +234,9 @@ function ResetHomeCard({ onOpenMorning, onOpenSummary }) {
   const pmStart = saversExempt(p, today);
   // Saturday: Friday night's check-in can still be done (open till midday, loggable after).
   const yest = addDays(today, -1);
-  const friPending = dowOf(today) === 6 && inProgramme(p, yest) && !ctx.checkinDates.has(yest);
-  const friOpen = friPending && ctx.now.hhmm < FRIDAY_CHECKIN_UNTIL;
+  const yPending = inProgramme(p, yest) && !ctx.checkinDates.has(yest); // last night's check-in not logged
+  const friOpen = yPending && dowOf(today) === 6 && ctx.now.hhmm < FRIDAY_CHECKIN_UNTIL;
+  const openYesterday = () => { try { window.dispatchEvent(new CustomEvent('compound:open-checkin-for', { detail: { date: yest } })); } catch (e) {} };
   const streaks = programmeStreaks(p, ctx, today);
   const missN = missStreak(p, ctx, today);
   const must = missN > 0;
@@ -291,12 +292,14 @@ function ResetHomeCard({ onOpenMorning, onOpenSummary }) {
       {/* TODAY: only what is actually asked of today. */}
       <div style={sectionLabel}>TODAY</div>
       <div>
-        {friPending && row("Friday's check-in", friOpen ? 'Open till midday' : 'Marked missed · you can still log it', false,
-          smallBtn('Log', () => { try { window.dispatchEvent(new CustomEvent('compound:open-checkin-for', { detail: { date: yest } })); } catch (e) {} }))}
         {row('Miracle Morning', dayData.morningDoneAt ? `${saversCount(dayData)}/6 · tonight's number ${dayData.number}` : 'SAVERS + tonight\'s number', !!dayData.morningDoneAt && (pmStart || saversCount(dayData) === 6),
           dayData.morningDoneAt ? quietBtn('Edit', onOpenMorning) : smallBtn('Open', onOpenMorning))}
+        {row('Weigh-in', weighDoneToday ? `${lastWeigh != null ? lastWeigh + ' kg · ' : ''}done` : 'Pre-water · one number', !!weighDoneToday, weighDoneToday ? null : smallBtn('Log', onWeighIn))}
+        {yPending && row(dowOf(today) === 6 ? "Friday's check-in" : "Yesterday's check-in", friOpen ? 'Open till midday' : 'Missed · you can still log it', false, smallBtn('Log', openYesterday))}
         {dayData.aim === true && !liftDone && row(`Workout · Day ${plan.lift} · ${RESET_DAYS[plan.lift].name}`, 'You said today · two lifts still counts', false, smallBtn('Start', startLift))}
         {plan.jog && !jogOk && !bigDay && row('Jog', '5:50am or this arvo · any distance counts', false, smallBtn('Log jog', logJog))}
+        {row('Daily check-in', checkinDoneToday ? 'Done for today' : dowOf(today) === 5 ? 'Tonight · or tomorrow before midday' : 'Tonight · your nine questions + the Reset', !!checkinDoneToday,
+          checkinDoneToday ? quietBtn('Edit', onOpenCheckin) : smallBtn('Open', onOpenCheckin))}
       </div>
 
       {/* THIS WEEK: what's still to go - do them on any day. */}

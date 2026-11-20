@@ -187,6 +187,9 @@ export function jogWeek(p, date, ctx) {
     if (isJogDay(p, x)) target += 1;
     if (jogDone(p, ctx, x)) jogs += 1; else if (bigStepDay(ctx, x)) walks += 1;
   }
+  // Week 1 (before the first Monday) has no scheduled jog days, but still
+  // aims for 2 jogs on any days - fewer if the week is very short.
+  if (start < firstMonday(p)) target = Math.min(2, Math.max(0, daysBetween(start, end)));
   const done = jogs + walks;
   return { start, end, target, done, jogs, walks, due: date === end && done < target };
 }
@@ -281,7 +284,7 @@ export function programmeSummary(p, ctx, weighins, today) {
     if (ctx.liftDates.has(d)) liftsDone += 1;
     if (plan.week && d === (plan.week.start < p.startDate ? p.startDate : plan.week.start)) liftsSched += plan.week.target;
     if (jogDone(p, ctx, d)) { jogsDone += 1; jogKm += Number(((ctx.days || {})[d] || {}).jogKm) || 0; } else if (bigStepDay(ctx, d)) stepDays += 1;
-    if (plan.week && d === plan.week.start) jogsSched += jogWeek(p, d, ctx).target;
+    { const jwk = jogWeek(p, d, ctx); if (d === jwk.start) jogsSched += jwk.target; }
     const day = (ctx.days || {})[d] || {};
     if (saversCount(day) >= 6) mm += 1;
     if (ctx.checkinDates && ctx.checkinDates.has(d)) nightsLogged += 1;

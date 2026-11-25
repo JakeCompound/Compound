@@ -9,6 +9,7 @@ import { useBackClose } from './back-button.js';
 function AddButton({ dietTracking, alcohol = true, onChanged, onGoNutrition }) {
   const [menu, setMenu] = React.useState(false);
   const [sheet, setSheet] = React.useState(null); // 'drink' | 'food'
+  const [foodSlot, setFoodSlot] = React.useState(null); // meal pre-selected by a section tap / reminder
   const [focusFood, setFocusFood] = React.useState(false); // notification "Log it" wants the keyboard up
   // Hardware back closes these (hooks must run before the early return below).
   useBackClose(menu, () => setMenu(false));
@@ -16,7 +17,7 @@ function AddButton({ dietTracking, alcohol = true, onChanged, onGoNutrition }) {
   // A meal reminder's "Log it" button (via sw.js → push.js) opens the food
   // sheet directly, textarea focused so they can just start typing.
   React.useEffect(() => {
-    const h = () => { setMenu(false); setFocusFood(true); setSheet('food'); };
+    const h = (e) => { setMenu(false); setFocusFood(true); setFoodSlot((e && e.detail && e.detail.slot) || null); setSheet('food'); };
     window.addEventListener('compound:open-food-add', h);
     return () => window.removeEventListener('compound:open-food-add', h);
   }, []);
@@ -44,7 +45,7 @@ function AddButton({ dietTracking, alcohol = true, onChanged, onGoNutrition }) {
             <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: C.accent, letterSpacing: 2.4, marginBottom: 12 }}>ADD TO TODAY</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <AddRow label="Drink" sub={alcohol ? 'Coffee, juice, energy — or a beer' : 'Coffee, juice, energy, soft drink'} glyph={alcohol ? '🥤' : '☕'} onClick={() => { setMenu(false); setSheet('drink'); }} />
-              {dietTracking && <AddRow label="Food" sub="Photo or describe — AI does the macros" glyph="🍽️" onClick={() => { setMenu(false); setSheet('food'); }} />}
+              {dietTracking && <AddRow label="Food" sub="Photo or describe — AI does the macros" glyph="🍽️" onClick={() => { setMenu(false); setFoodSlot(null); setSheet('food'); }} />}
               {dietTracking && !(window.bigDayEntry && window.bigDayEntry()) && (
                 <AddRow label="Big day" sub="Went big — write the day off in one tap, no itemising" glyph="🤙" onClick={() => { setMenu(false); setSheet('bigday'); }} />
               )}
@@ -54,7 +55,7 @@ function AddButton({ dietTracking, alcohol = true, onChanged, onGoNutrition }) {
       )}
 
       {sheet === 'drink' && <DrinkChooser onClose={() => setSheet(null)} onChanged={onChanged} />}
-      {sheet === 'food' && <FoodAdd autoFocus={focusFood} onClose={() => { setSheet(null); setFocusFood(false); }} onChanged={onChanged} onGoNutrition={onGoNutrition} />}
+      {sheet === 'food' && <FoodAdd autoFocus={focusFood} slot={foodSlot} onClose={() => { setSheet(null); setFocusFood(false); setFoodSlot(null); }} onChanged={onChanged} onGoNutrition={onGoNutrition} />}
       {sheet === 'bigday' && <BigDaySheet onClose={() => setSheet(null)} onChanged={onChanged} />}
     </>
   );
@@ -481,7 +482,10 @@ function SoftDrinkQuickAdd({ onClose, onChanged }) {
 }
 
 // ── Food add (photo + text → AI estimate) ───────────────────────────────────
-function FoodAdd({ onClose, onChanged, onGoNutrition, autoFocus = false }) {
+function FoodAdd({ onClose, onChanged, onGoNutrition, autoFocus = false, slot: slotProp = null }) {
+  // Which meal this goes under: the section that was tapped, else a guess from
+  // the time of day - always visible and changeable before saving.
+  const [slot, setSlot] = React.useState(() => slotProp || (window.mealSlot ? window.mealSlot({ ts: Date.now() }) : 'lunch'));
   const [desc, setDesc] = React.useState('');
   const [again, setAgain] = React.useState(null); // note after repeating a past meal
   const [photo, setPhoto] = React.useState(null); // dataURL
@@ -509,6 +513,7 @@ The text may describe ONE meal or SEVERAL (e.g. a whole day: "eggs on toast for 
 Respond ONLY with valid JSON:
 { "meals": [ {
   "name": "short meal name",
+  "slot": <"breakfast" | "lunch" | "dinner" if the text itself says which meal this was, otherwise null>,
   "kcal": <integer calories>,
   "p": <protein g>, "c": <carbs g>, "f": <fat g>,
   "confidence": "low" | "medium" | "high",
@@ -541,7 +546,9 @@ Rules: protein/carbs/fat in grams. BRANDED / PACKAGED PRODUCTS — if the meal n
           questions: Array.isArray(mObj.questions) ? mObj.questions.slice(0, 2).map((q) => ({ q: q.q, options: q.options || [], answer: null })) : [],
           nips: Math.max(0, +mObj.nips || 0),
           kind: 'food', servings: 1,
-          ts: Date.now() + i, // keep log order stable
+          // Several meals in one go: file each where the text put it; otherwise
+          // everything goes under the meal picked on this sheet.
+          ts: (window.slotTs ? window.slotTs(meals.length > 1 && ['breakfast', 'lunch', 'dinner'].includes(mObj.slot) ? mObj.slot : slot) : Date.now()) + i, // + i keeps log order stable
         };
         window.addFood(entry);
         totalNips += entry.nips;
@@ -600,6 +607,17 @@ Rules: protein/carbs/fat in grams. BRANDED / PACKAGED PRODUCTS — if the meal n
             </div>
           );
         })()}
+
+        {/* Meal picker */}
+        <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+          {['breakfast', 'lunch', 'dinner'].map((m) => (
+            <button key={m} onClick={() => setSlot(m)}
+              style={{ flex: 1, height: 38, borderRadius: 10, cursor: 'pointer', fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 13, letterSpacing: 1.2, textTransform: 'uppercase',
+                background: slot === m ? C.accent : 'transparent', color: slot === m ? C.onAccent : C.textMid, border: `1px solid ${slot === m ? C.accent : C.lineStrong}` }}>
+              {m}
+            </button>
+          ))}
+        </div>
 
         {/* Photo */}
         <input ref={fileRef} type="file" accept="image/*" onChange={pickPhoto} style={{ display: 'none' }} />

@@ -323,6 +323,20 @@ function clearMealSkip(slot, date) {
     if (legacy[k]) { delete legacy[k][slot]; localStorage.setItem('compound:mealSkips', JSON.stringify(legacy)); }
   } catch (e) {}
 }
+// Timestamp that files an entry under `slot` on `date` (default: the day being
+// logged). Sections are derived from the entry's time, so choosing a meal means
+// choosing its time: "now" when now is already inside that meal, otherwise a
+// representative hour inside it. The server reads the same timestamps for the
+// meal reminders, so a lunch logged at 8pm also stops the lunch reminder logic
+// from treating it as dinner.
+function slotTs(slot, date) {
+  const now = new Date();
+  const k = date || logDate();
+  if (!MEAL_SLOTS.includes(slot)) return now.getTime();
+  if (k === todayKey() && mealSlot({ ts: now.getTime() }) === slot) return now.getTime();
+  const [y, m, d] = k.split('-').map(Number);
+  return new Date(y, m - 1, d, SLOT_TS_HOUR[slot] ?? 12).getTime();
+}
 function mealSlot(f) {
   const h = new Date(f && f.ts ? f.ts : Date.now()).getHours();
   return h < 11 ? 'breakfast' : h < 16 ? 'lunch' : 'dinner';
@@ -544,7 +558,7 @@ function setNipsToday(n, date) {
 
 Object.assign(window, {
   GOALS, CUT_RATES, GAIN_RATES, LIFESTYLES, calcTargets,
-  loadTargets, saveTargets, loadFood, saveFood, foodForDay, mealSlot, MEAL_SLOTS, isMealSkipped, markMealSkipped, clearMealSkip, bigDayEntry, bigDayOver, markBigDay, clearBigDay, bigDaysInLastWeek, usualMealFor, logUsualMeal, assumedNips, addFood, updateFood, removeFood,
+  loadTargets, saveTargets, loadFood, saveFood, foodForDay, mealSlot, slotTs, MEAL_SLOTS, isMealSkipped, markMealSkipped, clearMealSkip, bigDayEntry, bigDayOver, markBigDay, clearBigDay, bigDaysInLastWeek, usualMealFor, logUsualMeal, assumedNips, addFood, updateFood, removeFood,
   dayTotals, openMealQuestions, todayKey: todayKey,
   loadNipsToday, setNipsToday,
   loadAlcoholKcal, setAlcoholKcal, addAlcoholKcal,

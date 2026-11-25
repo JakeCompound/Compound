@@ -221,7 +221,10 @@ function NutritionToday({ user, onChanged, onSetupTargets }) {
             return (
               <div key={slot}>
                 <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', margin: '8px 2px 6px' }}>
-                  <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9.5, letterSpacing: 2.2, color: C.textLow, textTransform: 'uppercase' }}>{slot}</span>
+                  <button onClick={() => { try { window.dispatchEvent(new CustomEvent('compound:open-food-add', { detail: { slot } })); } catch (e) {} }} aria-label={`Add ${slot}`}
+                    style={{ background: 'transparent', border: 0, padding: '4px 0', cursor: 'pointer', fontFamily: 'JetBrains Mono, monospace', fontSize: 9.5, letterSpacing: 2.2, color: C.textLow, textTransform: 'uppercase' }}>
+                    {slot} <span style={{ color: C.accent, fontSize: 12 }}>＋</span>
+                  </button>
                   {rows.length > 0 && <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9.5, color: C.textLow, fontVariantNumeric: 'tabular-nums' }}>{kcal} KCAL</span>}
                 </div>
                 {rows.length === 0 ? (
@@ -236,7 +239,10 @@ function NutritionToday({ user, onChanged, onSetupTargets }) {
                   ) : (
                     <div style={{ background: 'transparent', border: `1px dashed ${C.line}`, borderRadius: 12, padding: '11px 14px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
-                        <span style={{ fontFamily: 'Outfit, sans-serif', fontSize: 12, color: C.textLow }}>{onToday ? <>Not logged yet — tap <span style={{ color: C.accent }}>+</span> when you eat.</> : 'Nothing logged.'}</span>
+                        <button onClick={() => { try { window.dispatchEvent(new CustomEvent('compound:open-food-add', { detail: { slot } })); } catch (e) {} }}
+                          style={{ flex: 1, textAlign: 'left', background: 'transparent', border: 0, padding: '2px 0', cursor: 'pointer', fontFamily: 'Outfit, sans-serif', fontSize: 12, color: C.textLow }}>
+                          {onToday ? 'Not logged yet — ' : 'Nothing logged — '}<span style={{ color: C.accent }}>+ add {slot}</span>
+                        </button>
                         {onToday && (
                           <button onClick={() => { window.markMealSkipped(slot, day); refresh(); }} style={{ background: 'transparent', border: 0, cursor: 'pointer', padding: 2, fontFamily: 'JetBrains Mono, monospace', fontSize: 8.5, letterSpacing: 1.4, color: C.textLow, flexShrink: 0 }}>
                             SKIPPED IT
